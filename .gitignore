@@ -1,0 +1,14 @@
+# simulation scratch output
+sim/*.vvp
+sim/*.vcd
+
+# OpenLane run artifacts (keep config.json, ignore generated runs)
+openlane/runs/
+
+# editor / OS junk
+.vscode/
+*.swp
+.DS_Store
+
+# personal local overrides
+CLAUDE.local.md
