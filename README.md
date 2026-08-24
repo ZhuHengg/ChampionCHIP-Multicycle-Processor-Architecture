@@ -163,6 +163,14 @@ slice 4, and the SRAI/SRLI bit-30 trap is covered.
 (SLT/SLTU and BLT/BLTU disagreeing on the same bits, MULHSU's mixed
 extension, SRA sign-extension, shift-amount masking).
 
+**Memory — all 5 done.** `regfile.v`, `imem.v`, `dmem.v`,
+`address_decoder.v`, `lsu.v` all pass. DMEM's registered-output timing is
+*proven*, not just value-checked: the testbench asserts read data is NOT
+valid in the address cycle and IS valid the next, so a combinational
+implementation would fail. x0 write protection verified in the regfile.
+
+**10 of 11 modules done.** Only `crc.v` remains before `top.v`.
+
 | Item | Status |
 |---|---|
 | Control unit FSM design | ✅ `docs/HANDOFF_control_unit_ALL_STAGES.md` |
@@ -171,33 +179,43 @@ extension, SRA sign-extension, shift-amount masking).
 | `branch_comparator.v` | ✅ passing |
 | `imm_extend.v` | ✅ passing |
 | `mult.v` | ✅ passing |
-| `crc.v` | ⚠ **Blocked** — see below |
-| Memory modules (5) | ⬜ Not started — `rtl/memory/README.md` |
-| `top.v` integration | ⬜ Blocked on memory modules + `crc.v` |
+| `crc.v` | ⬜ **Unblocked** — parameters received, ready to build |
+| `regfile.v` | ✅ passing |
+| `imem.v` | ✅ passing |
+| `dmem.v` | ✅ passing — registered-output timing proven |
+| `address_decoder.v` | ✅ passing |
+| `lsu.v` | ✅ passing |
+| `top.v` integration | ⬜ Blocked on `crc.v` only |
 | System testbench + firmware | ⬜ Blocked on `top.v` |
 | OpenLane physical flow | ⬜ Blocked on `top.v` |
 
-### Blocked: `crc.v`
+### `crc.v` parameters — confirmed by organisers
 
-The Block Guide (§3.1.3, Table 11) defines `crcb`/`crch`/`crcw` as returning
-a 16-bit CRC but never states the **polynomial, initial value, input/output
-reflection, final XOR, or the rs1/rs2 operand roles**. These are arbitrary
-parameters with exactly one right answer in the validation firmware — a guess
-would produce a module that is perfectly self-consistent and fails validation.
+The Block Guide never specified these; asked on Discord and answered in full.
+**CRC-16/CCITT-FALSE:**
 
-Question raised with the organisers. Until answered, build `crc.v` with the
-parameters as Verilog `parameter`s so swapping them is a one-line change:
+| Parameter | Value |
+|---|---|
+| Polynomial | `0x1021` |
+| Initial value | `0xFFFF` |
+| Input / output reflection | None |
+| Final XOR | `0x0000` |
+| `rs1` | **data** |
+| `rs2` | **seed** |
 
-```verilog
-parameter POLY = 16'h1021, INIT = 16'hFFFF, REF_IN = 1'b0,
-          REF_OUT = 1'b0, XOR_OUT = 16'h0000;   // CRC-16/CCITT-FALSE placeholder
-```
+`crcb`/`crch`/`crcw` select how many bits of `rs1` are consumed (8 / 16 / 32).
+The result is always 16 bits — same algorithm throughout, not three different
+CRCs.
+
+⚠ **Note the operand roles are the reverse of the usual convention.** Most
+incremental CRC instructions carry the running state in rs1 and new data in
+rs2; here it's the opposite. Worth asking about — a self-consistent guess
+would have computed the CRC of the wrong operand and still looked correct.
 
 ### Open questions
 
 | Question | Blocks | Notes |
 |---|---|---|
-| CRC parameters | `crc.v` | Raised with organisers |
 | Does the validation firmware use ECALL as a halt signal? | Slice 5 correctness | A no-op ECALL passes the coverage table *and* silently fails firmware validation if the suite depends on it. Add a `halt_o` output held at 0 so the fix stays one line |
 
 ---

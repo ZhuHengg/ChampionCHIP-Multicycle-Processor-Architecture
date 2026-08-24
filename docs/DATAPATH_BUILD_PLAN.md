@@ -267,7 +267,67 @@ large number, and the two give completely different upper halves.
 
 ---
 
-## `crc.v` — ⚠ BLOCKED
+## `crc.v` — ✅ UNBLOCKED (parameters received from organisers)
+
+**Answer received.** CRC-16/CCITT-FALSE, fully specified:
+
+| Parameter | Value |
+|---|---|
+| Polynomial | `0x1021` |
+| Initial value | `0xFFFF` |
+| Input reflection | **No** |
+| Output reflection | **No** |
+| Final XOR | `0x0000` |
+| `rs1` | **data** |
+| `rs2` | **seed** |
+
+**Operand roles are the opposite of what this plan originally guessed.**
+An earlier revision assumed rs1 was the running CRC state and rs2 the new
+data — the standard pattern for incremental CRC instructions. It's reversed:
+**rs1 carries the data, rs2 carries the seed.** Wire it that way, and don't
+"correct" it to the more familiar convention.
+
+**`crcb`/`crch`/`crcw` select how many bits of `rs1` are consumed** — 8, 16,
+and 32 respectively. The result is always 16 bits. So `crcb` processes only
+`rs1[7:0]`, `crch` processes `rs1[15:0]`, `crcw` processes all 32 bits. The
+names describe input width, not three different algorithms — same polynomial
+and parameters throughout.
+
+### ✅ Golden vectors — organisers' validation firmware
+
+`firmware/crc_test.S` holds the organisers' own test. Three independent
+chains over the same 8 data bytes (`12 34 56 78 90 AB CD EF`), fed 8 / 16 /
+32 bits at a time. **All three must produce `0x1E82`.**
+
+```
+crcb chain (8 × 8-bit):  0x1E82
+crch chain (4 × 16-bit): 0x1E82
+crcw chain (2 × 32-bit): 0x1E82
+```
+
+**Verified against a reference implementation** (`scripts/crc_reference.py`)
+— all three chains reproduce `0x1E82` with the parameters above. The
+parameters and the firmware agree, so this is settled, not assumed.
+
+That agreement also pins down the algorithm precisely:
+
+- **MSB-first**, no reflection anywhere
+- Per bit: `crc = (crc << 1) & 0xFFFF`, then `crc ^= 0x1021` if
+  `crc[15] ^ input_bit`
+- The **seed enters as the initial CRC state**, and each result feeds the
+  next call's seed
+- Width selection controls only *how many bits of rs1 are consumed* — the
+  same 8 bytes give the same answer whether fed as 8×8, 4×16, or 2×32
+
+**Watch the operand order in the assembly:** `crcb s0, s1, s0` is
+rd=`s0`, rs1=`s1` (data), rs2=`s0` (seed). The running CRC is threaded
+through **rs2**. Easy to wire backwards.
+
+Note the usual CRC-16/CCITT-FALSE check value (`CRC16("123456789")` =
+`0x29B1`) is *not* the right sanity test here — use the firmware's `0x1E82`
+chains instead, since they exercise the actual instruction shape.
+
+### Original blocked-state notes (kept for context)
 
 **Guide §3.1.3, Table 11.** Computes a 16-bit CRC over parts of rs1/rs2.
 
@@ -308,25 +368,19 @@ and "without latency." It **never states**:
 These are not details that can be reasoned out. They're arbitrary
 parameters, and the validation firmware will have exactly one right answer.
 
-### What to do
+### Outcome
 
-**Ask on the ChampionCHIP platform now** — before the other four modules are
-done, so the answer arrives without blocking. Specifically ask for: the
-polynomial, initial value, reflection convention, final XOR, and the
-rs1/rs2 operand roles.
+Asked on Discord, answered in full — see the parameter table above. Worth
+noting the placeholder this plan suggested (CRC-16/CCITT, init `0xFFFF`)
+turned out to be right on polynomial, init, reflection, and final XOR — but
+the **operand roles were backwards**. Building on the guess would have
+produced a module that looked correct and computed the CRC of the wrong
+operand. That's exactly the failure mode that made this worth asking about
+rather than assuming.
 
-**Do not guess and build.** This is the same class of gap as `op_size_o`
-was for the control unit, except worse: `op_size_o` was an internal
-convention we could pick freely because only our own modules consume it. The
-CRC output is checked against firmware we don't control — a wrong guess
-produces a module that works perfectly, self-consistently, and fails
-validation.
-
-**If an answer doesn't arrive:** build the module with the polynomial and
-init value as parameters (`parameter POLY = 16'h1021;`), so swapping them is
-a one-line change rather than a rewrite. Then pick the most common
-convention (CRC-16/CCITT, init `0xFFFF`) as a placeholder and document the
-assumption prominently in the report.
+Keep the parameters as Verilog `parameter`s anyway — costs nothing, and
+makes the values visible at the module boundary rather than buried in the
+logic.
 
 ---
 
