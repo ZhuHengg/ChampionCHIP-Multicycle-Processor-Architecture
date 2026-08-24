@@ -4,13 +4,27 @@ Register file, LSU, address decoder, IMEM, DMEM.
 
 ## Expected files
 
-- `regfile.v` — 32×32-bit, x0 hardwired to zero (must silently discard
-  writes to x0 — see `HANDOFF_control_unit.md` §8 open items), async
-  read of rs1/rs2, sync write of rd.
-- `lsu.v` — §3.3 of guide. Alignment, sign/zero extension (LB/LH/LBU/LHU),
-  byte-write mask (`bw_o`) generation for SB/SH. `op_size_o` encoding is
-  NOT yet defined — this module effectively owns that decision; write it
-  up and share with Teammate A once settled.
+- `regfile.v` — 32×32-bit, async read of rs1/rs2, sync write of rd.
+  **x0 write protection is this module's job**, not the control unit's:
+  the CU asserts `reg_write_o` regardless of `rd`, so the guard lives here.
+  Guide §3.1.4 — "x0 is hardwired (fixed) at zero and cannot be modified."
+  One line: `if (reg_write_i && rd_addr_i != 5'd0) regs[rd_addr_i] <= ...`.
+  Not a design question, just a task — don't skip it, nothing upstream
+  catches a write to x0.
+- `lsu.v` — §3.3 of guide. Alignment and sign/zero extension
+  (LB/LH/LBU/LHU).
+  **Two things changed since this file was written — read before starting:**
+  - `op_size_o`'s 3-bit encoding **is now defined** (`[2:1]`=size,
+    `[0]`=sign) with `` `OP_SIZE_* `` macros in `rvbl2_defines.vh`. It was
+    decided control-unit-side while nothing was built against it. If you
+    have a reason to want it different, say so now — it's cheap to change
+    until this module exists.
+  - **`bw_o` generation is NOT this module's job any more.** The control
+    unit drives it (decision #11), computed from `op_size_o` and a 2-bit
+    `addr_lsb_i` input. This was a close call — you have the address
+    locally and could own `bw_o` with no extra port — so push back if you
+    disagree, but don't build it in parallel: two modules driving the same
+    mask is worse than either choice.
 - `address_decoder.v` — §4.4 of guide, Figure 3. Core-side ports named
   `we_i`/`oe_i`/`bw_i`/`address_i` (same wires as the core's `_o` outputs,
   opposite-end naming — see handoff doc §3). Routes `dmem_we_o` to DMEM

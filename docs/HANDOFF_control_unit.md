@@ -51,10 +51,26 @@ Key design decisions baked into this shape:
 | R-type/I-type ALU, MUL, CRC, LUI, AUIPC | 4 | fetch, decode, execute, write back |
 | Branch | 3 | fetch, decode, execute → fetch |
 | JAL / JALR | 4 | fetch, decode, execute, write back |
-| Store | 5 | fetch, decode, mem_addr, mem_access → fetch |
+| Store | 4 | fetch, decode, mem_addr, mem_access → fetch |
 | Load | 6 | fetch, decode, mem_addr, mem_access_addr, mem_access_data, write back |
 
+**Corrected:** store is 4 cycles, not 5. Cycle count equals states traversed
+in every row; store visits FETCH, DECODE, MEM_ADDR, MEM_ACCESS_STORE and
+loops back to FETCH, skipping WRITE BACK. The earlier "5" was an arithmetic
+slip (load's 6 minus one, without accounting for store also dropping WRITE
+BACK). The state names listed here were always right.
+
 ## 3. Signal glossary
+
+**Naming convention:** all control-unit output signals use `_o`, including
+invented ones — not just the guide-fixed set. `pc_write_o`, not bare
+`pc_write`. This matches the guide's own convention (`we_o` on the core's
+side becomes `we_i` on the receiving module's side) applied uniformly, so
+the whole port list reads consistently rather than mixing two naming
+styles. State encoding stays as `localparam` inside `control_unit.v`, not
+in the shared `defines.vh` — it never crosses a module boundary (no other
+module reads `state` directly, only the output signals derived from it), so
+there's no cross-file mismatch risk to guard against by sharing it.
 
 ### Fixed by the block guide — must match exactly (these are the ports other teammates' modules expect)
 
@@ -74,34 +90,69 @@ the decoder, not something the control unit needs to drive directly.
 | `op_size_o` | 3 | Fig. 2, §3.3.3 | Core→LSU: access size + sign |
 | `core_data_o` | 32 | Fig. 2 | Core→LSU: store data | 
 | `core_data_i` | 32 | Fig. 2 | LSU→core: load data, already sign/zero-extended |
-| `alu_op` | 4 | Table 9 | ALU select, `4'h0`–`4'hA` (11 values, needs 4 bits) |
-| `mult_op` | 2* | Table 10 | MUL select, values 0–3 (4 values, fits 2 bits) (*guide writes the values as `4'hN` literals but never states the port width — confirm with Teammate B before finalizing) |
-| `crc_op` | 2* | Table 11 | CRC select, values 0–2 (3 values, fits 2 bits) (*same caveat) |
+| `alu_op_o` | 4 | Table 9 | ALU select, `4'h0`–`4'hA` (11 values, needs 4 bits). **Decided:** despite being guide-fixed in name, this is a control-unit output, so it takes `_o` per the §3 naming convention — not bare `alu_op`. |
+| `mult_op` | 4 | Table 10 | MUL select, values 0–3 (only 2 bits strictly needed). **Decided: 4 bits**, matching `alu_op_o`'s width for consistency across all three op-select ports — simpler mux-select wiring, costs 2 unused bits. |
+| `crc_op` | 4 | Table 11 | CRC select, values 0–2 (only 2 bits strictly needed). **Decided: 4 bits**, same rationale as `mult_op`. |
 
 ### Invented internally — not in the guide, proposal only until confirmed with the team
 
 | Signal | Width | Meaning |
 |---|---|---|
-| `pc_write` | 1 | Enable PC to latch new value this cycle |
-| `pc_src` | 2 | `00`=PC+4, `01`=branch/jump target, `10`=jalr target |
-| `ir_write` | 1 | Enable IR to latch from IMEM (asserted only in FETCH) |
-| `reg_write` | 1 | Enable register file write |
-| `result_src` | 3 | `000`=ALU, `001`=MUL, `010`=CRC, `011`=DMEM data, `100`=PC+4 |
-| `alu_src_a` | 1 | `0`=rs1, `1`=PC |
-| `alu_src_b` | 2 | `00`=rs2, `01`=immediate, `10`=constant 4 |
-| `imm_sel` | 3 | Immediate format: I/S/B/U/J |
-| `mult_en` | 1 | Trigger multiplier this cycle |
-| `crc_en` | 1 | Trigger CRC unit this cycle |
-| `branch_taken` | 1 | Comparator output → feeds `pc_src` decision (not driven by control unit) |
+| `pc_write_o` | 1 | Enable PC to latch new value this cycle |
+| `pc_src_o` | 2 | `00`=PC+4, `01`=branch/jump target, `10`=jalr target |
+| `ir_write_o` | 1 | Enable IR to latch from IMEM (asserted only in FETCH) |
+| `reg_write_o` | 1 | Enable register file write |
+| `result_src_o` | 3 | `000`=ALU, `001`=MUL, `010`=CRC, `011`=DMEM data, `100`=PC+4 |
+| `alu_src_a_o` | 1 | `0`=rs1, `1`=PC |
+| `alu_src_b_o` | 2 | `00`=rs2, `01`=immediate, `10`=constant 4 |
+| `imm_sel_o` | 3 | Immediate format select. **Decided:** `000`=I, `001`=S, `010`=B, `011`=U, `100`=J (see table below) |
+| `mult_en_o` | 1 | Trigger multiplier this cycle |
+| `crc_en_o` | 1 | Trigger CRC unit this cycle |
+| `branch_taken_i` | 1 | Comparator output → feeds `pc_src_o` decision (**input** to control unit, not an output — hence `_i`) |
+
+**`imm_sel_o` opcode → format map (decided, self-consistent — no external
+spec to check against since this is fully our own invention):**
+
+| imm_sel_o | Format | Used by |
+|---|---|---|
+| `000` | I | I-type ALU, JALR, loads |
+| `001` | S | Stores |
+| `010` | B | Branches |
+| `011` | U | LUI, AUIPC |
+| `100` | J | JAL |
+
+**`op_size_o` 3-bit encoding (decided):** `op_size_o[2:1]` = size,
+`op_size_o[0]` = sign (ignored for stores, since stores never extend).
+
+| op_size_o | Size | Sign | Instruction |
+|---|---|---|---|
+| `000` | byte | signed | lb / sb |
+| `001` | byte | unsigned | lbu |
+| `010` | half | signed | lh / sh |
+| `011` | half | unsigned | lhu |
+| `100` | word | — | lw / sw |
+
+For stores, only `op_size_o[2:1]` (size) matters — bit 0 is don't-care.
+
+**`bw_o` ownership (decided): control unit drives it**, not the LSU. Keeps
+the LSU a purely combinational passthrough and keeps all "which bytes"
+decision logic in one place — the control unit already owns `op_size_o`
+selection, so the byte-mask math naturally lives alongside it. Computed from
+`op_size_o` and `address_o[1:0]`:
+
+- word → `4'b1111` (all bytes, address bits don't matter)
+- half → `4'b0011` if `address[1]=0`, else `4'b1100`
+- byte → `4'b0001` shifted left by `address[1:0]` (e.g. `address[1:0]=10` →
+  `4'b0100`, matching guide §3.3.2's worked example of writing byte 3)
 
 ## 4. Per-state control signal table
 
 `mult_op`/`crc_op` aren't separate columns here since they're not part of
 the original signal set drawn out per state — see §6 for their values
-(direct funct3 passthrough, asserted alongside `mult_en`/`crc_en` in the
-rows below).
+(direct funct3 passthrough, asserted alongside `mult_en_o`/`crc_en_o` in
+the rows below).
 
-| State | pc_write | pc_src | ir_write | reg_write | result_src | alu_src_a | alu_src_b | alu_op | imm_sel | mult_en | crc_en | we_o | oe_o | bw_o | op_size_o |
+| State | pc_write_o | pc_src_o | ir_write_o | reg_write_o | result_src_o | alu_src_a_o | alu_src_b_o | alu_op_o | imm_sel_o | mult_en_o | crc_en_o | we_o | oe_o | bw_o | op_size_o |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | RESET | 0 | - | 0 | 0 | - | - | - | - | - | 0 | 0 | 0 | 0 | - | - |
 | FETCH | 1 | 00 | 1 | 0 | - | - | - | - | - | 0 | 0 | 0 | 1 | - | - |
@@ -121,7 +172,7 @@ rows below).
 | MEM_ACCESS (store) | 0 | - | 0 | 0 | - | - | - | - | - | 0 | 0 | 1 | 0 | per size/addr[1:0] | per instr |
 | WRITE BACK | 0 | - | 0 | 1 | (carried from prior state) | - | - | - | - | 0 | 0 | 0 | 0 | - | - |
 
-\* `pc_write` for branch is conditional on `branch_taken` from the comparator.
+\* `pc_write_o` for branch is conditional on `branch_taken_i` from the comparator.
 
 ## 5. Decode's opcode → next-state map
 
@@ -129,7 +180,7 @@ rows below).
 
 | Opcode | funct7 (if 0110011) | Category | Next state |
 |---|---|---|---|
-| `0110011` | `0000000` (default) | R-type ALU | EXECUTE — ALU |
+| `0110011` | **else** (not `0000001`, not `1000000`) | R-type ALU | EXECUTE — ALU |
 | `0110011` | `0000001` | Zmmul | EXECUTE — MUL |
 | `0110011` | `1000000` | Xicrc | EXECUTE — CRC |
 | `0010011` | — | I-type ALU | EXECUTE — ALU |
@@ -143,36 +194,69 @@ rows below).
 | `1110011` | — | ECALL / EBREAK | EXECUTE — no-op (verify ECALL against real firmware, see §7) |
 | `0001111` | — | FENCE | EXECUTE — no-op |
 
+**Category selection is an `else`, not a three-way equality check.** SUB and
+SRA use `funct7 = 0100000` — a fourth value this table never lists. Category
+logic must be: `funct7==0000001` → MUL, `funct7==1000000` → CRC, everything
+else → ALU (which includes both `0000000` and `0100000`). Coding this as
+`if (funct7 == 7'b0000000)` to detect "this is ALU" silently breaks SUB/SRA
+— they'd match nothing. `funct7[5]` is used again inside the ALU branch, but
+for a different purpose: picking ADD vs SUB and SRL vs SRA within `alu_op`,
+not selecting the ALU category itself. See `alu_op` decode table in §6.
+
 **Verify these literal bit patterns against the RISC-V spec before coding** —
 a wrong opcode here silently misroutes an entire instruction class.
 
 ## 6. ALU / MUL / CRC operation codes (from guide Tables 9–11, copy exactly)
 
-`alu_op` needs 4 bits (11 distinct values, `4'h0`–`4'hA`). `mult_op` and
-`crc_op` only need 2 bits (4 and 3 distinct values respectively) — the
-guide's `4'hN` notation is just how it writes hex literals for these
-tables, not a statement of port width. **Port width for `mult_op`/`crc_op`
-is still open** — confirm with Teammate B whether the module expects a
-tight 2-bit port or a 4-bit port matching `alu_op`'s width for interface
-consistency (either works functionally; it's a wiring-convention choice,
-not a spec question).
+`alu_op_o` needs 4 bits (11 distinct values, `4'h0`–`4'hA`). `mult_op` and
+`crc_op` only strictly need 2 bits (4 and 3 distinct values respectively) —
+the guide's `4'hN` notation is just how it writes hex literals for these
+tables, not a statement of port width. **Decided: `mult_op`/`crc_op` are 4
+bits**, matching `alu_op_o`'s width — one consistent width across all three
+op-select ports simplifies mux-select wiring for whoever builds MULT/CRC;
+the 2 unused bits cost nothing.
 
-**`alu_op`:** `4'h0`=PASS_B, `4'h1`=ADD, `4'h2`=SUB, `4'h3`=AND, `4'h4`=OR,
-`4'h5`=XOR, `4'h6`=SLL, `4'h7`=SRL, `4'h8`=MRS(arith. shift/SRA), `4'h9`=SLT,
-`4'hA`=SLTU. **Needs real decode logic** — these codes do not match
-RV32I's standard funct3 encoding (e.g. ADD and SUB both use funct3=`000`,
-distinguished only by funct7 bit 5), so `alu_op` must come from a
-case/lookup on (funct3, funct7[5]), not a passthrough.
+**`alu_op_o`:** `4'h0`=PASS_B (no R-type instruction — used for LUI), plus
+the 10 R-type ALU codes below. **Needs real decode logic** — these codes do
+not match RV32I's standard funct3 encoding, so `alu_op_o` must come from a
+lookup on (funct3, funct7[5]), not a passthrough.
+
+**`alu_op_o` decode table** (R-type ALU, opcode `0110011`, reached only via
+the `else`-branch described in §5). Only funct3 `000` and `101` need
+`funct7[5]` to disambiguate; every other funct3 maps to `alu_op_o` directly
+regardless of funct7:
+
+| Instruction | funct3 | funct7 | funct7[5] | alu_op_o | Macro |
+|---|---|---|---|---|---|
+| ADD | `000` | `0000000` | 0 | `4'h1` | `ALU_ADD` |
+| SUB | `000` | `0100000` | 1 | `4'h2` | `ALU_SUB` |
+| SLL | `001` | `0000000` | 0 | `4'h6` | `ALU_SLL` |
+| SLT | `010` | `0000000` | 0 | `4'h9` | `ALU_SLT` |
+| SLTU | `011` | `0000000` | 0 | `4'hA` | `ALU_SLTU` |
+| XOR | `100` | `0000000` | 0 | `4'h5` | `ALU_XOR` |
+| SRL | `101` | `0000000` | 0 | `4'h7` | `ALU_SRL` |
+| SRA | `101` | `0100000` | 1 | `4'h8` | `ALU_MRS` |
+| OR | `110` | `0000000` | 0 | `4'h4` | `ALU_OR` |
+| AND | `111` | `0000000` | 0 | `4'h3` | `ALU_AND` |
+
+10 rows, matching the guide's "Arithmetic and Logic (Register): 10 expected"
+coverage count. I-type ALU (ADDI, SLTI, etc., opcode `0010011`) reuses this
+same table keyed on funct3 alone — no funct7 exists in I-type encoding, so
+no ADD/SUB or SRL/SRA ambiguity there (I-type has no SUBI; SRAI is
+distinguished from SRLI via `imm[10]` instead, worth confirming against the
+spec when that module gets built).
 
 **`mult_op`:** `4'h0`=MUL, `4'h1`=MULH, `4'h2`=MULHSU, `4'h3`=MULHU.
 **Direct passthrough of funct3** — Table 7's funct3 values for mul (`000`)
 / mulh (`001`) / mulhsu (`010`) / mulhu (`011`) equal the MULT code
-numerically. Wire `mult_op = {1'b0, funct3}` — no lookup table needed.
+numerically. Wire `mult_op = {2'b00, funct3}` (4-bit port, zero-extended) —
+no lookup table needed.
 
 **`crc_op`:** `4'h0`=CRCB, `4'h1`=CRCH, `4'h2`=CRCW. **Direct passthrough
 of funct3** — same pattern as MUL: Table 8's funct3 values for crcb
 (`000`) / crch (`001`) / crcw (`010`) equal the CRC code numerically.
-Wire `crc_op = {1'b0, funct3}` — no lookup table needed.
+Wire `crc_op = {2'b00, funct3}` (4-bit port, zero-extended) — no lookup
+table needed.
 
 ## 7. Resolved design decisions (reference, don't re-litigate)
 
@@ -193,28 +277,49 @@ Wire `crc_op = {1'b0, funct3}` — no lookup table needed.
    core drives `_o`, decoder receives as `_i`, same wires.
 
 6. **`mult_op`/`crc_op` are both a direct passthrough of `funct3`** — no
-   lookup table needed, unlike `alu_op` which requires real decode logic
-   since its codes don't match RV32I's standard funct3 numbering. Port
-   *width* for `mult_op`/`crc_op` (2-bit tight fit vs 4-bit to match
-   `alu_op`) is still open — see §8.
+   lookup table needed, unlike `alu_op_o` which requires real decode logic
+   since its codes don't match RV32I's standard funct3 numbering.
+7. **`mult_op`/`crc_op` are 4 bits**, matching `alu_op_o`'s width — settled
+   as a wiring-consistency call, not a spec requirement (values only need 2
+   bits; the extra 2 are always zero).
+8. **Port is named `alu_op_o`** (not bare `alu_op`) — the guide-fixed table
+   in §3 previously carried the bare name inconsistently with every other
+   invented signal's `_o` suffix; corrected to match the uniform convention.
+9. **`op_size_o` 3-bit encoding decided** — `[2:1]`=size, `[0]`=sign. See
+   table in §3.
+10. **`imm_sel_o` encoding and opcode map decided** — see table in §3.
+11. **`bw_o` is driven by the control unit**, computed from `op_size_o` and
+    `address_o[1:0]` — not generated inside the LSU. See §3.
+
+**These six items (6-11) were set unilaterally, before the ALU/MULT/CRC/LSU
+owners started their modules** — no teammate to conflict with yet, and every
+value is either forced by the guide's own numbering (6) or an internal
+wiring convention with no external spec to get wrong (7-11). Cheap to change
+if a teammate has a real reason to, before their module is built against it.
+Not cheap after.
 
 ## 8. Still open — pick up here
 
-- [ ] `mult_op`/`crc_op` port width — 2 bits (tight fit) or 4 bits (match
-      `alu_op`)? Values themselves are settled (direct funct3 passthrough,
-      §6) — only the port declaration width is open. Coordinate with
-      Teammate B.
-- [ ] `op_size_o` exact 3-bit encoding (size + sign) — coordinate with
-      whoever owns the LSU
-- [ ] `imm_sel` exact encoding, opcode → format mapping (confirmed not in
-      guide at all — this is fully our own invention, no spec to check
-      against, just internal consistency)
-- [ ] x0 write protection (register file should silently discard writes to
-      x0) — not FSM-blocking, add as a guard once main path works
-- [ ] Illegal-opcode handling policy — undecided, not required for first
-      working version
-- [ ] ECALL behavior — revisit once validation firmware is available (see
-      §7 item 4)
+**One genuinely open item.** See `HANDOFF_control_unit_ALL_STAGES.md`
+Part IV for the full treatment.
+
+- [ ] **ECALL behavior** — does the validation firmware use ECALL as a
+      "test complete / halt" signal? Blocked on the firmware's release, but
+      two things are doable now: (a) add a `halt_o` output wired to the
+      ECALL case, held at 0, so the fix is one line later; (b) check the
+      ChampionCHIP platform docs — standard `riscv-tests` suites use a
+      known write-result-then-ECALL pattern, so this may be predictable
+      before release.
+
+**Resolved since this list was written:**
+
+- ~~Illegal-opcode policy~~ — **decided: silent no-op.** The guide never
+  mentions illegal-instruction trapping and the coverage table has no row
+  for it. Replaces the `ALU_ADD` fallthrough placeholder.
+- ~~x0 write protection~~ — **not a control-unit item.** It's a one-line
+  guard in the regfile (`if (reg_write_i && rd_addr_i != 5'd0)`), per guide
+  §3.1.4. Belongs on the memory pair's task list, not this open-questions
+  list. Confirm with the regfile owner at integration.
 
 ## 9. Suggested repo layout
 
@@ -258,7 +363,7 @@ full datapath:
 1. State register + next-state logic for FETCH → DECODE → EXECUTE(ALU) →
    WRITE BACK only.
 2. Testbench that steps the clock and asserts `state`, `we_o`, `alu_op`,
-   `reg_write` etc. match §4's table row-by-row for a single instruction
+   `reg_write_o` etc. match §4's table row-by-row for a single instruction
    (e.g. `add x5, x6, x7`).
 3. Only once that passes, add MEM_ADDR/MEM_ACCESS/branch/jump paths.
 

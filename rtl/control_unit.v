@@ -7,9 +7,75 @@
 // `include "pkg/rvbl2_defines.vh" for every opcode/op-code literal.
 // Do not hardcode values already defined there.
 //
-// Recommended build order (handoff doc §11):
-//   1. FETCH -> DECODE -> EXECUTE(ALU only) -> WRITE BACK, verify in sim
-//   2. Add MEM_ADDR / MEM_ACCESS (load 2-cycle, store 1-cycle)
+// SLICE 1 SCOPE (DONE): FETCH -> DECODE -> EXECUTE_ALU -> WRITE_BACK,
+// R-type ALU only (opcode OPCODE_RTYPE, funct7 else-branch).
+//
+// SLICE 2 SCOPE (DONE): load/store. New states MEM_ADDR,
+// MEM_ACCESS_ADDR, MEM_ACCESS_DATA, MEM_ACCESS_STORE. See
+// docs/HANDOFF_control_unit_ALL_STAGES.md "Slice 2" section.
+//
+// SLICE 3 SCOPE (DONE): branch/jump. No new states — handoff §1
+// puts branch/jump as cases inside EXECUTE, same state as ALU
+// (EXECUTE_ALU here; the handoff's state diagram just calls it
+// "EXECUTE" generically). New cases for OPCODE_BRANCH/JAL/JALR, new
+// input branch_taken_i.
+//
+// SLICE 4 SCOPE (DONE): MUL/CRC. No new states — MUL is
+// combinational/single-cycle, handled inside EXECUTE_ALU's R-type
+// else-branch, disambiguated by funct7 (FUNCT7_MUL/FUNCT7_CRC, else
+// ALU — handoff §5 else-trap, exactly the structure slice 1 set up
+// for). New ports mult_op/crc_op/mult_en_o/crc_en_o.
+//
+// SLICE 5 SCOPE (DONE): LUI/AUIPC/system no-ops. No new states —
+// all EXECUTE cases. New cases for OPCODE_LUI, OPCODE_AUIPC,
+// OPCODE_SYSTEM, OPCODE_FENCE. LUI is the only user of ALU_PASS_B.
+// ECALL/EBREAK/FENCE are no-ops (handoff §7 decision 4 — caveat: revisit
+// once validation firmware is released, see handoff Slice 5 section).
+//
+// SLICE 6 SCOPE (this slice): I-type ALU. No new states — extends the
+// R-type ALU else-fallthrough inside EXECUTE_ALU to also accept
+// OPCODE_ITYPE. Only difference from R-type: alu_src_b_o=IMM (not RS2)
+// and imm_sel_o=IMM_SEL_I; the alu_op_o decode table is reused as-is,
+// keyed on funct3 alone (handoff Slice-6 section).
+//
+// DEVIATIONS / ASSUMPTIONS specific to slice 3 (flagged per CLAUDE.md
+// step 8):
+//
+// 1. Branch/jump reuse the EXECUTE_ALU state name from slice 1 rather
+//    than a renamed generic EXECUTE — renaming would touch every
+//    existing case label for no behavioral change, and the handoff
+//    itself doesn't require a rename (§1's diagram calls it "EXECUTE"
+//    informally, not as a literal identifier). Documented here so the
+//    name isn't mistaken for "ALU-only."
+//
+// DEVIATIONS / ASSUMPTIONS specific to slice 2 (flagged per CLAUDE.md
+// step 8 — none of these are stated outright in the handoff docs):
+//
+// 1. funct3 -> op_size_o for loads/stores is NOT given as a table
+//    anywhere in the handoff (unlike alu_op_o, which has an explicit
+//    decode table). Decoded here per the RISC-V spec's standard load/
+//    store funct3 encoding: lb=000, lh=001, lw=010, lbu=100, lhu=101;
+//    sb=000, sh=001, sw=010 (sign bit don't-care for stores per
+//    handoff §5/§3). Cross-checked against RV32I spec, not invented.
+//
+// 2. address_o / core_data_o / core_data_i (handoff §4, guide-fixed
+//    names) are NOT control_unit ports. The per-state table (handoff §9)
+//    never shows the control unit driving address_o in any row, and
+//    core_data_o/i are a pure datapath bus (ALU/regfile <-> LSU) with no
+//    control logic gating the value itself — only oe_o/we_o gate
+//    *when* that bus is sampled/committed. Those get wired directly at
+//    top.v (slice 7), not through this module. Confirmed with user
+//    before implementing (see conversation) rather than guessed.
+//
+// 3. bw_o's formula (handoff §5) needs address[1:0], but the control
+//    unit does not compute the effective address (the ALU does, in
+//    MEM_ADDR). So address[1:0] arrives here as a new INPUT,
+//    addr_lsb_i, sourced from the ALU/adder result — not as part of an
+//    address_o output this module owns. Confirmed with user.
+//
+// Recommended build order (handoff doc §11 / ALL_STAGES Part III):
+//   1. FETCH -> DECODE -> EXECUTE(ALU only) -> WRITE BACK, verify in sim  [SLICE 1, DONE]
+//   2. Add MEM_ADDR / MEM_ACCESS (load 2-cycle, store 1-cycle)           [THIS SLICE]
 //   3. Add branch / jump cases inside EXECUTE
 //   4. Add MUL / CRC / LUI / AUIPC / system no-op cases inside EXECUTE
 
@@ -18,17 +84,426 @@
 module control_unit (
     input  wire        clk_i,
     input  wire        rst_i,
-    // TODO: opcode/funct3/funct7 inputs from IR, branch_taken from
-    // branch_comparator, and every output signal listed in
-    // HANDOFF_control_unit.md section 3 (we_o, oe_o, bw_o, address_o,
-    // op_size_o, alu_op, mult_op, crc_op, pc_write, pc_src, ir_write,
-    // reg_write, result_src, alu_src_a, alu_src_b, imm_sel, mult_en,
-    // crc_en) go here as the module is built out.
-    input  wire        placeholder_i
+
+    // From IR — decode fields
+    input  wire [6:0]  opcode_i,      // IR[6:0]
+    input  wire [2:0]  funct3_i,      // IR[14:12]
+    input  wire [6:0]  funct7_i,      // IR[31:25]
+
+    // Slice 2: low address bits from the ALU/adder result (MEM_ADDR
+    // computes rs1+imm), needed only to compute bw_o. Not an
+    // address_o output owned by this module — see deviation note 3
+    // above.
+    input  wire [1:0]  addr_lsb_i,
+
+    // Slice 3: comparator result, feeds the conditional pc_write_o for
+    // branches (handoff §9 footnote — the only output that isn't a pure
+    // function of state). Input, not output — hence _i.
+    input  wire        branch_taken_i,
+
+    // Datapath control — invented signals (handoff §3)
+    output reg         pc_write_o,
+    output reg  [1:0]  pc_src_o,
+    output reg         ir_write_o,
+    output reg         reg_write_o,
+    output reg  [2:0]  result_src_o,
+    output reg         alu_src_a_o,
+    output reg  [1:0]  alu_src_b_o,
+    // NOTE: handoff §3 glossary lists this bare as "alu_op" under the
+    // guide-fixed table, but it is a control-unit *output*, so per the
+    // §3 naming convention (all CU outputs take _o, applied uniformly)
+    // it is declared alu_op_o here. Flagged to user — teammate's ALU
+    // module may expect the bare name; confirm before this hardens into
+    // a mismatch. Not silently resolving the doc's inconsistent row.
+    output reg  [3:0]  alu_op_o,
+    output reg  [2:0]  imm_sel_o,
+    // Slice 4: mult_op/crc_op are guide-fixed-named ports (handoff §3/§7
+    // item 7) despite the module lacking a matching "guide-fixed" table
+    // row treatment elsewhere — 4 bits each per that decision, direct
+    // funct3 passthrough (handoff §8), no lookup table.
+    output reg  [3:0]  mult_op,
+    output reg  [3:0]  crc_op,
+    output reg         mult_en_o,
+    output reg         crc_en_o,
+
+    // Memory interface — guide-fixed names, must match exactly
+    output reg         we_o,
+    output reg         oe_o,
+    output reg  [3:0]  bw_o,
+    output reg  [2:0]  op_size_o
 );
 
-    // TODO: state register, next-state logic, output logic.
-    // See HANDOFF_control_unit.md section 4 for the per-state signal
-    // table this module implements.
+    // ------------------------------------------------------------------
+    // State encoding — localparam, not in defines.vh (never crosses a
+    // module boundary per handoff §3).
+    // ------------------------------------------------------------------
+    localparam [3:0] RESET             = 4'd0;
+    localparam [3:0] FETCH             = 4'd1;
+    localparam [3:0] DECODE            = 4'd2;
+    localparam [3:0] EXECUTE_ALU       = 4'd3;
+    localparam [3:0] WRITE_BACK        = 4'd4;
+    localparam [3:0] MEM_ADDR          = 4'd5;
+    localparam [3:0] MEM_ACCESS_ADDR   = 4'd6;
+    localparam [3:0] MEM_ACCESS_DATA   = 4'd7;
+    localparam [3:0] MEM_ACCESS_STORE  = 4'd8;
+
+    reg [3:0] state, next_state;
+
+    // Slice 2: WRITE_BACK's result_src_o depends on which state led into
+    // it (EXECUTE_ALU -> RESULT_SRC_ALU, MEM_ACCESS_DATA -> RESULT_SRC_MEM
+    // — handoff §9's WRITE_BACK row says "carried from prior state" but
+    // doesn't specify the mechanism). prev_state records that, read
+    // combinationally by the output-logic block. Confirmed with user
+    // rather than guessed.
+    reg [3:0] prev_state;
+
+    // ------------------------------------------------------------------
+    // State register — sync reset (plan decision 1), NBA only.
+    // ------------------------------------------------------------------
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            state      <= RESET;
+            prev_state <= RESET;
+        end else begin
+            prev_state <= state;
+            state      <= next_state;
+        end
+    end
+
+    // ------------------------------------------------------------------
+    // Next-state logic — combinational, blocking only.
+    // ------------------------------------------------------------------
+    always @(*) begin
+        next_state = state; // default: hold (overwritten below)
+        case (state)
+            RESET:  next_state = FETCH;
+            FETCH:  next_state = DECODE;
+
+            DECODE: begin
+                // Slice 2: DECODE starts reading opcode_i for real.
+                // OPCODE_LOAD/OPCODE_STORE -> MEM_ADDR; everything else
+                // (R-type/I-type ALU, and slice 3's branch/jump) falls
+                // through to EXECUTE_ALU, same state for all of them
+                // (handoff §1 — branch/jump are cases inside EXECUTE,
+                // not separate states).
+                if (opcode_i == `OPCODE_LOAD || opcode_i == `OPCODE_STORE)
+                    next_state = MEM_ADDR;
+                else
+                    next_state = EXECUTE_ALU;
+            end
+
+            EXECUTE_ALU: begin
+                // Slice 3: branch skips WRITE_BACK, loops straight to
+                // FETCH (handoff §1 — branches produce no register
+                // result). Slice 5: ECALL/EBREAK/FENCE no-ops do the
+                // same — no register result, straight to FETCH. JAL/
+                // JALR, ALU/I-type, MUL/CRC, and (slice 5) LUI/AUIPC all
+                // still go to WRITE_BACK.
+                if (opcode_i == `OPCODE_BRANCH ||
+                    opcode_i == `OPCODE_SYSTEM ||
+                    opcode_i == `OPCODE_FENCE)
+                    next_state = FETCH;
+                else
+                    next_state = WRITE_BACK;
+            end
+
+            WRITE_BACK:  next_state = FETCH;
+
+            MEM_ADDR: begin
+                // Effective address (rs1+imm) computed this cycle by the
+                // ALU; branch on opcode to pick the load/store sub-path.
+                if (opcode_i == `OPCODE_STORE)
+                    next_state = MEM_ACCESS_STORE;
+                else
+                    next_state = MEM_ACCESS_ADDR;
+            end
+
+            MEM_ACCESS_ADDR: next_state = MEM_ACCESS_DATA;
+            MEM_ACCESS_DATA: next_state = WRITE_BACK;
+            MEM_ACCESS_STORE: next_state = FETCH; // store skips WRITE_BACK
+
+            default: next_state = RESET;
+        endcase
+    end
+
+    // ------------------------------------------------------------------
+    // Output logic — combinational, blocking only. Every output gets a
+    // default before the case, per CLAUDE.md rule 4 (no inferred latches).
+    //
+    // DEVIATION from handoff §4: that table shows "-" (don't care) in
+    // many cells; this block fills them with concrete defaults (mostly
+    // matching FETCH-state values) instead, purely to satisfy the
+    // latch-avoidance requirement. Behavior is identical — the datapath
+    // ignores these signals in states where they're "-".
+    // ------------------------------------------------------------------
+    // Slice 2: funct3 -> op_size_o lookup, shared by MEM_ADDR (stores
+    // need only size, sign bit don't-care) and MEM_ACCESS_ADDR (loads
+    // need size+sign). See deviation note 1 at top of file — this table
+    // is not given explicitly in the handoff, decoded from the RISC-V
+    // spec's standard load/store funct3 encoding.
+    reg [2:0] op_size_lookup;
+    always @(*) begin
+        case (funct3_i)
+            3'b000:  op_size_lookup = `OP_SIZE_BYTE_S; // lb / sb
+            3'b001:  op_size_lookup = `OP_SIZE_HALF_S; // lh / sh
+            3'b010:  op_size_lookup = `OP_SIZE_WORD;   // lw / sw
+            3'b100:  op_size_lookup = `OP_SIZE_BYTE_U; // lbu
+            3'b101:  op_size_lookup = `OP_SIZE_HALF_U; // lhu
+            default: op_size_lookup = `OP_SIZE_WORD;   // illegal funct3, policy open (handoff §8)
+        endcase
+    end
+
+    // Slice 2: bw_o formula (handoff §5) — computed from op_size_lookup
+    // and addr_lsb_i, combinational, reused by MEM_ADDR/MEM_ACCESS_ADDR/
+    // MEM_ACCESS_STORE below.
+    reg [3:0] bw_lookup;
+    always @(*) begin
+        case (op_size_lookup[2:1])
+            2'b10: bw_lookup = 4'b1111; // word
+            2'b01: bw_lookup = addr_lsb_i[1] ? 4'b1100 : 4'b0011; // half
+            2'b00: bw_lookup = 4'b0001 << addr_lsb_i; // byte
+            default: bw_lookup = 4'b1111;
+        endcase
+    end
+
+    always @(*) begin
+        // Defaults
+        pc_write_o   = 1'b0;
+        pc_src_o     = `PC_SRC_PLUS4;
+        ir_write_o   = 1'b0;
+        reg_write_o  = 1'b0;
+        result_src_o = `RESULT_SRC_ALU;
+        alu_src_a_o  = `ALU_SRC_A_RS1;
+        alu_src_b_o  = `ALU_SRC_B_RS2;
+        alu_op_o     = `ALU_PASS_B;
+        imm_sel_o    = `IMM_SEL_I;
+        mult_op      = 4'h0;
+        crc_op       = 4'h0;
+        mult_en_o    = 1'b0;
+        crc_en_o     = 1'b0;
+        we_o         = 1'b0;
+        oe_o         = 1'b0;
+        bw_o         = 4'b0000;
+        op_size_o    = `OP_SIZE_WORD;
+
+        case (state)
+            RESET: begin
+                // all defaults
+            end
+
+            FETCH: begin
+                pc_write_o = 1'b1;
+                ir_write_o = 1'b1;
+                oe_o       = 1'b1;
+            end
+
+            DECODE: begin
+                // imm_sel_o per opcode (handoff §9 "per opcode"). Only
+                // load/store are wired this slice; everything else
+                // (R-type, and unwired opcodes from later slices) keeps
+                // the IMM_SEL_I default, matching slice 1 behavior.
+                if (opcode_i == `OPCODE_LOAD)
+                    imm_sel_o = `IMM_SEL_I;
+                else if (opcode_i == `OPCODE_STORE)
+                    imm_sel_o = `IMM_SEL_S;
+                else if (opcode_i == `OPCODE_BRANCH)
+                    imm_sel_o = `IMM_SEL_B;
+                else if (opcode_i == `OPCODE_JAL)
+                    imm_sel_o = `IMM_SEL_J;
+                else if (opcode_i == `OPCODE_JALR)
+                    imm_sel_o = `IMM_SEL_I;
+                else if (opcode_i == `OPCODE_LUI || opcode_i == `OPCODE_AUIPC)
+                    imm_sel_o = `IMM_SEL_U;
+                else if (opcode_i == `OPCODE_ITYPE)
+                    imm_sel_o = `IMM_SEL_I;
+                else
+                    imm_sel_o = `IMM_SEL_I;
+            end
+
+            EXECUTE_ALU: begin
+                if (opcode_i == `OPCODE_BRANCH) begin
+                    // Slice 3 (handoff §9/Slice-3 table). Do NOT decode
+                    // funct3 here — that picks which comparison, which is
+                    // the comparator's job (handoff explicit warning).
+                    // pc_write_o is the one output that isn't a pure
+                    // function of state: it follows branch_taken_i.
+                    pc_write_o   = branch_taken_i;
+                    pc_src_o     = `PC_SRC_TARGET;
+                    alu_src_a_o  = `ALU_SRC_A_PC;
+                    alu_src_b_o  = `ALU_SRC_B_IMM;
+                    alu_op_o     = `ALU_ADD;
+                    imm_sel_o    = `IMM_SEL_B;
+                end else if (opcode_i == `OPCODE_JAL) begin
+                    pc_write_o   = 1'b1;
+                    pc_src_o     = `PC_SRC_TARGET;
+                    alu_src_a_o  = `ALU_SRC_A_PC;
+                    alu_src_b_o  = `ALU_SRC_B_IMM;
+                    alu_op_o     = `ALU_ADD;
+                    imm_sel_o    = `IMM_SEL_J;
+                    result_src_o = `RESULT_SRC_PC4;
+                end else if (opcode_i == `OPCODE_JALR) begin
+                    // Target = rs1 + imm, not PC + imm — alu_src_a_o
+                    // differs from JAL for exactly this reason (handoff
+                    // §9 Slice-3 table note).
+                    pc_write_o   = 1'b1;
+                    pc_src_o     = `PC_SRC_JALR;
+                    alu_src_a_o  = `ALU_SRC_A_RS1;
+                    alu_src_b_o  = `ALU_SRC_B_IMM;
+                    alu_op_o     = `ALU_ADD;
+                    imm_sel_o    = `IMM_SEL_I;
+                    result_src_o = `RESULT_SRC_PC4;
+                end else if (opcode_i == `OPCODE_LUI) begin
+                    // Slice 5 (handoff §9/Slice-5 section). The only use
+                    // of ALU_PASS_B — result is just the immediate,
+                    // passed through the ALU unchanged.
+                    alu_src_b_o = `ALU_SRC_B_IMM;
+                    alu_op_o    = `ALU_PASS_B;
+                    imm_sel_o   = `IMM_SEL_U;
+                end else if (opcode_i == `OPCODE_AUIPC) begin
+                    alu_src_a_o = `ALU_SRC_A_PC;
+                    alu_src_b_o = `ALU_SRC_B_IMM;
+                    alu_op_o    = `ALU_ADD;
+                    imm_sel_o   = `IMM_SEL_U;
+                end else if (opcode_i == `OPCODE_SYSTEM || opcode_i == `OPCODE_FENCE) begin
+                    // Slice 5: ECALL/EBREAK/FENCE no-op (handoff §7
+                    // decision 4). Advance to FETCH, write nothing,
+                    // assert nothing — all defaults apply, nothing to
+                    // set here.
+                    //
+                    // ECALL CAVEAT (handoff Slice 5 section, flagged
+                    // per CLAUDE.md step 8): a bare no-op satisfies the
+                    // 47/47 ISA coverage table, but some RISC-V
+                    // validation suites use ECALL as an explicit "test
+                    // complete/halt" signal the testbench watches for.
+                    // If the official firmware does that, this no-op
+                    // would silently break firmware validation while
+                    // still looking correct in the coverage table.
+                    // Revisit once the official validation firmware is
+                    // released — this is documented as the right
+                    // placeholder until then, not a guess.
+                end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_MUL) begin
+                    // Slice 4: Zmmul. Combinational/single-cycle, same
+                    // EXECUTE_ALU state as everything else (handoff §7
+                    // decision 1 — no MUL_WAIT). Direct funct3 passthrough
+                    // (handoff §8), no lookup table. Gated on
+                    // OPCODE_RTYPE explicitly (handoff §6's opcode map
+                    // scopes funct7 disambiguation to opcode 0110011
+                    // only) — I-type's IR[31:25] is immediate bits, not a
+                    // real funct7, and could otherwise coincidentally
+                    // match FUNCT7_MUL/CRC once slice 6 wires I-type in.
+                    mult_en_o    = 1'b1;
+                    mult_op      = {2'b00, funct3_i};
+                    result_src_o = `RESULT_SRC_MUL;
+                end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_CRC) begin
+                    // Slice 4: Xicrc. Same pattern as MUL.
+                    crc_en_o     = 1'b1;
+                    crc_op       = {2'b00, funct3_i};
+                    result_src_o = `RESULT_SRC_CRC;
+                end else begin
+                    // R-type ALU (else-fallthrough, handoff §5 trap:
+                    // covers funct7 0000000 AND 0100000, never an
+                    // equality check against either) AND I-type ALU
+                    // (slice 6 — OPCODE_ITYPE has no funct7 field at all;
+                    // IR[31:25] there is immediate bits, not a category
+                    // selector, so it naturally falls through to this
+                    // same else with no additional opcode check needed).
+                    //
+                    // Slice 6: I-type differs from R-type only in
+                    // alu_src_b_o/imm_sel_o (immediate operand, not rs2).
+                    // The alu_op_o decode table below is shared as-is.
+                    if (opcode_i == `OPCODE_ITYPE) begin
+                        alu_src_b_o = `ALU_SRC_B_IMM;
+                        imm_sel_o   = `IMM_SEL_I;
+                    end
+
+                    // alu_op decode (handoff §6, reused by slice 6 per
+                    // its "no change" instruction). funct3 000: R-type
+                    // ADD/SUB need funct7[5]; I-type has no SUBI (handoff
+                    // Slice-6 section — bit 30 in that position is
+                    // immediate data, not a category bit), so ADDI must
+                    // always decode as ADD regardless of that bit.
+                    // funct3 101: SRLI/SRAI genuinely reuse the same bit
+                    // position (instruction bit 30) as funct7[5] even
+                    // though it's not a "funct7" for I-type — confirmed
+                    // against the RISC-V spec (handoff explicit warning:
+                    // getting this wrong makes srai silently execute as
+                    // srli).
+                    case (funct3_i)
+                        3'b000: alu_op_o = (opcode_i != `OPCODE_ITYPE && funct7_i[5]) ? `ALU_SUB : `ALU_ADD;
+                        3'b001: alu_op_o = `ALU_SLL;
+                        3'b010: alu_op_o = `ALU_SLT;
+                        3'b011: alu_op_o = `ALU_SLTU;
+                        3'b100: alu_op_o = `ALU_XOR;
+                        3'b101: alu_op_o = funct7_i[5] ? `ALU_MRS : `ALU_SRL;
+                        3'b110: alu_op_o = `ALU_OR;
+                        3'b111: alu_op_o = `ALU_AND;
+                        // Illegal-opcode policy still open (handoff §8).
+                        // Defaulting to ADD for now — not a trap/exception
+                        // path, just a placeholder until policy is decided.
+                        default: alu_op_o = `ALU_ADD;
+                    endcase
+                end
+            end
+
+            MEM_ADDR: begin
+                // Effective address = rs1 + imm (handoff §9 row).
+                alu_src_a_o = `ALU_SRC_A_RS1;
+                alu_src_b_o = `ALU_SRC_B_IMM;
+                alu_op_o    = `ALU_ADD;
+                imm_sel_o   = (opcode_i == `OPCODE_STORE) ? `IMM_SEL_S : `IMM_SEL_I;
+                op_size_o   = op_size_lookup;
+                bw_o        = bw_lookup;
+            end
+
+            MEM_ACCESS_ADDR: begin
+                // Load, sub-cycle 1: present address to DMEM (registered-
+                // output SRAM — data not valid until next cycle).
+                oe_o      = 1'b1;
+                op_size_o = op_size_lookup;
+            end
+
+            MEM_ACCESS_DATA: begin
+                // Load, sub-cycle 2: DMEM's registered read data is valid
+                // this cycle.
+                result_src_o = `RESULT_SRC_MEM;
+            end
+
+            MEM_ACCESS_STORE: begin
+                // Store: commit write this single cycle, then straight to
+                // FETCH (no WRITE_BACK — handoff §1/§9).
+                we_o      = 1'b1;
+                op_size_o = op_size_lookup;
+                bw_o      = bw_lookup;
+            end
+
+            WRITE_BACK: begin
+                reg_write_o = 1'b1;
+                // result_src_o depends on the path taken to get here
+                // (see prev_state comment above). EXECUTE_ALU can mean
+                // ALU result, (slice 3) JAL/JALR's PC+4 link value, or
+                // (slice 4) MUL/CRC result — opcode_i/funct7_i still hold
+                // the just-executed instruction's fields here since IR
+                // isn't re-latched until FETCH, so they disambiguate
+                // within the EXECUTE_ALU-sourced case.
+                if (prev_state == MEM_ACCESS_DATA)
+                    result_src_o = `RESULT_SRC_MEM;
+                else if (prev_state == EXECUTE_ALU &&
+                         (opcode_i == `OPCODE_JAL || opcode_i == `OPCODE_JALR))
+                    result_src_o = `RESULT_SRC_PC4;
+                else if (prev_state == EXECUTE_ALU && opcode_i == `OPCODE_RTYPE &&
+                         funct7_i == `FUNCT7_MUL)
+                    result_src_o = `RESULT_SRC_MUL;
+                else if (prev_state == EXECUTE_ALU && opcode_i == `OPCODE_RTYPE &&
+                         funct7_i == `FUNCT7_CRC)
+                    result_src_o = `RESULT_SRC_CRC;
+                else
+                    result_src_o = `RESULT_SRC_ALU;
+            end
+
+            default: begin
+                // all defaults
+            end
+        endcase
+    end
 
 endmodule

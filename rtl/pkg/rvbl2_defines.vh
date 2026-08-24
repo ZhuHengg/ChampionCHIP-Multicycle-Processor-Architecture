@@ -32,9 +32,18 @@
 // ---------------------------------------------------------------------
 // funct7 disambiguation for OPCODE_RTYPE — handoff doc §5
 // ---------------------------------------------------------------------
-`define FUNCT7_ALU     7'b0000000  // default / non-special — plain R-type ALU
-`define FUNCT7_MUL     7'b0000001  // Zmmul
-`define FUNCT7_CRC     7'b1000000  // Xicrc
+// WARNING: category selection is an ELSE, not a three-way equality
+// check. SUB and SRA use funct7=0100000 — a fourth value that matches
+// neither FUNCT7_MUL nor FUNCT7_CRC. Correct logic:
+//     if      (funct7 == `FUNCT7_MUL) ...  // Zmmul
+//     else if (funct7 == `FUNCT7_CRC) ...  // Xicrc
+//     else                             ...  // R-type ALU (covers
+//                                            // 0000000 AND 0100000 AND
+//                                            // anything else)
+`define FUNCT7_MUL     7'b0000001  // Zmmul — exact match required
+`define FUNCT7_CRC     7'b1000000  // Xicrc — exact match required
+// No FUNCT7_ALU constant on purpose — ALU is "else", never an equality
+// target.
 
 // ---------------------------------------------------------------------
 // alu_op — Table 9. Requires real decode (funct3 + funct7[5]), NOT a
@@ -54,7 +63,8 @@
 
 // ---------------------------------------------------------------------
 // mult_op — Table 10. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// mult_op = {1'b0, funct3}. Do not build a lookup table for this.
+// mult_op = {2'b00, funct3}. Do not build a lookup table for this.
+// Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
 // ---------------------------------------------------------------------
 `define MULT_MUL       4'h0
 `define MULT_MULH      4'h1
@@ -63,7 +73,8 @@
 
 // ---------------------------------------------------------------------
 // crc_op — Table 11. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// crc_op = {1'b0, funct3}. Do not build a lookup table for this.
+// crc_op = {2'b00, funct3}. Do not build a lookup table for this.
+// Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
 // ---------------------------------------------------------------------
 `define CRC_CRCB       4'h0
 `define CRC_CRCH       4'h1
@@ -98,10 +109,31 @@
 `define DMEM_BASE        32'h10010000
 
 // ---------------------------------------------------------------------
+// op_size_o — decided (handoff §3, §7 item 9). [2:1]=size, [0]=sign.
+// Sign bit is don't-care for stores (stores never extend).
+// ---------------------------------------------------------------------
+`define OP_SIZE_BYTE_S   3'b000  // lb / sb
+`define OP_SIZE_BYTE_U   3'b001  // lbu
+`define OP_SIZE_HALF_S   3'b010  // lh / sh
+`define OP_SIZE_HALF_U   3'b011  // lhu
+`define OP_SIZE_WORD     3'b100  // lw / sw
+
+// ---------------------------------------------------------------------
+// imm_sel_o — decided (handoff §3, §7 item 10). Fully internal
+// invention, no external spec to check against.
+// ---------------------------------------------------------------------
+`define IMM_SEL_I        3'b000  // I-type ALU, JALR, loads
+`define IMM_SEL_S        3'b001  // stores
+`define IMM_SEL_B        3'b010  // branches
+`define IMM_SEL_U        3'b011  // LUI, AUIPC
+`define IMM_SEL_J        3'b100  // JAL
+
+// ---------------------------------------------------------------------
 // STILL OPEN — do not invent values for these, ask first.
 // See HANDOFF_control_unit.md §8.
 // ---------------------------------------------------------------------
-// `define OP_SIZE_*      — 3-bit encoding not yet defined
-// `define IMM_SEL_*      — format-select encoding not yet defined
+// Illegal-opcode handling policy — undecided.
+// ECALL behavior — revisit once validation firmware is released.
+// x0 write protection — belongs in regfile, not here; not FSM-blocking.
 
 `endif // RVBL2_DEFINES_VH

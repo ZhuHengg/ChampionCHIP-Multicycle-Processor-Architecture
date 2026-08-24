@@ -114,8 +114,13 @@ not a loose description of one cycle:
   clock edge; loop straight back to FETCH, no write back needed.
 
 Confirms `lw` at 6 cycles (fetch, decode, mem_addr, mem_access_addr,
-mem_access_data, write back) and `sw` at 5 (fetch, decode, mem_addr,
+mem_access_data, write back) and `sw` at 4 (fetch, decode, mem_addr,
 mem_access, back to fetch — no write back).
+
+**Note:** this line originally said `sw` at 5, which was wrong — the four
+state names listed are correct, so the count is 4. Corrected here and in
+`HANDOFF_control_unit.md`, `CONTROL_UNIT_BUILD_PLAN.md`, and
+`HANDOFF_control_unit_ALL_STAGES.md`.
 
 ## Resolved — Issue 3: Decode's opcode → next-state map
 

@@ -1,30 +1,34 @@
 # RVBL-2 Multicycle RISC-V Core — Phase 2
 
-ChampionCHIP eXperience submission. See `docs/HANDOFF_control_unit.md` for
-the full FSM design and control signal spec, and `.claude/CLAUDE.md` for
-AI-agent working rules.
+ChampionCHIP eXperience submission. **Start with
+`docs/HANDOFF_control_unit_ALL_STAGES.md`** — single self-contained handoff
+covering the control unit spec, all 7 build slices, and the decision log.
+`.claude/CLAUDE.md` has the AI-agent working rules.
 
 ## Ownership map
 
-Every folder below has exactly one owner. **Don't edit outside your
-folder** — if you need a change in someone else's module, ask them to
-change it, or open a comment/issue with the exact port and expected
-behavior. This keeps merges clean and keeps one person's assumptions from
-silently overwriting another's.
+Two pairs own the two hard-boundary modules; everything else (datapath,
+firmware, OpenLane, system integration) is shared by all four. **Don't edit
+outside your pair's folder without asking** — if you need a change in the
+other pair's module, ask them, or open a comment/issue with the exact port
+and expected behavior. This keeps merges clean and keeps one pair's
+assumptions from silently overwriting another's. Shared folders still need
+coordination before editing — "shared" means "everyone's responsible," not
+"whoever gets there first wins."
 
 | Folder | Owner | Contents |
 |---|---|---|
-| `rtl/control_unit.v`, `rtl/top.v` | **Teammate A** | FSM, top-level integration |
-| `rtl/datapath/` | **Teammate B** | ALU, multiplier, CRC, branch comparator, immediate extender |
-| `rtl/memory/` | **Teammate C** | Register file, LSU, address decoder, IMEM, DMEM |
+| `rtl/control_unit.v`, `rtl/top.v` | **FSM pair** | FSM, top-level integration |
+| `tb/control_unit/` | **FSM pair** | Control unit testbench |
+| `rtl/memory/` | **Memory pair** | Register file, LSU, address decoder, IMEM, DMEM |
+| `tb/memory/` | **Memory pair** | Per-module memory-side testbenches |
+| `rtl/datapath/` | **Shared — all four** | ALU, multiplier, CRC, branch comparator, immediate extender |
+| `tb/datapath/` | **Shared — all four** | Per-module datapath testbenches |
 | `rtl/pkg/` | **Shared — everyone reads, nobody edits without team agreement** | `rvbl2_defines.vh`, the single source of truth for every opcode/op-code literal |
-| `tb/control_unit/` | **Teammate A** | Control unit testbench |
-| `tb/datapath/` | **Teammate B** | Per-module datapath testbenches |
-| `tb/memory/` | **Teammate C** | Per-module memory-side testbenches |
-| `tb/system/` | **Teammate D** | Full-core testbench, firmware validation |
-| `firmware/` | **Teammate D** | Validation firmware (official + any team test programs) |
-| `openlane/` | **Teammate D** | `config.json`, synthesis run outputs |
-| `docs/` | **Shared** | Report assets, ChipInventor-exported diagrams |
+| `tb/system/` | **Shared — all four** | Full-core testbench, firmware validation |
+| `firmware/` | **Shared — all four** | Validation firmware (official + any team test programs) |
+| `openlane/` | **Shared — all four** | `config.json`, synthesis run outputs |
+| `docs/` | **Shared — all four** | Report assets, ChipInventor-exported diagrams |
 | `sim/` | **Nobody — gitignored** | Compiled `.vvp` / `.vcd` scratch output |
 
 ## Golden rule for `rtl/pkg/rvbl2_defines.vh`
@@ -39,7 +43,7 @@ at `top.v` time.
 ## Build / simulate
 
 ```bash
-iverilog -o sim/<name>.vvp -I rtl/pkg rtl/<path>/<file>.v tb/<path>/tb_<name>.v
+iverilog -o sim/<name>.vvp -I rtl rtl/<path>/<file>.v tb/<path>/tb_<name>.v
 vvp sim/<name>.vvp
 gtkwave sim/<name>.vcd
 ```
@@ -47,9 +51,10 @@ gtkwave sim/<name>.vcd
 ## Status
 
 - [x] Control unit FSM designed (see `docs/HANDOFF_control_unit.md`)
-- [ ] `control_unit.v` — in progress (Teammate A)
-- [ ] Datapath modules (Teammate B)
-- [ ] Memory modules (Teammate C)
-- [ ] `top.v` integration (Teammate A, after B/C land)
-- [ ] System testbench + firmware validation (Teammate D)
-- [ ] OpenLane physical flow (Teammate D)
+- [x] `control_unit.v` slice 1 — R-type ALU path, 10/10 instructions passing
+- [ ] `control_unit.v` slices 2-6 — see `docs/CONTROL_UNIT_BUILD_PLAN.md` (FSM pair)
+- [ ] Memory modules (Memory pair)
+- [ ] Datapath modules (Shared — all four)
+- [ ] `top.v` integration (FSM pair, after datapath/memory land)
+- [ ] System testbench + firmware validation (Shared — all four)
+- [ ] OpenLane physical flow (Shared — all four)
