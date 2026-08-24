@@ -51,10 +51,13 @@ gtkwave sim/<name>.vcd
 ## Status
 
 - [x] Control unit FSM designed (see `docs/HANDOFF_control_unit.md`)
-- [x] `control_unit.v` slice 1 — R-type ALU path, 10/10 instructions passing
-- [ ] `control_unit.v` slices 2-6 — see `docs/CONTROL_UNIT_BUILD_PLAN.md` (FSM pair)
-- [ ] Memory modules (Memory pair)
-- [ ] Datapath modules (Shared — all four)
-- [ ] `top.v` integration (FSM pair, after datapath/memory land)
+- [x] `control_unit.v` slices 1-6 — all 47 instructions decoding, 48/48 tests passing
+- [ ] Datapath modules — `alu.v`, `mult.v`, `crc.v`, `branch_comparator.v`,
+      `imm_extend.v`. See `docs/DATAPATH_BUILD_PLAN.md`. **Assign owners
+      first** — shared folder, so nobody owns any given module by default.
+      `crc.v` is blocked on a spec gap; raise it now.
+- [ ] Memory modules — `regfile.v`, `lsu.v`, `address_decoder.v`, `imem.v`,
+      `dmem.v` (Memory pair). See `rtl/memory/README.md`.
+- [ ] `top.v` integration — control unit slice 7, blocked until the above land
 - [ ] System testbench + firmware validation (Shared — all four)
 - [ ] OpenLane physical flow (Shared — all four)
