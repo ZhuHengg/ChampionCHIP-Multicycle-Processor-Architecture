@@ -15,15 +15,25 @@
 // Fixed trap 6 (RESULT_SRC_PC4 must be old_pc+4, not pc — see deviation
 // note 2).
 //
-// SLICE 7e SCOPE (this slice): + dmem, lsu, real mux_mem_addr ALU arm.
+// SLICE 7e SCOPE (done): + dmem, lsu, real mux_mem_addr ALU arm.
 // Loads (lw/lh/lhu/lb/lbu) and stores (sw/sh/sb) execute end to end
 // against DMEM, and lw from IMEM works (guide §4.2). Fixed trap 7 (see
-// deviation note 5). Still no MUL/CRC (7f).
+// deviation note 5).
+//
+// SLICE 7f SCOPE (this slice): + mult, crc. mul/mulh/mulhsu/mulhu
+// (Zmmul) and crcb/crch/crcw (Xicrc) execute end to end and write back.
+// Fixed trap 9 (see deviation note 7): mult_op_o/crc_op_o are only
+// driven inside EXECUTE_ALU and revert to their 4'h0 defaults in
+// WRITE_BACK (the state mux_result actually samples), so the live unit
+// outputs cannot be tapped directly the way TOP_BUILD_PLAN.md §2
+// assumed — mulh/mulhsu/mulhu and crch/crcw would silently read back
+// mul's/crcb's result. mult_en_o/crc_en_o (unconnected through 7e) now
+// gate two new result registers.
 //
 // Governing source: docs/TOP_BUILD_PLAN.md §2 (registers/muxes top.v
 // must create), §3 traps 1/2/6/7 (old_pc vs live pc, alu_out register vs
 // live ALU, RESULT_SRC_PC4 vs redirected pc, alu_out clobbered during
-// MEM_ACCESS_*), §4 (wiring table), §5 (slice list, this is 7e).
+// MEM_ACCESS_*), §4 (wiring table), §5 (slice list, this is 7f).
 //
 // DEVIATIONS / ASSUMPTIONS (CLAUDE.md step 8):
 //
@@ -63,9 +73,13 @@
 // 3. branch_comparator is now instantiated (slice 7d); control_unit's
 //    branch_taken_i is wired to its live branch_taken_o, not tied off.
 //
-// 4. mux_result's MUL/CRC arms are tied to 32'b0 this slice — no
-//    mult/crc module instantiated yet (7f). Named per the slice that
-//    fills them in so they aren't mistaken for finished wiring.
+// 4. [CORRECTED in slice 7f — this note described the 7e tie-off, now
+//    stale.] mult/crc are instantiated this slice, fed rs1_data/rs2_data
+//    directly (both stable for a whole instruction since ir only
+//    changes in FETCH — TOP_BUILD_PLAN.md §2's "no MUL/CRC result
+//    register needed" reasoning is correct as far as the operands go).
+//    But mux_result's RESULT_SRC_MUL/RESULT_SRC_CRC arms do NOT read the
+//    live mult.result_o/crc.result_o — see trap 9, deviation note 7.
 //
 // 5. alu_out no longer loads every cycle (trap 7) — TOP_BUILD_PLAN.md
 //    §2's table says "every cycle", and that was correct through slice
@@ -124,6 +138,39 @@
 //    mux_result's RESULT_SRC_MEM arm reads this register, not the live
 //    lsu_core_data_i wire.
 //
+// 7. mult_result_r / crc_result_r registers added (trap 9) — NOT in
+//    TOP_BUILD_PLAN.md §2's table, which claims MUL/CRC need no result
+//    register because their operands (rs1_data/rs2_data) stay stable for
+//    the whole instruction. That much is true, but the OP-SELECT is not
+//    stable: control_unit.v's output-logic block (control_unit.v:332-602)
+//    drives mult_op_o/crc_op_o only inside the EXECUTE_ALU MUL/CRC cases
+//    (control_unit.v:461-468) — every other state, including WRITE_BACK
+//    (control_unit.v:563-596, the state mux_result actually samples),
+//    falls through to the block's top-of-case defaults
+//    (control_unit.v:343-344): mult_op_o/crc_op_o = 4'h0. Verified by
+//    inspection that mult_en_o/crc_en_o (control_unit.v:461,466) are
+//    likewise asserted in exactly that EXECUTE_ALU case and nowhere
+//    else in the file — no other case branch sets either signal, and
+//    the defaults block clears both to 0.
+//
+//    4'h0 = `MULT_MUL`/`CRC_CRCB` (rvbl2_defines.vh), so a live tap of
+//    mult.result_o/crc.result_o during WRITE_BACK silently returns the
+//    MUL/CRCB answer for every op — mulh/mulhsu/mulhu and crch/crcw
+//    would read back mul's/crcb's result instead of their own. mul and
+//    crcb themselves pass regardless (4'h0 happens to be their own
+//    encoding), which is exactly why a test suite that only exercises
+//    those two ops reports green on a broken unit. Confirmed in
+//    simulation on this tree with `mulh x5, x1, x2`: state=3
+//    (EXECUTE_ALU) shows mult_en=1 mult_op=1; state=4 (WRITE_BACK) shows
+//    mult_en=0 mult_op=0.
+//
+//    Fix: mult_result_r/crc_result_r capture the live mult/crc result
+//    while mult_en_o/crc_en_o are asserted (i.e. only during
+//    EXECUTE_ALU, while mult_op_o/crc_op_o are still correctly driven),
+//    then hold through WRITE_BACK. mux_result's RESULT_SRC_MUL/
+//    RESULT_SRC_CRC arms read these REGISTERS, not the live mult/crc
+//    outputs — same pattern as traps 2 and 8 (alu_out/mem_result).
+//
 // Wiring notes from the plan, restated here because they are exactly
 // where a fetch-path bug hides:
 // - address_decoder.address_o is [29:0] (bottom two bits already
@@ -161,6 +208,12 @@ module top #(
     // deviation note 6 above.
     reg [31:0] mem_result;
 
+    // mult_result_r / crc_result_r — trap 9 (deviation note 7). Captured
+    // while mult_en_o/crc_en_o are asserted (EXECUTE_ALU only), held
+    // through WRITE_BACK.
+    reg [31:0] mult_result_r;
+    reg [31:0] crc_result_r;
+
     // ------------------------------------------------------------------
     // Control unit <-> datapath wiring.
     // ------------------------------------------------------------------
@@ -173,6 +226,10 @@ module top #(
     wire [1:0]  alu_src_b_o;
     wire [3:0]  alu_op_o;
     wire [2:0]  imm_sel_o;
+    wire [3:0]  mult_op_o;
+    wire [3:0]  crc_op_o;
+    wire        mult_en_o;
+    wire        crc_en_o;
     wire        we_o;
     wire        oe_o;
     wire [3:0]  bw_o;
@@ -192,10 +249,12 @@ module top #(
     wire [31:0] alu_result; // live ALU output — trap 2, do not tap for RESULT_SRC_ALU
     wire        branch_taken;
 
-    // Tie-offs — not yet computed by any module this slice. See
-    // deviation note 4 above.
-    wire [31:0] mult_result = 32'b0; // slice 7f
-    wire [31:0] crc_result  = 32'b0; // slice 7f
+    // Live mult/crc outputs — combinational, valid only while
+    // mult_op_o/crc_op_o are correctly driven (EXECUTE_ALU). Do NOT tap
+    // these for mux_result — trap 9, deviation note 7. Captured into
+    // mult_result_r/crc_result_r instead.
+    wire [31:0] mult_result;
+    wire [31:0] crc_result;
 
     // DMEM / LSU nets.
     wire [31:0] dmem_data_o;
@@ -274,8 +333,8 @@ module top #(
         mux_result = alu_out; // default
         case (result_src_o)
             `RESULT_SRC_ALU: mux_result = alu_out;         // trap 2 — the REGISTER
-            `RESULT_SRC_MUL: mux_result = mult_result;      // slice 7f
-            `RESULT_SRC_CRC: mux_result = crc_result;       // slice 7f
+            `RESULT_SRC_MUL: mux_result = mult_result;   // MUTATION 1 TEMP
+            `RESULT_SRC_CRC: mux_result = crc_result_r;    // trap 9 — the REGISTER, not live crc_result
             `RESULT_SRC_MEM: mux_result = mem_result; // trap 8 — the REGISTER, not live lsu_core_data_i
             // trap 6: NOT pc — pc has already been redirected to the
             // jump target by JAL/JALR's pc_write_o inside EXECUTE_ALU,
@@ -341,6 +400,27 @@ module top #(
     end
 
     // ------------------------------------------------------------------
+    // mult_result_r / crc_result_r registers — trap 9. Own always blocks
+    // per CLAUDE.md step 4 (one purpose each). Capture the live mult/crc
+    // result only while mult_en_o/crc_en_o are asserted — that is
+    // exactly EXECUTE_ALU, the one state where mult_op_o/crc_op_o are
+    // correctly driven (see deviation note 7). Held through WRITE_BACK.
+    // ------------------------------------------------------------------
+    always @(posedge clk_i) begin
+        if (rst_i)
+            mult_result_r <= 32'b0;
+        else if (mult_en_o)
+            mult_result_r <= mult_result;
+    end
+
+    always @(posedge clk_i) begin
+        if (rst_i)
+            crc_result_r <= 32'b0;
+        else if (crc_en_o)
+            crc_result_r <= crc_result;
+    end
+
+    // ------------------------------------------------------------------
     // Module instances.
     // ------------------------------------------------------------------
     control_unit u_control_unit (
@@ -361,10 +441,10 @@ module top #(
         .alu_src_b_o    (alu_src_b_o),
         .alu_op_o       (alu_op_o),
         .imm_sel_o      (imm_sel_o),
-        .mult_op_o      (),        // slice 7f
-        .crc_op_o       (),        // slice 7f
-        .mult_en_o      (),        // slice 7f
-        .crc_en_o       (),        // slice 7f
+        .mult_op_o      (mult_op_o),
+        .crc_op_o       (crc_op_o),
+        .mult_en_o      (mult_en_o),
+        .crc_en_o       (crc_en_o),
         .we_o           (we_o),
         .oe_o           (oe_o),
         .bw_o           (bw_o),
@@ -428,6 +508,30 @@ module top #(
         .rs2_i          (rs2_data),
         .funct3_i       (ir[14:12]),
         .branch_taken_o (branch_taken)
+    );
+
+    // Combinational, single-cycle (handoff decision #1 — no MUL_WAIT).
+    // rs1_data/rs2_data are stable for the whole instruction (ir only
+    // changes in FETCH). Live result is captured into mult_result_r —
+    // do not tap mult_result itself from mux_result (trap 9).
+    mult u_mult (
+        .a_i       (rs1_data),
+        .b_i       (rs2_data),
+        .mult_op_i (mult_op_o),
+        .result_o  (mult_result)
+    );
+
+    // Combinational, no latency (guide §3.1.3). CRC operand roles are
+    // REVERSED from the usual incremental-CRC convention: a_i (rs1) is
+    // the data, b_i (rs2) is the running CRC seed — confirmed against
+    // firmware/crc_test.S's `crcb s0, s1, s0` (rd=s0, rs1=s1 data,
+    // rs2=s0 seed). Live result captured into crc_result_r — do not tap
+    // crc_result itself from mux_result (trap 9).
+    crc u_crc (
+        .a_i      (rs1_data),
+        .b_i      (rs2_data),
+        .crc_op_i (crc_op_o),
+        .result_o (crc_result)
     );
 
     dmem u_dmem (
