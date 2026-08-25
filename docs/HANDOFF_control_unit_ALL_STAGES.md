@@ -113,9 +113,35 @@ drives.
 | `op_size_o` | 3 | Fig. 2, §3.3.3 | Core→LSU: access size + sign |
 | `core_data_o` | 32 | Fig. 2 | Core→LSU: store data |
 | `core_data_i` | 32 | Fig. 2 | LSU→core: load data, already sign/zero-extended |
+| `core_address_o` | 32 | Fig. 2 | Core→LSU: access address |
+| `mem_data_o` | 32 | Fig. 2 | Memory→LSU: raw word read back |
+| `mem_data_i` | 32 | Fig. 2 | LSU→memory: store data, byte-positioned |
+| `mem_address_i` | 32 | Fig. 2 | LSU→memory: address |
+| `byte_write_i` | 4 | Fig. 2 | LSU→memory: byte write mask — the guide's own name for what §4.4 calls `bw_o` on the core side |
+
+**Verified against the PDF, 2026-08-25.** This is the complete set of port
+names the guide actually states. `we_o`/`oe_o`/`bw_o`/`address_o` appear in
+the §4.4 body text and in Figure 3; the LSU names are the labels drawn
+inside Figure 2. Nothing else in the guide names a port.
+
+### Op-select ports — encodings guide-fixed, names ours
+
+Tables 9/10/11 are **value tables**: an encoding column and an operation
+column, no port-name column. The strings `alu_op`, `mult_op`, and `crc_op`
+appear nowhere in the guide (full-text search of the PDF, 2026-08-25).
+Encodings must match exactly; the names are a team decision.
+
+| Signal | Width | Encoding source | Meaning |
+|---|---|---|---|
 | `alu_op_o` | 4 | Table 9 | ALU select, `4'h0`–`4'hA` (11 values → 4 bits) |
-| `mult_op` | 4 | Table 10 | MUL select, values 0–3 |
-| `crc_op` | 4 | Table 11 | CRC select, values 0–2 |
+| `mult_op_o` | 4 | Table 10 | MUL select, values 0–3 |
+| `crc_op_o` | 4 | Table 11 | CRC select, values 0–2 |
+
+✅ **Resolved 2026-08-25.** These were originally declared bare
+(`mult_op`/`crc_op`), the only two control-unit outputs missing the `_o`
+suffix. Renamed to `mult_op_o`/`crc_op_o` before `top.v` was written, while
+`control_unit.v` was still the only file referencing them. `mult.v` and
+`crc.v` receive them as `mult_op_i`/`crc_op_i` and were untouched.
 
 ### Invented internally — not in the guide
 
@@ -241,17 +267,17 @@ passthrough. Only funct3 `000` and `101` consult funct7[5]:
 Ten rows, matching the guide's "Arithmetic and Logic (Register): 10 expected."
 `` `ALU_PASS_B `` (`4'h0`) has no R-type instruction — it's used by LUI only.
 
-## 8. `mult_op` / `crc_op` — direct funct3 passthrough
+## 8. `mult_op_o` / `crc_op_o` — direct funct3 passthrough
 
 **The opposite of `alu_op_o`.** The guide's numbering makes these identical
 to funct3 by construction, so no lookup table is needed:
 
 ```verilog
-mult_op = {2'b00, funct3_i};   // 4-bit port, zero-extended
-crc_op  = {2'b00, funct3_i};
+mult_op_o = {2'b00, funct3_i};   // 4-bit port, zero-extended
+crc_op_o  = {2'b00, funct3_i};
 ```
 
-| mult_op | Instruction | funct3 | | crc_op | Instruction | funct3 |
+| mult_op_o | Instruction | funct3 | | crc_op_o | Instruction | funct3 |
 |---|---|---|---|---|---|---|
 | `4'h0` | mul | `000` | | `4'h0` | crcb | `000` |
 | `4'h1` | mulh | `001` | | `4'h1` | crch | `001` |
@@ -452,15 +478,15 @@ it in one cycle like ALU. 4 cycles total.
 `FUNCT7_MUL` → MUL, `FUNCT7_CRC` → CRC, **else → ALU**. This is where slice
 1's else-structure pays off.
 
-**New ports:** `mult_op` (4), `crc_op` (4), `mult_en_o` (1), `crc_en_o` (1).
+**New ports:** `mult_op_o` (4), `crc_op_o` (4), `mult_en_o` (1), `crc_en_o` (1).
 
-**Wiring:** `mult_op = {2'b00, funct3_i}`, `crc_op = {2'b00, funct3_i}` —
+**Wiring:** `mult_op_o = {2'b00, funct3_i}`, `crc_op_o = {2'b00, funct3_i}` —
 passthrough, no lookup table (§8).
 
 **`result_src_o`:** `RESULT_SRC_MUL` for MUL, `RESULT_SRC_CRC` for CRC.
 
 **Tests:** 4 MUL (mul, mulh, mulhsu, mulhu — funct3 000/001/010/011) and 3
-CRC (crcb, crch, crcw — funct3 000/001/010). Assert `mult_op`/`crc_op` equals
+CRC (crcb, crch, crcw — funct3 000/001/010). Assert `mult_op_o`/`crc_op_o` equals
 funct3, correct enable, correct `result_src_o`, 4 cycles.
 
 **⚠ Regression risk — test explicitly.** After adding the MUL/CRC funct7
@@ -496,12 +522,31 @@ firmware does that, a no-op ECALL **silently breaks firmware validation**
 (report §6) while still looking correct in the coverage table — passing one
 scored category while failing another, with nothing pointing at the cause.
 
-**Build it so the fix is one line.** Add a `halt_o` output (or internal
-`halted` flag) wired to the ECALL case, held at 0. If the firmware turns out
-to need it, setting it is a one-liner rather than a restructure under
-deadline pressure. Also worth checking the ChampionCHIP platform docs before
-assuming the answer is unknowable — see Part IV, "ECALL — what to do while
-it's blocked."
+**✅ DONE 2026-08-25 — `halt_o` implemented.** Sticky status flag, set on
+the posedge that retires an ECALL, cleared only by reset.
+
+- **Requires a new CU input**, `funct12_i` = IR[31:20]. `funct7_i`
+  (IR[31:25]) cannot do this job: ECALL and EBREAK share opcode `1110011`,
+  funct3 `000`, *and* funct7 `0000000`. They differ only in IR[20].
+  `` `FUNCT12_ECALL `` = `12'h000`, `` `FUNCT12_EBREAK `` = `12'h001`,
+  cross-referenced against the RISC-V spec's Environment Call chapter.
+- **Execution semantics unchanged.** ECALL, EBREAK and FENCE all remain
+  3-cycle no-ops with the PC advancing. `halt_o` is a status output that
+  nothing inside the core reads, so all 48 prior tests are unaffected by
+  construction — and are still passing.
+- **Set on retire, not on decode** (EXECUTE_ALU, not DECODE), so the flag
+  cannot assert for an instruction that never executed.
+- **Sticky, not a pulse.** A one-cycle pulse is missable by a testbench
+  sampling on the wrong edge.
+- **Tested:** reset clears it; EBREAK and FENCE leave it at 0; ECALL sets
+  it; a later ADD does not clear it; reset clears it again. A continuous
+  guard block also fails the run if `halt_o` ever asserts before an ECALL
+  has retired. Four mutants (drop the funct12 check, match EBREAK instead,
+  set during DECODE, make it non-sticky) were each confirmed to fail the
+  testbench.
+- **Still open:** whether the firmware needs the core to actually *stop*
+  (PC frozen) rather than just flag. One line from here — gate
+  `pc_write_o` on `!halt_o`. See decision 15.
 
 **Tests:** LUI/AUIPC assert correct `alu_op_o`/`alu_src_*_o`, 4 cycles,
 `reg_write_o` in WRITE_BACK. System no-ops assert 3 cycles and
@@ -542,7 +587,7 @@ address decoder, IMEM, DMEM) landing from their owners.
 **Work:**
 1. Replace every testbench stub input with the real module output.
 2. Verify port widths match on both sides of every connection — especially
-   `mult_op`/`crc_op` (4-bit here) and `op_size_o`.
+   `mult_op_o`/`crc_op_o` (4-bit here) and `op_size_o`.
 3. Wire `branch_taken_i` from the real comparator.
 4. Run the full-core testbench in `tb/system/`.
 5. Run the official validation firmware once released.
@@ -574,16 +619,19 @@ work together:**
 | 1 | MUL is combinational, single-cycle | Timing slack is ample at target clock; area is the risk, not timing. Revisit only if OpenLane shows MUL dominating |
 | 2 | DMEM load = 2 sub-cycles, store = 1 | Forced by synchronous registered-output SRAM (guide §4.3) |
 | 3 | Branch/jump merged into EXECUTE | No shared-hardware conflict justifies splitting; splitting costs a cycle per branch |
-| 4 | ECALL/EBREAK/FENCE as no-ops | Needed for 47/47 coverage. **Caveat — see slice 5** |
+| 4 | ECALL/EBREAK/FENCE as no-ops | Needed for 47/47 coverage. EBREAK and FENCE are *finished* this way — no debugger, no caches, nothing for either to do in this core. ECALL additionally raises `halt_o`; see decision 15 |
 | 5 | `we_o`/`oe_o`/`bw_o`/`address_o` naming | Confirmed against Figure 3 — core drives `_o`, decoder receives `_i` |
-| 6 | `mult_op`/`crc_op` are funct3 passthrough | Guide's own numbering makes them identical — no lookup table needed |
-| 7 | `mult_op`/`crc_op` are 4 bits | Matches `alu_op_o`; wiring consistency. Values need only 2 bits, extra 2 always zero |
-| 8 | Port named `alu_op_o`, not `alu_op` | Uniform `_o` convention across all CU outputs |
+| 6 | `mult_op_o`/`crc_op_o` are funct3 passthrough | Guide's own numbering makes them identical — no lookup table needed |
+| 7 | `mult_op_o`/`crc_op_o` are 4 bits | Matches `alu_op_o`; wiring consistency. Values need only 2 bits, extra 2 always zero |
+| 8 | Port named `alu_op_o`, not `alu_op` | Uniform `_o` convention across all CU outputs. **Corrected 2026-08-25:** originally recorded as deviating from a guide-fixed name — it doesn't. The guide never names this port; Table 9 fixes the encoding only |
 | 9 | `op_size_o` = `[2:1]` size, `[0]` sign | See §5 |
 | 10 | `imm_sel_o` encoding + opcode map | See §5 |
 | 11 | `bw_o` driven by control unit, via `addr_lsb_i` input | Keeps LSU a pure passthrough; CU already owns `op_size_o`. Requires a 2-bit `addr_lsb_i` input from the ALU result — the CU doesn't compute the address. **Close call:** the LSU already has the address locally, so it could own `bw_o` with no new port. Raise with the LSU owner |
 | 12 | Reset is synchronous | Guide is silent; sync chosen for OpenLane flow |
 | 13 | Illegal opcode → **silent no-op** | Unknown opcode advances to FETCH writing nothing. The guide never mentions illegal-instruction trapping, the ISA coverage table has no row for it, and the validation firmware won't deliberately execute bad opcodes. Replaces the earlier `ALU_ADD` fallthrough placeholder, which quietly *executed* garbage as an ADD. Report wording: "unimplemented opcodes are treated as no-ops; illegal-instruction trapping is out of scope for this ISA subset." **Cosmetic for the 47 defined instructions** — changes nothing observable, so fold it into the next edit of `control_unit.v` rather than making it a task |
+| 14 | `mem_address_i`/`byte_write_i` not implemented on the LSU | Guide Figure 2 draws both as LSU outputs to memory. Ours has neither: the address goes core → address decoder directly, and `bw_o` is driven by the control unit (decision 11). `lsu.v` still reads `core_address_o[1:0]` internally for byte positioning. **Functionally equivalent, structurally a deviation from Figure 2** — state it explicitly in the report rather than letting a reviewer find it |
+| 15 | ECALL raises a **sticky status flag**, it does not stop the core | The guide never mentions ECALL, halting, or traps at all (full-text search of the PDF, 2026-08-25), so there is no spec to comply with. Two readings existed: (a) flag completion and keep running, (b) freeze the PC. **(a) chosen** because it is strictly weaker — it adds an observable signal without changing any executed behavior, so it cannot break firmware that uses ECALL mid-program for something other than termination. (b) can be layered on later by gating `pc_write_o` on `!halt_o`; starting at (b) and discovering the firmware wanted (a) is not recoverable as cheaply |
+| 16 | `mult_op`/`crc_op` renamed to `mult_op_o`/`crc_op_o` | They were the only two CU outputs without the `_o` suffix. Done 2026-08-25, before `top.v` existed and while `control_unit.v` was the sole file referencing them — one file plus its testbench, versus two files and a written report later. Receiving ports (`mult_op_i`/`crc_op_i` on `mult.v`/`crc.v`) were already correct and did not change |
 
 **Items 6-12 were set unilaterally**, before the ALU/MULT/CRC/LSU owners
 started their modules — no teammate to conflict with yet, and every value is
@@ -595,7 +643,7 @@ not cheap after.
 | Decision | Confirm with |
 |---|---|
 | `op_size_o` encoding, `bw_o` ownership | LSU owner |
-| `mult_op`/`crc_op` width | MULT/CRC owner |
+| `mult_op_o`/`crc_op_o` width | MULT/CRC owner |
 | `alu_op_o` port name | ALU owner |
 | `imm_sel_o` encoding | Team (our own invention) |
 
@@ -670,7 +718,11 @@ Every testbench needs `$dumpfile("sim/<name>.vcd")` and `$dumpvars(0, ...)`.
 | System / Synchronization | 3 | 5 | |
 | Multiplication | 4 | 4 | |
 | CRC | 3 | 4 | |
-| **Total** | **47** | | **10/47** |
+| **Total** | **47** | | **47/47 decoded** |
+
+All 47 decode in `control_unit.v` (slices 1-6, 48/48 tests passing). Decode
+coverage is not the same as end-to-end execution — that needs `top.v` and
+the system testbench before the report's coverage table can be claimed.
 
 ## Memory map (guide Table 13)
 

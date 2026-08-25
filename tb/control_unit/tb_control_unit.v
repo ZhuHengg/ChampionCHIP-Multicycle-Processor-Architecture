@@ -14,6 +14,7 @@ module tb_control_unit;
     reg [6:0]  opcode_i;
     reg [2:0]  funct3_i;
     reg [6:0]  funct7_i;
+    reg [11:0] funct12_i;
     reg [1:0]  addr_lsb_i;
     reg        branch_taken_i;
 
@@ -30,10 +31,11 @@ module tb_control_unit;
     wire        oe_o;
     wire [3:0]  bw_o;
     wire [2:0]  op_size_o;
-    wire [3:0]  mult_op;
-    wire [3:0]  crc_op;
+    wire [3:0]  mult_op_o;
+    wire [3:0]  crc_op_o;
     wire        mult_en_o;
     wire        crc_en_o;
+    wire        halt_o;
 
     integer errors;
 
@@ -48,12 +50,26 @@ module tb_control_unit;
         end
     end
 
+    // halt_o guard: halt_o must never assert before an ECALL has
+    // retired. Same continuous-check style as the we_o guard above, so
+    // a spurious assertion anywhere in the run is caught, not just at
+    // the directed checkpoints. ecall_seen is set by the testbench
+    // immediately before the one test that is supposed to trigger it.
+    reg ecall_seen;
+    always @(*) begin
+        if (halt_o && !ecall_seen) begin
+            $display("FAIL [halt_o guard] halt_o asserted with no ECALL retired, state=%0d", dut.state);
+            errors = errors + 1;
+        end
+    end
+
     control_unit dut (
         .clk_i        (clk_i),
         .rst_i        (rst_i),
         .opcode_i     (opcode_i),
         .funct3_i     (funct3_i),
         .funct7_i     (funct7_i),
+        .funct12_i    (funct12_i),
         .addr_lsb_i     (addr_lsb_i),
         .branch_taken_i (branch_taken_i),
         .pc_write_o   (pc_write_o),
@@ -65,14 +81,15 @@ module tb_control_unit;
         .alu_src_b_o  (alu_src_b_o),
         .alu_op_o     (alu_op_o),
         .imm_sel_o    (imm_sel_o),
-        .mult_op      (mult_op),
-        .crc_op       (crc_op),
+        .mult_op_o      (mult_op_o),
+        .crc_op_o       (crc_op_o),
         .mult_en_o    (mult_en_o),
         .crc_en_o     (crc_en_o),
         .we_o         (we_o),
         .oe_o         (oe_o),
         .bw_o         (bw_o),
-        .op_size_o    (op_size_o)
+        .op_size_o    (op_size_o),
+        .halt_o       (halt_o)
     );
 
     // 10ns clock
@@ -554,7 +571,7 @@ module tb_control_unit;
     // Slice 4: runs a full MUL or CRC instruction,
     // FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, 4 cycles. is_crc
     // selects which enable/op/result_src set to check (handoff §8 —
-    // mult_op/crc_op are direct funct3 passthrough, no lookup table).
+    // mult_op_o/crc_op_o are direct funct3 passthrough, no lookup table).
     // -----------------------------------------------------------------
     task run_mulcrc;
         input [127:0] label;
@@ -591,8 +608,8 @@ module tb_control_unit;
                     $display("FAIL [%0s-EXECUTE] mult_en_o: exp=0 got=%b", label, mult_en_o);
                     errors = errors + 1;
                 end
-                if (crc_op !== {2'b00, funct3_i}) begin
-                    $display("FAIL [%0s-EXECUTE] crc_op: exp=%h got=%h", label, {2'b00, funct3_i}, crc_op);
+                if (crc_op_o !== {2'b00, funct3_i}) begin
+                    $display("FAIL [%0s-EXECUTE] crc_op_o: exp=%h got=%h", label, {2'b00, funct3_i}, crc_op_o);
                     errors = errors + 1;
                 end
                 if (result_src_o !== `RESULT_SRC_CRC) begin
@@ -608,8 +625,8 @@ module tb_control_unit;
                     $display("FAIL [%0s-EXECUTE] crc_en_o: exp=0 got=%b", label, crc_en_o);
                     errors = errors + 1;
                 end
-                if (mult_op !== {2'b00, funct3_i}) begin
-                    $display("FAIL [%0s-EXECUTE] mult_op: exp=%h got=%h", label, {2'b00, funct3_i}, mult_op);
+                if (mult_op_o !== {2'b00, funct3_i}) begin
+                    $display("FAIL [%0s-EXECUTE] mult_op_o: exp=%h got=%h", label, {2'b00, funct3_i}, mult_op_o);
                     errors = errors + 1;
                 end
                 if (result_src_o !== `RESULT_SRC_MUL) begin
@@ -743,9 +760,12 @@ module tb_control_unit;
     // -----------------------------------------------------------------
     task run_system_nop;
         input [127:0] label;
+        input         exp_halt;   // halt_o expected once the instruction retires
         integer cycle_count;
+        reg     halt_at_entry;
         begin
-            cycle_count = 0;
+            cycle_count   = 0;
+            halt_at_entry = halt_o;  // sticky flags may already be set
 
             // FETCH
             if (dut.state !== 4'd1) begin
@@ -759,11 +779,25 @@ module tb_control_unit;
                 $display("FAIL [%0s] expected DECODE, got=%0d", label, dut.state);
                 errors = errors + 1;
             end
+            // Retire-timing check: halt_o is latched by the posedge at
+            // the END of EXECUTE_ALU, so decoding an ECALL must not have
+            // moved it yet. A flag wired to DECODE instead of retire
+            // fails here.
+            if (halt_o !== halt_at_entry) begin
+                $display("FAIL [%0s-DECODE] halt_o changed before retire: entry=%b got=%b",
+                         label, halt_at_entry, halt_o);
+                errors = errors + 1;
+            end
             @(posedge clk_i); #1; cycle_count = cycle_count + 1;
 
             // EXECUTE_ALU (no-op)
             if (dut.state !== 4'd3) begin
                 $display("FAIL [%0s] expected EXECUTE_ALU, got=%0d", label, dut.state);
+                errors = errors + 1;
+            end
+            if (halt_o !== halt_at_entry) begin
+                $display("FAIL [%0s-EXECUTE] halt_o changed before retire: entry=%b got=%b",
+                         label, halt_at_entry, halt_o);
                 errors = errors + 1;
             end
             if (reg_write_o !== 1'b0) begin
@@ -787,6 +821,14 @@ module tb_control_unit;
                 errors = errors + 1;
             end else begin
                 $display("PASS [%0s] cycle count = 3 (handoff Sec 2)", label);
+            end
+
+            // halt_o now that the instruction has retired.
+            if (halt_o !== exp_halt) begin
+                $display("FAIL [%0s] halt_o after retire: exp=%b got=%b", label, exp_halt, halt_o);
+                errors = errors + 1;
+            end else begin
+                $display("PASS [%0s] halt_o = %b after retire", label, exp_halt);
             end
         end
     endtask
@@ -876,13 +918,25 @@ module tb_control_unit;
         opcode_i = `OPCODE_RTYPE;
         funct3_i = 3'b000;
         funct7_i = 7'b0000000;
+        // Default is EBREAK, deliberately NOT ECALL: funct12 is a
+        // don't-care for every opcode except OPCODE_SYSTEM, and holding
+        // it at the ECALL pattern would let an unrelated test latch
+        // halt_o by accident and mask a real bug.
+        funct12_i = `FUNCT12_EBREAK;
         addr_lsb_i = 2'b00;
         branch_taken_i = 1'b0;
+        ecall_seen = 1'b0;
 
         @(posedge clk_i); #1;
         if (dut.state !== 4'd0) begin
             $display("FAIL [reset] state: exp=RESET(0) got=%0d", dut.state);
             errors = errors + 1;
+        end
+        if (halt_o !== 1'b0) begin
+            $display("FAIL [reset] halt_o: exp=0 got=%b", halt_o);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [reset] halt_o = 0 out of reset");
         end
         rst_i = 0;
         @(posedge clk_i); #1; // RESET -> FETCH transition lands here
@@ -1061,11 +1115,15 @@ module tb_control_unit;
         opcode_i = `OPCODE_AUIPC;
         run_lui_auipc("AUIPC", 1'b1);
 
-        opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; // ECALL/EBREAK (funct3 doesn't disambiguate at CU level)
-        run_system_nop("ECALL_EBREAK");
+        // EBREAK: opcode SYSTEM, funct3 000, funct12 001. Must NOT
+        // halt — only ECALL does. This is the pair that funct7 alone
+        // cannot separate, so it is the real test of the funct12 decode.
+        opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; funct12_i = `FUNCT12_EBREAK;
+        run_system_nop("EBREAK", 1'b0);
 
+        // FENCE: different opcode entirely, shares the same no-op arm.
         opcode_i = `OPCODE_FENCE;
-        run_system_nop("FENCE");
+        run_system_nop("FENCE", 1'b0);
 
         // ---------------------------------------------------------------
         // Slice 6: I-type ALU. 9 instructions (no SUBI). SRAI/SRLI is
@@ -1119,6 +1177,54 @@ module tb_control_unit;
 
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b101; funct7_i = 7'b0100000;
         run_instruction("SRA_REGRESSION2", `ALU_MRS);
+
+        // ---------------------------------------------------------------
+        // ECALL / halt_o. Deliberately LAST: halt_o is sticky, so once
+        // it latches it stays high for the rest of the run. Placing
+        // these earlier would make every later test run with halt_o
+        // already set and weaken the guard above.
+        // ---------------------------------------------------------------
+
+        // ---- halt_o still 0 after a full run of non-ECALL work ----
+        if (halt_o !== 1'b0) begin
+            $display("FAIL [pre-ECALL] halt_o: exp=0 got=%b", halt_o);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [pre-ECALL] halt_o still 0 after all prior instructions");
+        end
+
+        // ---- ECALL: same funct3 as EBREAK, funct12 000 instead of 001.
+        // Everything about execution is identical; only halt_o differs.
+        ecall_seen = 1'b1;   // arm the guard
+        opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; funct12_i = `FUNCT12_ECALL;
+        run_system_nop("ECALL", 1'b1);
+
+        // ---- Sticky: an unrelated instruction must not clear it ----
+        opcode_i = `OPCODE_RTYPE; funct3_i = 3'b000; funct7_i = 7'b0000000;
+        funct12_i = `FUNCT12_EBREAK;
+        run_instruction("ADD_AFTER_ECALL", `ALU_ADD);
+        if (halt_o !== 1'b1) begin
+            $display("FAIL [sticky] halt_o cleared by a later instruction: got=%b", halt_o);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [sticky] halt_o still 1 after a later ADD");
+        end
+
+        // ---- ECALL must not have changed execution semantics: the ADD
+        // above ran normally, proving the core did not stall. ----
+
+        // ---- Reset clears it ----
+        rst_i = 1;
+        @(posedge clk_i); #1;
+        if (halt_o !== 1'b0) begin
+            $display("FAIL [halt reset] halt_o not cleared by reset: got=%b", halt_o);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [halt reset] halt_o cleared by reset");
+        end
+        ecall_seen = 1'b0;   // disarm: nothing may re-assert halt_o now
+        rst_i = 0;
+        @(posedge clk_i); #1;
 
         if (errors == 0)
             $display("ALL TESTS PASSED");

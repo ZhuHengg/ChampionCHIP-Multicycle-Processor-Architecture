@@ -214,7 +214,7 @@ which half of the result to return.
 |---|---|---|---|
 | `a_i` | in | 32 | rs1 |
 | `b_i` | in | 32 | rs2 |
-| `mult_op_i` | in | 4 | From the CU's `mult_op` |
+| `mult_op_i` | in | 4 | From the CU's `mult_op_o` |
 | `result_o` | out | 32 | |
 
 **Combinational, single cycle** — handoff decision #1. No `MUL_WAIT` state,
@@ -335,7 +335,7 @@ chains instead, since they exercise the actual instruction shape.
 |---|---|---|---|
 | `a_i` | in | 32 | rs1 |
 | `b_i` | in | 32 | rs2 |
-| `crc_op_i` | in | 4 | From the CU's `crc_op` |
+| `crc_op_i` | in | 4 | From the CU's `crc_op_o` |
 | `result_o` | out | 32 | Result in `[15:0]`, upper bits zero |
 
 | Macro | Value | Operation |
@@ -416,7 +416,7 @@ to debug later:
 - **Port naming.** The CU drives `alu_op_o`; this module receives
   `alu_op_i`. Same wire. Mismatches here are compile errors at `top.v`, not
   subtle bugs — but they're avoidable by following the convention now.
-- **Width agreement.** `mult_op`/`crc_op` are 4 bits (handoff decision #7),
+- **Width agreement.** `mult_op_o`/`crc_op_o` are 4 bits (handoff decision #7),
   even though the values only need 2. Declare the ports 4 bits wide.
 - **`bw_o` is NOT the datapath's job.** The control unit computes it
   (decision #11). If someone builds byte-mask logic into the LSU or ALU too,

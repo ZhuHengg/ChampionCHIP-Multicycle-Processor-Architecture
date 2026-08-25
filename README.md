@@ -87,7 +87,7 @@ default** — which is how you end up with two `alu.v` implementations and no
 
 ## Golden rule for `rtl/pkg/rvbl2_defines.vh`
 
-About to write a raw opcode, `alu_op`, `mult_op`, `crc_op`, `result_src`, or
+About to write a raw opcode, `alu_op_o`, `mult_op_o`, `crc_op_o`, `result_src_o`, or
 `pc_src` literal into your module? Stop. `` `include "pkg/rvbl2_defines.vh" ``
 and use the named macro instead.
 
@@ -158,8 +158,8 @@ Without these there's no waveform to inspect when something fails.
 instructions decoding. Verified: SUB/SRA survive the funct7 dispatch added in
 slice 4, and the SRAI/SRLI bit-30 trap is covered.
 
-**Datapath — 4 of 5 done.** `alu.v`, `branch_comparator.v`, `imm_extend.v`,
-`mult.v` all pass their testbenches, including the signedness traps
+**Datapath — all 5 done.** `alu.v`, `branch_comparator.v`, `imm_extend.v`,
+`mult.v`, `crc.v` all pass their testbenches, including the signedness traps
 (SLT/SLTU and BLT/BLTU disagreeing on the same bits, MULHSU's mixed
 extension, SRA sign-extension, shift-amount masking).
 
@@ -169,23 +169,25 @@ extension, SRA sign-extension, shift-amount masking).
 valid in the address cycle and IS valid the next, so a combinational
 implementation would fail. x0 write protection verified in the regfile.
 
-**10 of 11 modules done.** Only `crc.v` remains before `top.v`.
+**All 11 modules done and passing.** `top.v` is unblocked — it is the next
+build, and nothing else in the repo can start until it exists.
 
 | Item | Status |
 |---|---|
 | Control unit FSM design | ✅ `docs/HANDOFF_control_unit_ALL_STAGES.md` |
-| `control_unit.v` slices 1-6 | ✅ 48/48 passing |
+| `control_unit.v` slices 1-6 | ✅ passing |
+| `halt_o` ECALL status flag | ✅ passing — funct12 decode separates ECALL from EBREAK |
 | `alu.v` | ✅ passing |
 | `branch_comparator.v` | ✅ passing |
 | `imm_extend.v` | ✅ passing |
 | `mult.v` | ✅ passing |
-| `crc.v` | ⬜ **Unblocked** — parameters received, ready to build |
+| `crc.v` | ✅ passing |
 | `regfile.v` | ✅ passing |
 | `imem.v` | ✅ passing |
 | `dmem.v` | ✅ passing — registered-output timing proven |
 | `address_decoder.v` | ✅ passing |
 | `lsu.v` | ✅ passing |
-| `top.v` integration | ⬜ Blocked on `crc.v` only |
+| `top.v` integration | ⬜ **Not started — unblocked, next up** |
 | System testbench + firmware | ⬜ Blocked on `top.v` |
 | OpenLane physical flow | ⬜ Blocked on `top.v` |
 
@@ -216,20 +218,18 @@ would have computed the CRC of the wrong operand and still looked correct.
 
 | Question | Blocks | Notes |
 |---|---|---|
-| Does the validation firmware use ECALL as a halt signal? | Slice 5 correctness | A no-op ECALL passes the coverage table *and* silently fails firmware validation if the suite depends on it. Add a `halt_o` output held at 0 so the fix stays one line |
+| Does the validation firmware expect the core to **stop** on ECALL, or just flag it? | System testbench design | **Half-answered 2026-08-25.** `halt_o` is now implemented: a sticky status flag set when an ECALL retires, cleared by reset. The system testbench can `wait (halt_o)` instead of guessing a cycle timeout. What is still unknown is whether the firmware needs the core to actually freeze (PC held) rather than keep running. If it does, that is one line: gate `pc_write_o` on `!halt_o`. Blocked on the firmware's release |
 
 ---
 
 ## Build order from here
 
-1. **Memory modules** (memory pair) — `regfile.v`, `lsu.v`,
-   `address_decoder.v`, `imem.v`, `dmem.v`. ⚠ `dmem.v` **must be
-   registered-output** (synchronous read): address captured on one edge, data
-   valid the *next*. The FSM's 2-cycle load design depends on it. Build it
-   combinational and slice 2's timing is wrong — and you won't find out until
-   integration.
-2. **`crc.v`** once the parameters land.
-3. **`top.v`** (FSM pair) — control unit slice 7.
+1. ~~**Memory modules**~~ — done. `dmem.v`'s registered-output timing is
+   proven by its testbench, not just assumed: the FSM's 2-cycle load design
+   depends on read data being invalid in the address cycle and valid the
+   next, and the testbench asserts both.
+2. ~~**`crc.v`**~~ — done, parameters confirmed by organisers (below).
+3. **`top.v`** (FSM pair) — control unit slice 7. **← next**
 4. **System testbench + firmware validation.**
 5. **OpenLane flow** → GDSII, gate-level netlist, area/density numbers for
    report §5. Watch the multiplier's area here: a full combinational 64-bit

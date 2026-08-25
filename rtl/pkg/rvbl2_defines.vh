@@ -1,7 +1,7 @@
 // rvbl2_defines.vh
 // Single source of truth for every opcode/funct/op-code literal used across
 // the project. `include this in every module that switches on an opcode,
-// alu_op, mult_op, crc_op, result_src, pc_src, or alu_src value.
+// alu_op, mult_op_o, crc_op_o, result_src, pc_src, or alu_src value.
 //
 // DO NOT hardcode any of these numbers directly in control_unit.v, alu.v,
 // mult.v, crc.v, or anywhere else. If a value here is wrong, fixing it once
@@ -28,6 +28,24 @@
 `define OPCODE_AUIPC   7'b0010111
 `define OPCODE_SYSTEM  7'b1110011  // ECALL / EBREAK
 `define OPCODE_FENCE   7'b0001111
+
+// ---------------------------------------------------------------------
+// funct12 disambiguation for OPCODE_SYSTEM — IR[31:20]
+// ---------------------------------------------------------------------
+// ECALL and EBREAK share opcode 1110011 AND funct3 000. The only field
+// that separates them is IR[31:20]. funct7 (IR[31:25]) is NOT enough:
+// both have funct7 = 0000000 and differ solely in IR[20].
+//
+// Cross-referenced against the RISC-V Unprivileged ISA spec, Chapter 2
+// (Environment Call and Breakpoints) — not from memory.
+//
+//   ECALL  = 0x00000073  → IR[31:20] = 12'h000
+//   EBREAK = 0x00100073  → IR[31:20] = 12'h001
+//
+// Both also require rs1 = 0, funct3 = 0, rd = 0. The CU checks funct3
+// and funct12 only; rs1/rd are datapath address fields it never sees.
+`define FUNCT12_ECALL  12'h000
+`define FUNCT12_EBREAK 12'h001
 
 // ---------------------------------------------------------------------
 // funct7 disambiguation for OPCODE_RTYPE — handoff doc §5
@@ -62,8 +80,8 @@
 `define ALU_SLTU       4'hA
 
 // ---------------------------------------------------------------------
-// mult_op — Table 10. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// mult_op = {2'b00, funct3}. Do not build a lookup table for this.
+// mult_op_o — Table 10. DIRECT PASSTHROUGH of funct3 (zero-extended).
+// mult_op_o = {2'b00, funct3}. Do not build a lookup table for this.
 // Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
 // ---------------------------------------------------------------------
 `define MULT_MUL       4'h0
@@ -72,8 +90,8 @@
 `define MULT_MULHU     4'h3
 
 // ---------------------------------------------------------------------
-// crc_op — Table 11. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// crc_op = {2'b00, funct3}. Do not build a lookup table for this.
+// crc_op_o — Table 11. DIRECT PASSTHROUGH of funct3 (zero-extended).
+// crc_op_o = {2'b00, funct3}. Do not build a lookup table for this.
 // Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
 // ---------------------------------------------------------------------
 `define CRC_CRCB       4'h0
@@ -133,7 +151,11 @@
 // See HANDOFF_control_unit.md §8.
 // ---------------------------------------------------------------------
 // Illegal-opcode handling policy — undecided.
-// ECALL behavior — revisit once validation firmware is released.
+// ECALL behavior — partially resolved 2026-08-25: ECALL now raises a
+//   sticky halt_o status flag (see control_unit.v). Execution semantics
+//   are unchanged (still a no-op, PC still advances). What remains open
+//   is whether the validation firmware expects the core to actually
+//   STOP on ECALL rather than just flag it — that needs the firmware.
 // x0 write protection — belongs in regfile, not here; not FSM-blocking.
 
 `endif // RVBL2_DEFINES_VH

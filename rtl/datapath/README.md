@@ -14,10 +14,10 @@ detail.
 - `alu.v` — Table 9. 11 operations, `alu_op` 4 bits. Also used for
   address calc (loads/stores) and branch/jump target calc — reused
   hardware, not instruction-specific.
-- `mult.v` — Table 10. `mult_op` is a **direct passthrough of funct3**
+- `mult.v` — Table 10. `mult_op_o` is a **direct passthrough of funct3**
   (zero-extended) — see `rvbl2_defines.vh` and `HANDOFF_control_unit.md`
   §6. Decision: combinational, single cycle (§7 item 1 of handoff doc).
-- `crc.v` — Table 11. `crc_op` also a **direct passthrough of funct3**.
+- `crc.v` — Table 11. `crc_op_o` also a **direct passthrough of funct3**.
   ⚠ **Blocked — the guide never states the CRC polynomial, initial value,
   bit ordering, or reflection.** Table 11 gives only `rd = CRC8(rs1,
   rs2)[15:0]`. Those missing parameters determine whether your output
@@ -32,7 +32,7 @@ detail.
 
 ## Ports
 
-Match `alu_op`/`mult_op`/`crc_op` widths and values exactly against
+Match `alu_op`/`mult_op_o`/`crc_op_o` widths and values exactly against
 `rtl/pkg/rvbl2_defines.vh` — don't re-derive from the guide tables
 independently, use the shared header.
 

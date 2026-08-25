@@ -90,9 +90,35 @@ the decoder, not something the control unit needs to drive directly.
 | `op_size_o` | 3 | Fig. 2, §3.3.3 | Core→LSU: access size + sign |
 | `core_data_o` | 32 | Fig. 2 | Core→LSU: store data | 
 | `core_data_i` | 32 | Fig. 2 | LSU→core: load data, already sign/zero-extended |
-| `alu_op_o` | 4 | Table 9 | ALU select, `4'h0`–`4'hA` (11 values, needs 4 bits). **Decided:** despite being guide-fixed in name, this is a control-unit output, so it takes `_o` per the §3 naming convention — not bare `alu_op`. |
-| `mult_op` | 4 | Table 10 | MUL select, values 0–3 (only 2 bits strictly needed). **Decided: 4 bits**, matching `alu_op_o`'s width for consistency across all three op-select ports — simpler mux-select wiring, costs 2 unused bits. |
-| `crc_op` | 4 | Table 11 | CRC select, values 0–2 (only 2 bits strictly needed). **Decided: 4 bits**, same rationale as `mult_op`. |
+| `core_address_o` | 32 | Fig. 2 | Core→LSU: access address |
+| `mem_data_o` | 32 | Fig. 2 | Memory→LSU: raw word read back |
+| `mem_data_i` | 32 | Fig. 2 | LSU→memory: store data, byte-positioned |
+| `mem_address_i` | 32 | Fig. 2 | LSU→memory: address |
+| `byte_write_i` | 4 | Fig. 2 | LSU→memory: byte write mask (the guide's own name for what §4.4 calls `bw_o` on the core side) |
+
+**Verified against the PDF, 2026-08-25.** These are the only port names the
+guide actually states. `we_o`/`oe_o`/`bw_o`/`address_o` appear in the §4.4
+body text and Figure 3; the LSU names above are the labels inside Figure 2.
+
+### Op-select ports — encodings guide-fixed, names ours
+
+Tables 9/10/11 give **values only** — an encoding column and an operation
+column, no port name anywhere. The strings `alu_op`, `mult_op`, and `crc_op`
+do not appear in the guide at all (checked by full-text search of the PDF,
+2026-08-25). So the encodings below must match exactly; the port names are a
+team decision.
+
+| Signal | Width | Encoding source | Meaning |
+|---|---|---|---|
+| `alu_op_o` | 4 | Table 9 | ALU select, `4'h0`–`4'hA` (11 values, needs 4 bits). Named `alu_op_o` per the §3 `_o` convention for outputs — an internal naming choice, not a guide requirement. |
+| `mult_op_o` | 4 | Table 10 | MUL select, values 0–3 (only 2 bits strictly needed). **Decided: 4 bits**, matching `alu_op_o`'s width for consistency across all three op-select ports — simpler mux-select wiring, costs 2 unused bits. |
+| `crc_op_o` | 4 | Table 11 | CRC select, values 0–2 (only 2 bits strictly needed). **Decided: 4 bits**, same rationale as `mult_op_o`. |
+
+✅ **Resolved 2026-08-25.** These were originally declared bare
+(`mult_op`/`crc_op`), the only two control-unit outputs missing the `_o`
+suffix. Renamed to `mult_op_o`/`crc_op_o` before `top.v` was written, while
+`control_unit.v` was still the only file referencing them. `mult.v` and
+`crc.v` receive them as `mult_op_i`/`crc_op_i` and were untouched.
 
 ### Invented internally — not in the guide, proposal only until confirmed with the team
 
@@ -147,7 +173,7 @@ selection, so the byte-mask math naturally lives alongside it. Computed from
 
 ## 4. Per-state control signal table
 
-`mult_op`/`crc_op` aren't separate columns here since they're not part of
+`mult_op_o`/`crc_op_o` aren't separate columns here since they're not part of
 the original signal set drawn out per state — see §6 for their values
 (direct funct3 passthrough, asserted alongside `mult_en_o`/`crc_en_o` in
 the rows below).
@@ -208,10 +234,10 @@ a wrong opcode here silently misroutes an entire instruction class.
 
 ## 6. ALU / MUL / CRC operation codes (from guide Tables 9–11, copy exactly)
 
-`alu_op_o` needs 4 bits (11 distinct values, `4'h0`–`4'hA`). `mult_op` and
-`crc_op` only strictly need 2 bits (4 and 3 distinct values respectively) —
+`alu_op_o` needs 4 bits (11 distinct values, `4'h0`–`4'hA`). `mult_op_o` and
+`crc_op_o` only strictly need 2 bits (4 and 3 distinct values respectively) —
 the guide's `4'hN` notation is just how it writes hex literals for these
-tables, not a statement of port width. **Decided: `mult_op`/`crc_op` are 4
+tables, not a statement of port width. **Decided: `mult_op_o`/`crc_op_o` are 4
 bits**, matching `alu_op_o`'s width — one consistent width across all three
 op-select ports simplifies mux-select wiring for whoever builds MULT/CRC;
 the 2 unused bits cost nothing.
@@ -246,16 +272,16 @@ no ADD/SUB or SRL/SRA ambiguity there (I-type has no SUBI; SRAI is
 distinguished from SRLI via `imm[10]` instead, worth confirming against the
 spec when that module gets built).
 
-**`mult_op`:** `4'h0`=MUL, `4'h1`=MULH, `4'h2`=MULHSU, `4'h3`=MULHU.
+**`mult_op_o`:** `4'h0`=MUL, `4'h1`=MULH, `4'h2`=MULHSU, `4'h3`=MULHU.
 **Direct passthrough of funct3** — Table 7's funct3 values for mul (`000`)
 / mulh (`001`) / mulhsu (`010`) / mulhu (`011`) equal the MULT code
-numerically. Wire `mult_op = {2'b00, funct3}` (4-bit port, zero-extended) —
+numerically. Wire `mult_op_o = {2'b00, funct3}` (4-bit port, zero-extended) —
 no lookup table needed.
 
-**`crc_op`:** `4'h0`=CRCB, `4'h1`=CRCH, `4'h2`=CRCW. **Direct passthrough
+**`crc_op_o`:** `4'h0`=CRCB, `4'h1`=CRCH, `4'h2`=CRCW. **Direct passthrough
 of funct3** — same pattern as MUL: Table 8's funct3 values for crcb
 (`000`) / crch (`001`) / crcw (`010`) equal the CRC code numerically.
-Wire `crc_op = {2'b00, funct3}` (4-bit port, zero-extended) — no lookup
+Wire `crc_op_o = {2'b00, funct3}` (4-bit port, zero-extended) — no lookup
 table needed.
 
 ## 7. Resolved design decisions (reference, don't re-litigate)
@@ -276,15 +302,17 @@ table needed.
 5. **`we_o`/`oe_o`/`bw_o`/`address_o` naming confirmed** against Figure 3 —
    core drives `_o`, decoder receives as `_i`, same wires.
 
-6. **`mult_op`/`crc_op` are both a direct passthrough of `funct3`** — no
+6. **`mult_op_o`/`crc_op_o` are both a direct passthrough of `funct3`** — no
    lookup table needed, unlike `alu_op_o` which requires real decode logic
    since its codes don't match RV32I's standard funct3 numbering.
-7. **`mult_op`/`crc_op` are 4 bits**, matching `alu_op_o`'s width — settled
+7. **`mult_op_o`/`crc_op_o` are 4 bits**, matching `alu_op_o`'s width — settled
    as a wiring-consistency call, not a spec requirement (values only need 2
    bits; the extra 2 are always zero).
-8. **Port is named `alu_op_o`** (not bare `alu_op`) — the guide-fixed table
-   in §3 previously carried the bare name inconsistently with every other
-   invented signal's `_o` suffix; corrected to match the uniform convention.
+8. **Port is named `alu_op_o`** (not bare `alu_op`) — uniform `_o` suffix
+   across every control-unit output. **Corrected 2026-08-25:** this was
+   originally written up as deviating from a guide-fixed name. It doesn't.
+   The guide never names this port; Table 9 fixes the encoding only. There
+   was nothing to deviate from, and nothing here needs organiser sign-off.
 9. **`op_size_o` 3-bit encoding decided** — `[2:1]`=size, `[0]`=sign. See
    table in §3.
 10. **`imm_sel_o` encoding and opcode map decided** — see table in §3.
@@ -303,7 +331,12 @@ Not cheap after.
 **One genuinely open item.** See `HANDOFF_control_unit_ALL_STAGES.md`
 Part IV for the full treatment.
 
-- [ ] **ECALL behavior** — does the validation firmware use ECALL as a
+- [x] **ECALL observability** — DONE 2026-08-25. `halt_o`, a sticky status
+      flag set when an ECALL retires, plus a new `funct12_i` (IR[31:20])
+      input to tell ECALL from EBREAK (funct7 cannot — they differ only in
+      IR[20]). Execution semantics unchanged; the flag is what the system
+      testbench waits on instead of a cycle-count timeout.
+- [ ] **ECALL semantics** — does the validation firmware use ECALL as a
       "test complete / halt" signal? Blocked on the firmware's release, but
       two things are doable now: (a) add a `halt_o` output wired to the
       ECALL case, held at 0, so the fix is one line later; (b) check the

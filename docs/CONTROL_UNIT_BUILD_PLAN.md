@@ -82,9 +82,10 @@ SLTU, XOR, SRL, SRA, OR, AND), each verified for correct `alu_op_o` and a
 4-cycle count matching handoff §2. `ALL TESTS PASSED`.
 
 **Known open items carried forward:**
-- `alu_op` vs `alu_op_o` naming — handoff §3's guide-fixed table still lists
-  the bare name. Confirm with whoever owns `alu.v` before it hardens into a
-  port mismatch at `top.v` time.
+- ~~`alu_op` vs `alu_op_o` naming~~ — **closed 2026-08-25.** The guide never
+  names this port; Table 9 fixes the encoding only, so there was no
+  guide-fixed name to conflict with. CU drives `alu_op_o`, `alu.v` receives
+  `alu_op_i`, both built and passing. Handoff §3 corrected.
 - Illegal-opcode default is `ALU_ADD` placeholder; policy undecided.
 - `opcode_i` is declared but unused — DECODE unconditionally targets
   EXECUTE_ALU. Slice 2 is where it starts being read.
@@ -312,10 +313,11 @@ address decoder, IMEM, DMEM) landing from their owners.
 
 **Work:**
 1. Replace every testbench stub input with the real module output.
-2. Resolve the `alu_op` vs `alu_op_o` naming question — if it wasn't
-   settled back in slice 1, it becomes a compile error here.
+2. ~~Resolve the `alu_op` vs `alu_op_o` naming question~~ — settled:
+   `alu_op_o` on the CU, `alu_op_i` on the ALU, same wire.
 3. Verify port widths match on both sides of every connection, especially
-   `mult_op`/`crc_op` (the 2-vs-4-bit question) and `op_size_o`.
+   `mult_op_o`→`mult_op_i` / `crc_op_o`→`crc_op_i` (4 bits both ends) and
+   `op_size_o`.
 4. Wire `branch_taken_i` from the real comparator.
 5. Run the full-core testbench in `tb/system/`.
 6. Run the official validation firmware (`firmware/`) once released.
@@ -348,14 +350,15 @@ early if they have a real reason to want it different:
 | 1 | `op_size_o` 3-bit encoding | `[2:1]`=size, `[0]`=sign — see handoff §3 | LSU owner |
 | 2 | `imm_sel_o` encoding + opcode→format map | `000`=I…`100`=J — see handoff §3 | Team (our own invention, no spec to violate) |
 | 3 | `mult_op`/`crc_op` port width | 4 bits, matches `alu_op_o` | MULT/CRC owner |
+| 3b | `mult_op`/`crc_op` port **names** | Renamed to `mult_op_o`/`crc_op_o` 2026-08-25 — they were the only CU outputs missing the `_o` suffix. Done before `top.v`, while `control_unit.v` was the only file using them. Receiving ports `mult_op_i`/`crc_op_i` unchanged | Closed |
 | 4 | `bw_o` driven by control unit or LSU? | Control unit | LSU owner |
-| 5 | `alu_op` vs `alu_op_o` port name | `alu_op_o` (uniform `_o` convention) | ALU owner |
+| 5 | `alu_op` vs `alu_op_o` port name | `alu_op_o` (uniform `_o` convention). **Not a guide question at all** — verified 2026-08-25 that the guide names no op-select port | Nobody — closed, `alu.v` already built to `alu_op_i` |
 
 ## Still genuinely open (no unilateral answer possible)
 
 | # | Question | Blocks | Why it can't be decided here |
 |---|---|---|---|
-| 6 | Does the validation firmware use ECALL as a halt signal? | Slice 5 correctness | Depends on official firmware behavior, not yet released. **Prep now:** add a `halt_o` output held at 0 so the fix is one line; and check the platform docs — `riscv-tests` uses a known pattern that may make this predictable early |
+| 6 | Does the firmware expect the core to **stop** on ECALL, or only to flag it? | System testbench design | **Prep done 2026-08-25** — `halt_o` implemented as a sticky status flag, set when an ECALL retires (funct12 `12'h000`), cleared by reset. Execution semantics unchanged: ECALL is still a 3-cycle no-op and the PC still advances. The testbench can now `wait (halt_o)` instead of timing out. Remaining unknown: whether the firmware needs the PC actually frozen. That is a one-line change from here — gate `pc_write_o` on `!halt_o` |
 
 ## Reclassified — were on this list, no longer questions
 

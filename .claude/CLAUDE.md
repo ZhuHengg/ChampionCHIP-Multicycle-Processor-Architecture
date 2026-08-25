@@ -92,10 +92,18 @@ ask before guessing.
 
 ## Hard rules
 
-- Signal names/widths listed as "fixed by the block guide" in the handoff
-  doc (`we_o`, `oe_o`, `bw_o`, `address_o`, `op_size_o`, `alu_op`,
-  `mult_op`, `crc_op`) must match exactly — other teammates' modules are
-  built against these exact port names.
+- **Guide-fixed port names** — verified against the block guide itself
+  (Figure 2 for the LSU interface, Figure 3 and §4.4 for the memory
+  interface): `we_o`, `oe_o`, `bw_o`, `address_o`, `op_size_o`,
+  `core_data_o`, `core_data_i`, `core_address_o`, `mem_data_o`,
+  `mem_data_i`, `mem_address_i`, `byte_write_i`. These must match
+  exactly — they are the guide's own names, not ours to change.
+- **Team-fixed port names** — `alu_op_o`, `mult_op_o`, `crc_op_o`,
+  `result_src_o`, `pc_src_o`, `imm_sel_o`, and every other control
+  signal. The guide never names these ports; Tables 9/10/11 fix their
+  *encodings* only. They must still match across modules — teammates
+  build against them — but changing one is a team decision, not a spec
+  violation. Don't cite the guide as the reason a name can't change.
 - Never guess RV32I opcode/funct3/funct7 bit patterns from memory. Cross-
   reference against the handoff doc's opcode table or the RISC-V spec.
 - Combinational output logic must assign every signal a default value at

@@ -24,13 +24,15 @@
 // combinational/single-cycle, handled inside EXECUTE_ALU's R-type
 // else-branch, disambiguated by funct7 (FUNCT7_MUL/FUNCT7_CRC, else
 // ALU — handoff §5 else-trap, exactly the structure slice 1 set up
-// for). New ports mult_op/crc_op/mult_en_o/crc_en_o.
+// for). New ports mult_op_o/crc_op_o/mult_en_o/crc_en_o.
 //
 // SLICE 5 SCOPE (DONE): LUI/AUIPC/system no-ops. No new states —
 // all EXECUTE cases. New cases for OPCODE_LUI, OPCODE_AUIPC,
 // OPCODE_SYSTEM, OPCODE_FENCE. LUI is the only user of ALU_PASS_B.
-// ECALL/EBREAK/FENCE are no-ops (handoff §7 decision 4 — caveat: revisit
-// once validation firmware is released, see handoff Slice 5 section).
+// ECALL/EBREAK/FENCE are no-ops (handoff §7 decision 4). ECALL also
+// raises the sticky halt_o status flag added 2026-08-25 — see the
+// halt_o always block and handoff decision 15. Execution semantics are
+// unchanged for all three; halt_o is observability only.
 //
 // SLICE 6 SCOPE (this slice): I-type ALU. No new states — extends the
 // R-type ALU else-fallthrough inside EXECUTE_ALU to also accept
@@ -89,6 +91,11 @@ module control_unit (
     input  wire [6:0]  opcode_i,      // IR[6:0]
     input  wire [2:0]  funct3_i,      // IR[14:12]
     input  wire [6:0]  funct7_i,      // IR[31:25]
+    // ECALL/EBREAK disambiguation. funct7_i cannot do this job: both
+    // instructions have funct7 = 0000000 and differ only in IR[20], so
+    // the full IR[31:20] field is required. Unused for every opcode
+    // other than OPCODE_SYSTEM.
+    input  wire [11:0] funct12_i,     // IR[31:20]
 
     // Slice 2: low address bits from the ALU/adder result (MEM_ADDR
     // computes rs1+imm), needed only to compute bw_o. Not an
@@ -109,20 +116,21 @@ module control_unit (
     output reg  [2:0]  result_src_o,
     output reg         alu_src_a_o,
     output reg  [1:0]  alu_src_b_o,
-    // NOTE: handoff §3 glossary lists this bare as "alu_op" under the
-    // guide-fixed table, but it is a control-unit *output*, so per the
-    // §3 naming convention (all CU outputs take _o, applied uniformly)
-    // it is declared alu_op_o here. Flagged to user — teammate's ALU
-    // module may expect the bare name; confirm before this hardens into
-    // a mismatch. Not silently resolving the doc's inconsistent row.
+    // Declared alu_op_o per the handoff §3 convention (all CU outputs
+    // take _o). Settled 2026-08-25: the block guide names no op-select
+    // port anywhere — its Table 9 fixes the *encoding* only — so there
+    // was never a guide-fixed bare "alu_op" to conflict with. alu.v
+    // receives this as alu_op_i; both are built and passing.
     output reg  [3:0]  alu_op_o,
     output reg  [2:0]  imm_sel_o,
-    // Slice 4: mult_op/crc_op are guide-fixed-named ports (handoff §3/§7
-    // item 7) despite the module lacking a matching "guide-fixed" table
-    // row treatment elsewhere — 4 bits each per that decision, direct
-    // funct3 passthrough (handoff §8), no lookup table.
-    output reg  [3:0]  mult_op,
-    output reg  [3:0]  crc_op,
+    // Slice 4: 4 bits each (handoff §7 item 7), direct funct3
+    // passthrough (handoff §8), no lookup table. NOTE the missing _o
+    // suffix — these are outputs, and every other output here has one.
+    // The guide names no op-select port (verified 2026-08-25), so the
+    // name is ours; renaming to mult_op_o/crc_op_o is still cheap while
+    // nothing outside this file references them. Open.
+    output reg  [3:0]  mult_op_o,
+    output reg  [3:0]  crc_op_o,
     output reg         mult_en_o,
     output reg         crc_en_o,
 
@@ -130,7 +138,12 @@ module control_unit (
     output reg         we_o,
     output reg         oe_o,
     output reg  [3:0]  bw_o,
-    output reg  [2:0]  op_size_o
+    output reg  [2:0]  op_size_o,
+
+    // Status output — not a datapath control signal, drives nothing
+    // inside the core. Sticky: set when an ECALL retires, cleared only
+    // by reset. See the halt_o block below for the full rationale.
+    output reg         halt_o
 );
 
     // ------------------------------------------------------------------
@@ -168,6 +181,52 @@ module control_unit (
             prev_state <= state;
             state      <= next_state;
         end
+    end
+
+    // ------------------------------------------------------------------
+    // halt_o — sticky ECALL status flag. Sequential, NBA, sync reset
+    // (decision 12), own always block per CLAUDE.md step 4.
+    //
+    // WHAT IT IS: a status flag saying "an ECALL has retired". Its only
+    // consumer is the system testbench, which waits on it instead of
+    // guessing a cycle-count timeout for when firmware has finished.
+    //
+    // WHAT IT IS NOT: it does not stop the core. ECALL's execution
+    // semantics are unchanged from slice 5 — still a no-op, still 3
+    // cycles, PC still advances. Nothing inside this module reads
+    // halt_o, so every one of the 48 pre-existing tests is unaffected
+    // by construction.
+    //
+    // DEVIATION NOTE (CLAUDE.md step 8): the block guide never mentions
+    // ECALL, halting, or trap handling at all — verified by full-text
+    // search of the PDF, 2026-08-25. So there is no spec to comply with
+    // here and no "correct" answer to look up. Two readings exist:
+    //
+    //   (a) ECALL flags completion, core keeps running   ← implemented
+    //   (b) ECALL stops the core (PC frozen / HALT state)
+    //
+    // (a) is chosen because it is strictly weaker: it adds an observable
+    // signal without changing any executed behavior, so it cannot break
+    // firmware that uses ECALL mid-program for something other than
+    // termination. (b) can be layered on top later by gating pc_write_o
+    // on !halt_o — it is a one-line change from here, whereas starting
+    // at (b) and discovering the firmware needs (a) is not.
+    //
+    // SET CONDITION: EXECUTE_ALU, not DECODE. The flag means "retired",
+    // so it must not assert for an instruction that never executed.
+    // ------------------------------------------------------------------
+    wire is_ecall = (opcode_i  == `OPCODE_SYSTEM) &&
+                    (funct3_i  == 3'b000)         &&
+                    (funct12_i == `FUNCT12_ECALL);
+
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            halt_o <= 1'b0;
+        end else if ((state == EXECUTE_ALU) && is_ecall) begin
+            halt_o <= 1'b1;
+        end
+        // else: hold. Sticky by design — a one-cycle pulse would be
+        // missed by a testbench sampling on the wrong edge.
     end
 
     // ------------------------------------------------------------------
@@ -277,8 +336,8 @@ module control_unit (
         alu_src_b_o  = `ALU_SRC_B_RS2;
         alu_op_o     = `ALU_PASS_B;
         imm_sel_o    = `IMM_SEL_I;
-        mult_op      = 4'h0;
-        crc_op       = 4'h0;
+        mult_op_o      = 4'h0;
+        crc_op_o       = 4'h0;
         mult_en_o    = 1'b0;
         crc_en_o     = 1'b0;
         we_o         = 1'b0;
@@ -370,17 +429,20 @@ module control_unit (
                     // assert nothing — all defaults apply, nothing to
                     // set here.
                     //
-                    // ECALL CAVEAT (handoff Slice 5 section, flagged
-                    // per CLAUDE.md step 8): a bare no-op satisfies the
-                    // 47/47 ISA coverage table, but some RISC-V
-                    // validation suites use ECALL as an explicit "test
-                    // complete/halt" signal the testbench watches for.
-                    // If the official firmware does that, this no-op
-                    // would silently break firmware validation while
-                    // still looking correct in the coverage table.
-                    // Revisit once the official validation firmware is
-                    // released — this is documented as the right
-                    // placeholder until then, not a guess.
+                    // ECALL additionally raises the sticky halt_o
+                    // status flag — see the halt_o always block above.
+                    // That is handled there, not here: halt_o is
+                    // sequential and this is the combinational output
+                    // block, so driving it from both would be a
+                    // multiple-driver error (CLAUDE.md step 5).
+                    //
+                    // Execution semantics stay identical for all three
+                    // instructions: no-op, 3 cycles, PC advances.
+                    // EBREAK and FENCE are genuinely finished this way
+                    // — no debugger, no caches, nothing for either to
+                    // do in this core. Only ECALL carries a remaining
+                    // question, and it is now observable rather than
+                    // silent.
                 end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_MUL) begin
                     // Slice 4: Zmmul. Combinational/single-cycle, same
                     // EXECUTE_ALU state as everything else (handoff §7
@@ -392,12 +454,12 @@ module control_unit (
                     // real funct7, and could otherwise coincidentally
                     // match FUNCT7_MUL/CRC once slice 6 wires I-type in.
                     mult_en_o    = 1'b1;
-                    mult_op      = {2'b00, funct3_i};
+                    mult_op_o      = {2'b00, funct3_i};
                     result_src_o = `RESULT_SRC_MUL;
                 end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_CRC) begin
                     // Slice 4: Xicrc. Same pattern as MUL.
                     crc_en_o     = 1'b1;
-                    crc_op       = {2'b00, funct3_i};
+                    crc_op_o       = {2'b00, funct3_i};
                     result_src_o = `RESULT_SRC_CRC;
                 end else begin
                     // R-type ALU (else-fallthrough, handoff §5 trap:
