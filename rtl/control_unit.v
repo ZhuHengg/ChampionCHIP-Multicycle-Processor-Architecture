@@ -139,6 +139,10 @@ module control_unit (
     output reg         oe_o,
     output reg  [3:0]  bw_o,
     output reg  [2:0]  op_size_o,
+    // Slice 7a: memory address mux select (top.v build plan §6 decision
+    // D1). PC during FETCH, alu_out during the three memory-access
+    // states. No owner existed before this slice — trap 4.
+    output reg         adr_src_o,
 
     // Status output — not a datapath control signal, drives nothing
     // inside the core. Sticky: set when an ECALL retires, cleared only
@@ -344,6 +348,7 @@ module control_unit (
         oe_o         = 1'b0;
         bw_o         = 4'b0000;
         op_size_o    = `OP_SIZE_WORD;
+        adr_src_o    = `ADR_SRC_PC;
 
         case (state)
             RESET: begin
@@ -522,12 +527,28 @@ module control_unit (
                 // output SRAM — data not valid until next cycle).
                 oe_o      = 1'b1;
                 op_size_o = op_size_lookup;
+                adr_src_o = `ADR_SRC_ALU;
             end
 
             MEM_ACCESS_DATA: begin
                 // Load, sub-cycle 2: DMEM's registered read data is valid
-                // this cycle.
+                // this cycle. Trap 3: op_size_o must stay driven here too
+                // — this is the state result_src_o=RESULT_SRC_MEM is
+                // consumed downstream by the LSU's extension logic, so
+                // letting it fall back to the OP_SIZE_WORD default made
+                // every lb/lh/lbu/lhu behave like lw. ir is unchanged
+                // since DECODE, so op_size_lookup is still valid.
+                // Trap 5: oe_o must stay asserted here too — imem.v is
+                // combinational and its data_o collapses to 0 the instant
+                // oe_i drops, so a load whose effective address lands in
+                // IMEM read as zero. DMEM's data_o is a real register, so
+                // re-asserting oe_o there just re-reads/re-latches the
+                // same value — harmless. Depends on adr_src_o still
+                // selecting alu_out here (D1), which it now does.
                 result_src_o = `RESULT_SRC_MEM;
+                op_size_o    = op_size_lookup;
+                oe_o         = 1'b1;
+                adr_src_o    = `ADR_SRC_ALU;
             end
 
             MEM_ACCESS_STORE: begin
@@ -536,6 +557,7 @@ module control_unit (
                 we_o      = 1'b1;
                 op_size_o = op_size_lookup;
                 bw_o      = bw_lookup;
+                adr_src_o = `ADR_SRC_ALU;
             end
 
             WRITE_BACK: begin
@@ -547,8 +569,19 @@ module control_unit (
                 // the just-executed instruction's fields here since IR
                 // isn't re-latched until FETCH, so they disambiguate
                 // within the EXECUTE_ALU-sourced case.
-                if (prev_state == MEM_ACCESS_DATA)
+                if (prev_state == MEM_ACCESS_DATA) begin
                     result_src_o = `RESULT_SRC_MEM;
+                    // Trap 3, second half: the LSU's extension logic
+                    // reads op_size_o here too (this is where
+                    // reg_write_o actually commits the loaded/extended
+                    // value), so it needs the same fix as
+                    // MEM_ACCESS_DATA. ir is still unchanged since
+                    // DECODE, so op_size_lookup is still valid — guarded
+                    // on prev_state so non-load writers (ALU/MUL/CRC/
+                    // JAL/JALR) don't get op_size_o overridden away from
+                    // their don't-care default.
+                    op_size_o    = op_size_lookup;
+                end
                 else if (prev_state == EXECUTE_ALU &&
                          (opcode_i == `OPCODE_JAL || opcode_i == `OPCODE_JALR))
                     result_src_o = `RESULT_SRC_PC4;

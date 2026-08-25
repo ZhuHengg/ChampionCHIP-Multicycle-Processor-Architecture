@@ -119,6 +119,12 @@
 `define ALU_SRC_B_IMM    2'b01
 `define ALU_SRC_B_CONST4 2'b10
 
+// adr_src_o — memory address mux select (top.v build plan §6 decision
+// D1). PC during FETCH, computed effective address (alu_out) during
+// the three memory-access states.
+`define ADR_SRC_PC       1'b0
+`define ADR_SRC_ALU      1'b1
+
 // ---------------------------------------------------------------------
 // Memory map — guide Table 13
 // ---------------------------------------------------------------------

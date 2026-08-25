@@ -31,6 +31,7 @@ module tb_control_unit;
     wire        oe_o;
     wire [3:0]  bw_o;
     wire [2:0]  op_size_o;
+    wire        adr_src_o;
     wire [3:0]  mult_op_o;
     wire [3:0]  crc_op_o;
     wire        mult_en_o;
@@ -63,6 +64,35 @@ module tb_control_unit;
         end
     end
 
+    // Slice 7a: adr_src_o guard. Checked continuously against every
+    // state, not just the memory ones — a wrong default is the failure
+    // mode that matters (task spec). Expected ADR_SRC_ALU in exactly the
+    // three memory-access states (D1); ADR_SRC_PC everywhere else,
+    // including RESET/FETCH/DECODE/EXECUTE_ALU/WRITE_BACK/MEM_ADDR.
+    always @(*) begin
+        // Gated on !rst_i: at t=0, state is x for one delta before the
+        // first posedge latches RESET, and x !== 0/1 always reads true
+        // — a simulation artifact, not a real defect (adr_src_o's
+        // combinational default is provably ADR_SRC_PC whenever state
+        // is a known value, checked below). Not required reading during
+        // reset assertion anyway.
+        if (!rst_i) begin
+            if (dut.state === dut.MEM_ACCESS_ADDR ||
+                dut.state === dut.MEM_ACCESS_DATA ||
+                dut.state === dut.MEM_ACCESS_STORE) begin
+                if (adr_src_o !== `ADR_SRC_ALU) begin
+                    $display("FAIL [adr_src_o guard] exp=ALU got=%b, state=%0d", adr_src_o, dut.state);
+                    errors = errors + 1;
+                end
+            end else begin
+                if (adr_src_o !== `ADR_SRC_PC) begin
+                    $display("FAIL [adr_src_o guard] exp=PC got=%b, state=%0d", adr_src_o, dut.state);
+                    errors = errors + 1;
+                end
+            end
+        end
+    end
+
     control_unit dut (
         .clk_i        (clk_i),
         .rst_i        (rst_i),
@@ -89,6 +119,7 @@ module tb_control_unit;
         .oe_o         (oe_o),
         .bw_o         (bw_o),
         .op_size_o    (op_size_o),
+        .adr_src_o    (adr_src_o),
         .halt_o       (halt_o)
     );
 
@@ -280,6 +311,20 @@ module tb_control_unit;
                 $display("FAIL [%0s-MEM_ACCESS_DATA] result_src_o: exp=MEM got=%b", label, result_src_o);
                 errors = errors + 1;
             end
+            // Trap 3: op_size_o must stay driven here, not fall back to
+            // the OP_SIZE_WORD default — this is where the LSU's
+            // extension logic actually consumes it.
+            if (op_size_o !== exp_op_size) begin
+                $display("FAIL [%0s-MEM_ACCESS_DATA] op_size_o: exp=%b got=%b", label, exp_op_size, op_size_o);
+                errors = errors + 1;
+            end
+            // Trap 5: oe_o must be re-asserted here — imem.v is
+            // combinational and drops its output to 0 the instant oe_i
+            // is low, so a load from IMEM would read back zero.
+            if (oe_o !== 1'b1) begin
+                $display("FAIL [%0s-MEM_ACCESS_DATA] oe_o: exp=1 got=%b", label, oe_o);
+                errors = errors + 1;
+            end
             @(posedge clk_i); #1; cycle_count = cycle_count + 1;
 
             // WRITE_BACK
@@ -293,6 +338,13 @@ module tb_control_unit;
             end
             if (result_src_o !== `RESULT_SRC_MEM) begin
                 $display("FAIL [%0s-WRITE_BACK] result_src_o: exp=MEM got=%b", label, result_src_o);
+                errors = errors + 1;
+            end
+            // Trap 3, second half: op_size_o must still be driven here
+            // too — this is the state reg_write_o actually commits the
+            // extended value.
+            if (op_size_o !== exp_op_size) begin
+                $display("FAIL [%0s-WRITE_BACK] op_size_o: exp=%b got=%b", label, exp_op_size, op_size_o);
                 errors = errors + 1;
             end
             @(posedge clk_i); #1; cycle_count = cycle_count + 1;
