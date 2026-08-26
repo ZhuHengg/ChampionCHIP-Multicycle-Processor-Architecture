@@ -183,9 +183,33 @@
 
 `include "pkg/rvbl2_defines.vh"
 
+// SYNTHESIS PARAMETERS (added 2026-08-26 for the OpenLane flow — see
+// docs/OPENLANE_SYNTHESIS.md):
+//
+// - IMEM_INIT_FILE defaults to the validation firmware, NOT "". Under
+//   synthesis, an imem whose $readmemh never runs is an array that is
+//   never written and never initialised, so yosys optimises it away
+//   entirely: data_o goes constant and the whole datapath constant-folds
+//   behind it. The result is a GDSII of almost nothing that still
+//   completes the flow without erroring. Every testbench overrides this
+//   parameter explicitly, so the default only ever matters to synthesis.
+//
+// - DMEM_DEPTH_WORDS is now a top-level parameter (it previously used
+//   dmem.v's own 2048 default, unreachable from here). Both memories are
+//   behavioural arrays with no PDK macro behind them, so their depth
+//   directly sets how many flip-flops and how much mux tree the flow has
+//   to place. Defaults preserve the pre-synthesis behaviour; shrink them
+//   for area runs and say so in the report.
+//
+//   Floor on IMEM_DEPTH_WORDS: firmware/validation.hex is 413 words, so
+//   anything below 512 truncates the program. dmem's base address maps to
+//   index 0 at any depth (DMEM_BASE's word address has its low bits
+//   clear), so shrinking dmem only limits how far above the base the
+//   firmware may reach.
 module top #(
     parameter IMEM_DEPTH_WORDS = 1024,
-    parameter IMEM_INIT_FILE   = ""
+    parameter DMEM_DEPTH_WORDS = 2048,
+    parameter IMEM_INIT_FILE   = "firmware/validation.hex"
 ) (
     input  wire clk_i,
     input  wire rst_i,
@@ -534,7 +558,9 @@ module top #(
         .result_o (crc_result)
     );
 
-    dmem u_dmem (
+    dmem #(
+        .DEPTH_WORDS (DMEM_DEPTH_WORDS)
+    ) u_dmem (
         .clk_i  (clk_i),
         .rst_i  (rst_i),
         .addr_i ({2'b00, decoder_address_o}), // zero-extend 30->32, not shifted again
