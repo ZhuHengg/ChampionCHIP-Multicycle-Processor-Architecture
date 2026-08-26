@@ -544,9 +544,21 @@ the posedge that retires an ECALL, cleared only by reset.
   has retired. Four mutants (drop the funct12 check, match EBREAK instead,
   set during DECODE, make it non-sticky) were each confirmed to fail the
   testbench.
-- **Still open:** whether the firmware needs the core to actually *stop*
-  (PC frozen) rather than just flag. One line from here — gate
-  `pc_write_o` on `!halt_o`. See decision 15.
+- **RESOLVED 2026-08-26 — the core stops.** `pc_write_o` **and**
+  `ir_write_o` are both gated on `!halt_o`, appended after the output
+  `case` so the override wins over every state. Not the one line this
+  note originally predicted: gating `pc_write_o` alone freezes `pc` at
+  `ECALL address + 4` while `ir_write_o` keeps reloading `mem[ECALL+4]`
+  every FETCH, re-executing that instruction forever. Freezing `ir` too
+  pins it at the `ECALL` — a no-op — so the FSM spins with no
+  architectural effect. Cleared only by reset. See decision 15 and
+  `HANDOFF_control_unit.md` §8.
+
+  Consequence for the system testbench: a `jal x0, 0` self-loop after the
+  `ECALL` is no longer required to keep the PC from running into
+  uninitialized IMEM. `firmware/validation.hex` still has one; it is now
+  dead code, harmless, and worth keeping as belt-and-braces for firmware
+  that may be run on an older build.
 
 **Tests:** LUI/AUIPC assert correct `alu_op_o`/`alu_src_*_o`, 4 cycles,
 `reg_write_o` in WRITE_BACK. System no-ops assert 3 cycles and

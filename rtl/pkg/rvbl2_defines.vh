@@ -153,15 +153,23 @@
 `define IMM_SEL_J        3'b100  // JAL
 
 // ---------------------------------------------------------------------
-// STILL OPEN — do not invent values for these, ask first.
-// See HANDOFF_control_unit.md §8.
+// RESOLVED — nothing in this file is open. Kept as a record of what was
+// decided and where the behavior lives. See HANDOFF_control_unit.md §8.
 // ---------------------------------------------------------------------
-// Illegal-opcode handling policy — undecided.
-// ECALL behavior — partially resolved 2026-08-25: ECALL now raises a
-//   sticky halt_o status flag (see control_unit.v). Execution semantics
-//   are unchanged (still a no-op, PC still advances). What remains open
-//   is whether the validation firmware expects the core to actually
-//   STOP on ECALL rather than just flag it — that needs the firmware.
-// x0 write protection — belongs in regfile, not here; not FSM-blocking.
+// Illegal-opcode handling policy — RESOLVED 2026-08-26: silent no-op.
+//   An opcode outside the eleven this core implements skips WRITE_BACK
+//   and returns straight to FETCH (3 cycles), so it writes no register
+//   and no memory, and the PC advances normally. Implemented as
+//   control_unit.v's `opcode_legal` wire. No new macro needed — the
+//   eleven `OPCODE_* defines above are the whole legal set.
+// ECALL behavior — RESOLVED 2026-08-26. Was partially resolved
+//   2026-08-25 (sticky halt_o status flag, plus funct12_i to tell ECALL
+//   from EBREAK). Now completed: the core actually STOPS. control_unit.v
+//   gates both pc_write_o and ir_write_o on !halt_o — gating pc_write_o
+//   alone would leave ir reloading each FETCH and the instruction after
+//   the ECALL re-executing forever. Cleared only by reset.
+// x0 write protection — RESOLVED: implemented in regfile.v
+//   (`if (reg_write_i && rd_addr_i != 5'd0)`), per guide §3.1.4. Never
+//   was an FSM concern.
 
 `endif // RVBL2_DEFINES_VH

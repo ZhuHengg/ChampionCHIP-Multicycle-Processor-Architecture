@@ -234,6 +234,31 @@ module control_unit (
     end
 
     // ------------------------------------------------------------------
+    // Illegal-opcode detection (handoff §8 — policy DECIDED: silent
+    // no-op). True only for the eleven opcodes this core implements;
+    // anything else is an illegal instruction.
+    //
+    // Without this, DECODE's else-branch routes an unknown opcode to
+    // EXECUTE_ALU, which falls through to WRITE_BACK and asserts
+    // reg_write_o — so an illegal instruction executed as an ADD and
+    // clobbered rd. Confirmed in simulation before the fix (custom-0
+    // opcode 7'b0001011 with rd=x6 overwrote x6). "Silent no-op" means
+    // no architectural side effect at all: no register write, no memory
+    // write, PC advances normally.
+    // ------------------------------------------------------------------
+    wire opcode_legal = (opcode_i == `OPCODE_RTYPE)  ||
+                        (opcode_i == `OPCODE_ITYPE)  ||
+                        (opcode_i == `OPCODE_LOAD)   ||
+                        (opcode_i == `OPCODE_STORE)  ||
+                        (opcode_i == `OPCODE_BRANCH) ||
+                        (opcode_i == `OPCODE_JAL)    ||
+                        (opcode_i == `OPCODE_JALR)   ||
+                        (opcode_i == `OPCODE_LUI)    ||
+                        (opcode_i == `OPCODE_AUIPC)  ||
+                        (opcode_i == `OPCODE_SYSTEM) ||
+                        (opcode_i == `OPCODE_FENCE);
+
+    // ------------------------------------------------------------------
     // Next-state logic — combinational, blocking only.
     // ------------------------------------------------------------------
     always @(*) begin
@@ -262,9 +287,13 @@ module control_unit (
                 // same — no register result, straight to FETCH. JAL/
                 // JALR, ALU/I-type, MUL/CRC, and (slice 5) LUI/AUIPC all
                 // still go to WRITE_BACK.
+                // An illegal opcode takes this same skip-WRITE_BACK path
+                // (handoff §8, silent no-op) — 3 cycles, no register
+                // write, identical in shape to the system no-ops.
                 if (opcode_i == `OPCODE_BRANCH ||
                     opcode_i == `OPCODE_SYSTEM ||
-                    opcode_i == `OPCODE_FENCE)
+                    opcode_i == `OPCODE_FENCE  ||
+                    !opcode_legal)
                     next_state = FETCH;
                 else
                     next_state = WRITE_BACK;
@@ -312,7 +341,13 @@ module control_unit (
             3'b010:  op_size_lookup = `OP_SIZE_WORD;   // lw / sw
             3'b100:  op_size_lookup = `OP_SIZE_BYTE_U; // lbu
             3'b101:  op_size_lookup = `OP_SIZE_HALF_U; // lhu
-            default: op_size_lookup = `OP_SIZE_WORD;   // illegal funct3, policy open (handoff §8)
+            // Illegal funct3 within a legal load/store opcode. Distinct
+            // from the illegal-OPCODE case (handoff §8, now decided —
+            // see opcode_legal above): the instruction is still a load
+            // or store, only its width field is undefined. Falls back to
+            // word width. Unreachable for any RV32I encoding; kept for
+            // latch avoidance.
+            default: op_size_lookup = `OP_SIZE_WORD;
         endcase
     end
 
@@ -504,9 +539,13 @@ module control_unit (
                         3'b101: alu_op_o = funct7_i[5] ? `ALU_MRS : `ALU_SRL;
                         3'b110: alu_op_o = `ALU_OR;
                         3'b111: alu_op_o = `ALU_AND;
-                        // Illegal-opcode policy still open (handoff §8).
-                        // Defaulting to ADD for now — not a trap/exception
-                        // path, just a placeholder until policy is decided.
+                        // funct3_i is 3 bits and all eight values are
+                        // covered above, so this arm is unreachable —
+                        // kept only for latch avoidance. Illegal
+                        // *opcodes* never reach here at all: they skip
+                        // WRITE_BACK entirely (see opcode_legal above,
+                        // handoff §8 silent-no-op policy), so alu_op_o's
+                        // value is irrelevant for them.
                         default: alu_op_o = `ALU_ADD;
                     endcase
                 end
@@ -599,6 +638,31 @@ module control_unit (
                 // all defaults
             end
         endcase
+
+        // --------------------------------------------------------------
+        // Halt override (handoff §8 "ECALL semantics" — RESOLVED
+        // 2026-08-26: the core STOPS, it does not merely flag).
+        // Placed after the case deliberately: it must win over whatever
+        // the current state drove, and both signals already have
+        // defaults at the top of this block, so no latch is inferred.
+        //
+        // BOTH signals must be gated, not just pc_write_o as the handoff
+        // originally sketched. Gating pc_write_o alone freezes pc at
+        // (ECALL address + 4), but ir_write_o keeps firing every FETCH,
+        // so the core reloads mem[ECALL+4] and re-executes that one
+        // instruction forever — side effects included, so a store there
+        // would repeat indefinitely. Freezing ir as well pins it at the
+        // ECALL itself, which is a no-op that writes nothing, so the FSM
+        // spins harmlessly through FETCH/DECODE/EXECUTE_ALU with no
+        // architectural state change.
+        //
+        // halt_o is sticky and cleared only by reset, so this is a
+        // permanent stop until the core is reset.
+        // --------------------------------------------------------------
+        if (halt_o) begin
+            pc_write_o = 1'b0;
+            ir_write_o = 1'b0;
+        end
     end
 
 endmodule

@@ -39,6 +39,10 @@ module tb_control_unit;
     wire        halt_o;
 
     integer errors;
+    integer halt_errors;   // post-ECALL halt check (handoff §8)
+    integer h;             // loop index for the same
+    integer ill_errors;    // illegal-opcode silent-no-op check (handoff §8)
+    integer k;             // loop index for the same
 
     // Slice 2, highest-consequence assertion (see task spec): we_o must
     // be 0 in every state except MEM_ACCESS_STORE. Checked every cycle
@@ -1231,6 +1235,56 @@ module tb_control_unit;
         run_instruction("SRA_REGRESSION2", `ALU_MRS);
 
         // ---------------------------------------------------------------
+        // Illegal opcode — silent no-op (handoff §8, DECIDED).
+        //
+        // Must run BEFORE the ECALL block: halt_o is sticky, and once it
+        // latches, pc_write_o/ir_write_o are gated low for the rest of
+        // the run, so this test could never see a real FETCH.
+        //
+        // Requirements: 3 cycles (FETCH -> DECODE -> EXECUTE_ALU ->
+        // FETCH, never WRITE_BACK), reg_write_o never asserted, we_o
+        // never asserted. Before the fix this reached WRITE_BACK and
+        // asserted reg_write_o, executing as an ADD into rd.
+        // ---------------------------------------------------------------
+        // 7'b0001011 is RISC-V "custom-0" — a real encoding this core
+        // does not implement, so it exercises the path without relying
+        // on a bit pattern that could later become legal.
+        opcode_i = 7'b0001011; funct3_i = 3'b000; funct7_i = 7'b0000000;
+        funct12_i = `FUNCT12_EBREAK;
+        ill_errors = 0;
+
+        // FETCH
+        if (dut.state !== 4'd1) begin
+            $display("FAIL [ILLEGAL] not at FETCH on entry: state=%0d", dut.state);
+            ill_errors = ill_errors + 1;
+        end
+        for (k = 0; k < 3; k = k + 1) begin
+            if (reg_write_o !== 1'b0) begin
+                $display("FAIL [ILLEGAL] reg_write_o asserted: cycle=%0d state=%0d", k, dut.state);
+                ill_errors = ill_errors + 1;
+            end
+            if (we_o !== 1'b0) begin
+                $display("FAIL [ILLEGAL] we_o asserted: cycle=%0d state=%0d", k, dut.state);
+                ill_errors = ill_errors + 1;
+            end
+            if (dut.state === 4'd4) begin
+                $display("FAIL [ILLEGAL] reached WRITE_BACK: cycle=%0d", k);
+                ill_errors = ill_errors + 1;
+            end
+            @(posedge clk_i); #1;
+        end
+        // After 3 cycles it must be back at FETCH, never having written.
+        if (dut.state !== 4'd1) begin
+            $display("FAIL [ILLEGAL] did not return to FETCH in 3 cycles: state=%0d", dut.state);
+            ill_errors = ill_errors + 1;
+        end
+        if (ill_errors == 0) begin
+            $display("PASS [ILLEGAL] silent no-op: 3 cycles, no reg_write_o, no we_o (handoff Sec 8)");
+        end else begin
+            errors = errors + ill_errors;
+        end
+
+        // ---------------------------------------------------------------
         // ECALL / halt_o. Deliberately LAST: halt_o is sticky, so once
         // it latches it stays high for the rest of the run. Placing
         // these earlier would make every later test run with halt_o
@@ -1251,19 +1305,39 @@ module tb_control_unit;
         opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; funct12_i = `FUNCT12_ECALL;
         run_system_nop("ECALL", 1'b1);
 
-        // ---- Sticky: an unrelated instruction must not clear it ----
+        // ---- Halted: the core must now be STOPPED, not merely flagged.
+        // Handoff §8 "ECALL semantics" — RESOLVED 2026-08-26. This
+        // replaces the old ADD_AFTER_ECALL check, which asserted the
+        // opposite ("the core did not stall") under the earlier
+        // flag-only reading. Both pc_write_o and ir_write_o must stay
+        // low for the rest of the run: gating pc_write_o alone would
+        // leave ir reloading every FETCH and the instruction after the
+        // ECALL re-executing forever. ----
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b000; funct7_i = 7'b0000000;
         funct12_i = `FUNCT12_EBREAK;
-        run_instruction("ADD_AFTER_ECALL", `ALU_ADD);
-        if (halt_o !== 1'b1) begin
-            $display("FAIL [sticky] halt_o cleared by a later instruction: got=%b", halt_o);
-            errors = errors + 1;
-        end else begin
-            $display("PASS [sticky] halt_o still 1 after a later ADD");
+        halt_errors = 0;
+        for (h = 0; h < 12; h = h + 1) begin
+            if (pc_write_o !== 1'b0) begin
+                $display("FAIL [halted] pc_write_o asserted after ECALL: cycle=%0d state=%0d",
+                         h, dut.state);
+                halt_errors = halt_errors + 1;
+            end
+            if (ir_write_o !== 1'b0) begin
+                $display("FAIL [halted] ir_write_o asserted after ECALL: cycle=%0d state=%0d",
+                         h, dut.state);
+                halt_errors = halt_errors + 1;
+            end
+            if (halt_o !== 1'b1) begin
+                $display("FAIL [sticky] halt_o cleared after ECALL: cycle=%0d got=%b", h, halt_o);
+                halt_errors = halt_errors + 1;
+            end
+            @(posedge clk_i); #1;
         end
-
-        // ---- ECALL must not have changed execution semantics: the ADD
-        // above ran normally, proving the core did not stall. ----
+        if (halt_errors == 0) begin
+            $display("PASS [halted] pc_write_o/ir_write_o held 0 and halt_o held 1 for 12 cycles");
+        end else begin
+            errors = errors + halt_errors;
+        end
 
         // ---- Reset clears it ----
         rst_i = 1;

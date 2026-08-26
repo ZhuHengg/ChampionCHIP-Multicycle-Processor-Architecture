@@ -336,19 +336,42 @@ Part IV for the full treatment.
       input to tell ECALL from EBREAK (funct7 cannot — they differ only in
       IR[20]). Execution semantics unchanged; the flag is what the system
       testbench waits on instead of a cycle-count timeout.
-- [ ] **ECALL semantics** — does the validation firmware use ECALL as a
-      "test complete / halt" signal? Blocked on the firmware's release, but
-      two things are doable now: (a) add a `halt_o` output wired to the
-      ECALL case, held at 0, so the fix is one line later; (b) check the
-      ChampionCHIP platform docs — standard `riscv-tests` suites use a
-      known write-result-then-ECALL pattern, so this may be predictable
-      before release.
+- [x] **ECALL semantics** — DONE 2026-08-26. **The core stops.**
+      `control_unit.v` gates `pc_write_o` **and** `ir_write_o` on
+      `!halt_o`, appended after the output `case` so it overrides every
+      state. Both signals must be gated: the one-line sketch this item
+      originally proposed (gate `pc_write_o` only) freezes `pc` at
+      `ECALL address + 4`, but `ir_write_o` keeps firing every FETCH, so
+      the core reloads `mem[ECALL+4]` and re-executes that single
+      instruction forever — side effects included, so a store there would
+      repeat indefinitely. Freezing `ir` as well pins it at the `ECALL`,
+      a no-op that writes nothing, and the FSM spins harmlessly.
+      Verified: `tb_control_unit`'s `[halted]` check holds both signals
+      at 0 and `halt_o` at 1 for 12 cycles, and fails under a mutation
+      that gates `pc_write_o` alone.
+
+      This **replaces** the earlier flag-only reading. The old
+      `ADD_AFTER_ECALL` test asserted the opposite ("the core did not
+      stall") and was removed along with the decision it encoded.
 
 **Resolved since this list was written:**
 
 - ~~Illegal-opcode policy~~ — **decided: silent no-op.** The guide never
   mentions illegal-instruction trapping and the coverage table has no row
   for it. Replaces the `ALU_ADD` fallthrough placeholder.
+
+  **IMPLEMENTED 2026-08-26** — the decision sat here unimplemented for a
+  while, and the gap was real: DECODE's else-branch routed any unknown
+  opcode to EXECUTE_ALU, which fell through to WRITE_BACK and asserted
+  `reg_write_o`, so an illegal instruction executed as an ADD and
+  clobbered `rd`. Confirmed in simulation before the fix (custom-0
+  opcode `7'b0001011` with `rd=x6` overwrote `x6`). Now a new
+  `opcode_legal` wire adds unknown opcodes to the same skip-WRITE_BACK
+  path `BRANCH`/`SYSTEM`/`FENCE` already take: 3 cycles, no register
+  write, no memory write, PC advances. Note the `ALU_ADD` default in the
+  funct3 case was *not* the actual defect — `funct3_i` is 3 bits with all
+  eight values covered, so that arm is unreachable. The defect was the
+  next-state routing. Tested by `tb_control_unit`'s `[ILLEGAL]` check.
 - ~~x0 write protection~~ — **not a control-unit item.** It's a one-line
   guard in the regfile (`if (reg_write_i && rd_addr_i != 5'd0)`), per guide
   §3.1.4. Belongs on the memory pair's task list, not this open-questions
