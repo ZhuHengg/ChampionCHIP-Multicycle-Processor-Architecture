@@ -333,7 +333,7 @@ module top #(
         mux_result = alu_out; // default
         case (result_src_o)
             `RESULT_SRC_ALU: mux_result = alu_out;         // trap 2 — the REGISTER
-            `RESULT_SRC_MUL: mux_result = mult_result;   // MUTATION 1 TEMP
+            `RESULT_SRC_MUL: mux_result = mult_result_r;   // trap 9 — the REGISTER, not live mult_result
             `RESULT_SRC_CRC: mux_result = crc_result_r;    // trap 9 — the REGISTER, not live crc_result
             `RESULT_SRC_MEM: mux_result = mem_result; // trap 8 — the REGISTER, not live lsu_core_data_i
             // trap 6: NOT pc — pc has already been redirected to the
