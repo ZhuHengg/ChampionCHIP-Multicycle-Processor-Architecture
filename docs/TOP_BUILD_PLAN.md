@@ -38,23 +38,37 @@ wiring is the easy half.
 | `mux_pc_next` | 32 | comb | `pc_src_o`: PC+4 / target / JALR target |
 | `mux_mem_addr` | 32 | comb | **See trap 4** — no CU signal selects this yet |
 
-An MDR (memory data register) is **not** required: `dmem.v`'s `data_o` is
-already registered and only updates when `oe_i` is asserted, so it holds the
-loaded word through `MEM_ACCESS_DATA` and `WRITE_BACK` on its own.
+**[CORRECTED 2026-08-26, slice 7g — both claims below were wrong; see traps
+8 and 9.]**
 
-MUL and CRC results also need no register. Both read `rs1_data`/`rs2_data`
-directly rather than through the ALU source muxes, and those stay stable
-while `ir` is unchanged — so their combinational outputs are still valid in
-`WRITE_BACK`.
+~~An MDR (memory data register) is not required: `dmem.v`'s `data_o` is
+already registered...~~ — wrong. `address_decoder.data_o` re-routes based
+on the *current* address, and by `WRITE_BACK` that address is `pc`, not the
+load's effective address — the decoder is reading IMEM by then regardless
+of which device actually served the load. A `mem_result` register
+(capturing `lsu.core_data_i` while `result_src_o == RESULT_SRC_MEM`) is
+required. See trap 8.
+
+~~MUL and CRC results also need no register. Both read `rs1_data`/
+`rs2_data` directly... so their combinational outputs are still valid in
+`WRITE_BACK`.~~ — the operand half of this is correct, but the op-select
+half isn't: `mult_op_o`/`crc_op_o` are driven only in `EXECUTE_ALU` and
+revert to their `4'h0` defaults in `WRITE_BACK` (the state `mux_result`
+actually samples). `mult_result_r`/`crc_result_r` registers, gated on
+`mult_en_o`/`crc_en_o`, are required. See trap 9 — this one shipped broken
+in commit `44d9aa2` before being fixed in `3efdead`.
 
 ---
 
 ## 3. Integration traps
 
-Five places where the obvious wiring produces a core that simulates without
-error and executes the wrong thing. Each was found by reading the control
-unit's per-state outputs against what the consuming module needs, not by
-running anything.
+Nine places where the obvious wiring produces a core that simulates without
+error and executes the wrong thing. Traps 1-5 were found by reading the
+control unit's per-state outputs against what the consuming module needs,
+not by running anything, before any `top.v` RTL existed. Traps 6-9 were
+found during integration (slices 7d/7e/7f) and are corrected here
+2026-08-26 (slice 7g) — this section originally listed only 1-5; the other
+four existed only in `rtl/top.v`'s own header until now.
 
 ### Trap 1 — branch targets need `old_pc`, not `pc`
 
@@ -186,6 +200,100 @@ depends on `adr_src_o` still selecting `alu_out` in that state (D1).
 An MDR register is *not* an alternative fix here: latching at the end of
 `MEM_ACCESS_ADDR` would capture IMEM correctly but DMEM a cycle too early,
 since DMEM's registered read has not landed yet.
+
+### Trap 6 — `RESULT_SRC_PC4` must be `old_pc + 4`, not `pc`
+
+**Symptom:** JAL/JALR's link register (`rd`) ends up holding the *jump
+target*, not the return address — `x1` (or whatever `rd` is) comes back
+wrong by however far the jump moved, not by a fixed +4.
+
+**Root cause:** `` `RESULT_SRC_PC4 `` is defined as "this instruction's
+address + 4," which for an *ordinary* instruction is exactly the
+already-incremented `pc` (FETCH's `pc_write_o=1`/`PC_SRC_PLUS4` has already
+advanced it). But JAL and JALR redirect `pc` to the jump target **inside
+`EXECUTE_ALU`** (`pc_write_o=1`, `PC_SRC_TARGET`/`PC_SRC_JALR`) — the very
+same instruction whose link value `RESULT_SRC_PC4` is trying to compute. By
+`WRITE_BACK`, `pc` holds the target, not `old_pc + 4`.
+
+**Fix:** `mux_result`'s `` `RESULT_SRC_PC4 `` arm reads `old_pc + 4`
+directly, not `pc`. `old_pc` is stable across an instruction's full cycle
+count (`ir_write_o` only fires in FETCH), so it's unaffected by whatever
+`pc` gets redirected to later in the same instruction.
+
+### Trap 7 — `alu_out` must freeze while the memory path owns the address
+
+**Symptom:** loads and stores intermittently address the wrong word — the
+effective address computed in `MEM_ADDR` gets silently overwritten one
+cycle later.
+
+**Root cause:** `alu_out`'s original spec ("loads every cycle," §2 above)
+was correct only through slice 7d, when nothing needed `alu_out` to survive
+past the cycle it was computed. Once the memory path exists, `MEM_ACCESS_ADDR`
+leaves `alu_src_a_o`/`alu_src_b_o`/`alu_op_o` at their RS1/RS2/PASS_B
+defaults (that state drives only `oe_o`/`op_size_o`/`adr_src_o`) — so the
+*live* ALU output during `MEM_ACCESS_ADDR` is `rs2_data`, which for an
+I-type load is immediate bits, not a real register value. An
+unconditionally-loading `alu_out` clobbers `MEM_ADDR`'s correctly-computed
+effective address with this garbage one cycle later.
+
+**Fix:** `alu_out` loads every cycle **except** while `adr_src_o` selects
+`` `ADR_SRC_ALU `` (i.e. not during `MEM_ACCESS_ADDR`/`MEM_ACCESS_DATA`/
+`MEM_ACCESS_STORE`) — freezing the effective address for the memory path's
+own three cycles, then resuming normal every-cycle loading everywhere else.
+
+### Trap 8 — a `mem_result` register is required after all
+
+**Symptom:** loaded values read back as `0` (or as whatever IMEM happens to
+hold at the current PC) by the time `WRITE_BACK` commits them to the
+register file.
+
+**Root cause:** §2's original claim — "an MDR is not required, `dmem.v`'s
+`data_o` already holds the value" — is **wrong**, and is corrected here
+rather than left standing. That reasoning only covers DMEM. By `WRITE_BACK`,
+`adr_src_o` has reverted to `` `ADR_SRC_PC `` (its default), so
+`mux_mem_addr` is `pc` — always inside IMEM's address range — and
+`address_decoder.data_o` **re-routes to the IMEM branch based on the
+current address**, regardless of which device the load actually read from.
+A plain DMEM `lw` breaks too: by `WRITE_BACK`, the decoder is reading back
+`imem_data_o`, which is itself `0` because `oe_o` is not asserted on IMEM in
+`WRITE_BACK` and `imem.v` is combinational.
+
+**Fix:** `mem_result` captures `lsu.core_data_i` (the LSU's already-fully-
+computed extended load result) whenever `result_src_o == RESULT_SRC_MEM` —
+true in both `MEM_ACCESS_DATA` (when the capture is correct) and the
+following `WRITE_BACK` (a harmless re-capture of the same by-then-stale
+value, since the regfile write already sampled the register from the prior
+edge). `mux_result`'s `` `RESULT_SRC_MEM `` arm reads this register, not the
+live `lsu.core_data_i` wire.
+
+### Trap 9 — `mult_op_o`/`crc_op_o` are only driven in `EXECUTE_ALU`
+
+**Symptom:** `mulh`/`mulhsu`/`mulhu` silently return `mul`'s answer, and
+`crch`/`crcw` silently return `crcb`'s answer. `mul` and `crcb` themselves
+pass regardless, since they happen to be op-select `4'h0` — the same value
+these signals default to everywhere else. **This one shipped broken:**
+commit `44d9aa2` left a mutation-testing artifact
+(`` `RESULT_SRC_MUL: mux_result = mult_result; `` — the live tap, not the
+register) uncommitted-reverted in the tree; it was caught and fixed in
+`3efdead`.
+
+**Root cause:** §2's claim that "MUL and CRC results also need no register"
+is **wrong about the op-select, even though it's right about the operands**
+— corrected here rather than left standing. `rs1_data`/`rs2_data` genuinely
+are stable for an instruction's whole multi-cycle execution. But
+`mult_op_o`/`crc_op_o` are driven only inside `EXECUTE_ALU`'s MUL/CRC cases;
+every other state — including `WRITE_BACK`, the state `mux_result` actually
+samples — falls back to the control unit's `4'h0` defaults. A live tap of
+`mult.result_o`/`crc.result_o` from `mux_result` therefore reads the
+low-half-MUL/CRCB answer regardless of which op the instruction actually
+requested.
+
+**Fix:** `mult_result_r`/`crc_result_r` registers capture the live
+`mult`/`crc` output while `mult_en_o`/`crc_en_o` are asserted — exactly
+`EXECUTE_ALU`, the one state where the op-select is still correctly driven
+— then hold through `WRITE_BACK`. `mux_result`'s `` `RESULT_SRC_MUL ``/
+`` `RESULT_SRC_CRC `` arms read these registers, not the live outputs. Same
+pattern as traps 2 and 8.
 
 ---
 
@@ -358,7 +466,11 @@ hardcoding means editing RTL for every firmware case.
   Table 14's IMEM firmware layout.
 - One directed test per slice above, not one at the end.
 - Cycle counts cross-checked against the handoff §2 table: 4 for ALU/I-type,
-  5 for loads, 4 for stores, 3 for branches and system no-ops.
+  **6 for loads** (FETCH, DECODE, MEM_ADDR, MEM_ACCESS_ADDR, MEM_ACCESS_DATA,
+  WRITE_BACK — corrected 2026-08-26, slice 7g; this section previously said
+  5, which was wrong — `HANDOFF_control_unit_ALL_STAGES.md` lines 393-397
+  and `tb_top_mem`'s own passing assertion both say 6), 4 for stores, 3 for
+  branches and system no-ops.
 - `firmware/crc_test.S` already exists and is the natural 7f test.
 - A `$monitor`-style trace of `pc` / `ir` / `state` makes slice 7b
   debuggable; wire it before it is needed.

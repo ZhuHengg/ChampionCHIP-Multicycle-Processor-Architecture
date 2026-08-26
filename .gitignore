@@ -10,5 +10,9 @@ openlane/runs/
 *.swp
 .DS_Store
 
+# Python cache (scripts/ tools)
+__pycache__/
+*.pyc
+
 # personal local overrides
 CLAUDE.local.md
