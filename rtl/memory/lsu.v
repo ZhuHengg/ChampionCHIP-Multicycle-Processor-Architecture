@@ -69,8 +69,6 @@
 // test — it passes under either reading.
 // ============================================================================
 
-`include "pkg/rvbl2_defines.vh"
-
 module lsu (
     input  wire [31:0] core_data_o,     // INPUT: store data from core (rs2)
     input  wire [31:0] core_address_o,  // INPUT: effective address from core (uses [1:0])
@@ -80,6 +78,13 @@ module lsu (
     output reg  [31:0] core_data_i,     // OUTPUT: load result, extended, back to core
     output reg  [31:0] mem_data_i       // OUTPUT: store data, positioned, out to memory
 );
+
+    // Operation Size Encodings (from guide / handoff)
+    localparam [2:0] OP_SIZE_BYTE_S = 3'b000; // lb / sb
+    localparam [2:0] OP_SIZE_BYTE_U = 3'b001; // lbu
+    localparam [2:0] OP_SIZE_HALF_S = 3'b010; // lh / sh
+    localparam [2:0] OP_SIZE_HALF_U = 3'b011; // lhu
+    localparam [2:0] OP_SIZE_WORD   = 3'b100; // lw / sw
 
     wire [1:0] byte_sel = core_address_o[1:0];
 
@@ -112,11 +117,11 @@ module lsu (
     always @(*) begin
         core_data_i = 32'b0; // default
         case (op_size_o)
-            `OP_SIZE_BYTE_S: core_data_i = {{24{load_byte[7]}}, load_byte};
-            `OP_SIZE_BYTE_U: core_data_i = {24'b0, load_byte};
-            `OP_SIZE_HALF_S: core_data_i = {{16{load_half[15]}}, load_half};
-            `OP_SIZE_HALF_U: core_data_i = {16'b0, load_half};
-            `OP_SIZE_WORD:   core_data_i = mem_data_o;
+            OP_SIZE_BYTE_S: core_data_i = {{24{load_byte[7]}}, load_byte};
+            OP_SIZE_BYTE_U: core_data_i = {24'b0, load_byte};
+            OP_SIZE_HALF_S: core_data_i = {{16{load_half[15]}}, load_half};
+            OP_SIZE_HALF_U: core_data_i = {16'b0, load_half};
+            OP_SIZE_WORD:   core_data_i = mem_data_o;
             default:         core_data_i = mem_data_o;
         endcase
     end

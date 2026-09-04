@@ -181,7 +181,32 @@
 //   lsu.mem_data_o (the load path's read of memory) reuses that same
 //   decoder_data_o net — one read-back path serves both fetch and loads.
 
-`include "pkg/rvbl2_defines.vh"
+// ---------------------------------------------------------------------
+// Multiplexer select lines & constants (from rvbl2_defines.vh)
+// ---------------------------------------------------------------------
+`define RESULT_SRC_ALU   3'b000
+`define RESULT_SRC_MUL   3'b001
+`define RESULT_SRC_CRC   3'b010
+`define RESULT_SRC_MEM   3'b011
+`define RESULT_SRC_PC4   3'b100
+
+`define PC_SRC_PLUS4     2'b00
+`define PC_SRC_TARGET    2'b01
+`define PC_SRC_JALR      2'b10
+
+`define ALU_SRC_A_RS1    1'b0
+`define ALU_SRC_A_PC     1'b1
+
+`define ALU_SRC_B_RS2    2'b00
+`define ALU_SRC_B_IMM    2'b01
+`define ALU_SRC_B_CONST4 2'b10
+
+`define ADR_SRC_PC       1'b0
+`define ADR_SRC_ALU      1'b1
+
+`define PC_RESET_ADDR    32'h00400000
+`define IMEM_BASE        32'h00400000
+`define DMEM_BASE        32'h10010000
 
 // SYNTHESIS PARAMETERS (added 2026-08-26 for the OpenLane flow — see
 // docs/OPENLANE_SYNTHESIS.md):

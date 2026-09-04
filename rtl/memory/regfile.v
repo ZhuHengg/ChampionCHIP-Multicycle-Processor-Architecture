@@ -9,8 +9,6 @@
 //
 // Reset: synchronous, matching control_unit.v.
 
-`include "pkg/rvbl2_defines.vh"
-
 module regfile (
     input  wire        clk_i,
     input  wire        rst_i,

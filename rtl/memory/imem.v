@@ -25,8 +25,6 @@
 // `lw` reading 0x00400100) — no special-casing needed, oe_i/addr_i work
 // identically whether the access is a fetch or a load.
 
-`include "pkg/rvbl2_defines.vh"
-
 module imem #(
     parameter DEPTH_WORDS = 1024,
     parameter INIT_FILE   = ""

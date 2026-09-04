@@ -17,8 +17,6 @@
 // Sizing: DEPTH_WORDS defaults to 2048 words = 8 kB, the guide's real
 // size (guide is already small enough not to need shrinking for sim).
 
-`include "pkg/rvbl2_defines.vh"
-
 module dmem #(
     parameter DEPTH_WORDS = 2048
 ) (

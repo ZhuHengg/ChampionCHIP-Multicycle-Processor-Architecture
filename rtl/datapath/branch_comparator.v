@@ -8,7 +8,7 @@ module branch_comparator (
     input  wire [31:0] rs1_i,
     input  wire [31:0] rs2_i,
     input  wire [2:0]  funct3_i,
-    output reg         branch_taken_o
+    output reg  branch_taken_o
 );
 
     // funct3 encodings are RV32I standard branch funct3 values (RISC-V
