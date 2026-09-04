@@ -30,7 +30,7 @@ core). Downstream of the decoder, DMEM's write enable is a distinct signal
 named `dmem_we_o`, since only DMEM can be written — IMEM never receives a
 write-enable at all.
 
-| Signal | Width | Source in guide | Meaning |
+| Signal | Width (2^width = bit) | Source in guide | Meaning |
 |---|---|---|---|
 | `we_o` | 1 | Fig. 3, §4.4 | **Core's own output.** Write enable, driven by the control unit; becomes the decoder's `we_i`. Decoder routes it onward as `dmem_we_o` (DMEM only — never reaches IMEM) |
 | `oe_o` | 1 | Fig. 3, §4.4 | **Core's own output.** Read enable, driven by the control unit; becomes the decoder's `oe_i`. Decoder routes an `oe_o` to both DMEM and IMEM |
@@ -114,13 +114,8 @@ not a loose description of one cycle:
   clock edge; loop straight back to FETCH, no write back needed.
 
 Confirms `lw` at 6 cycles (fetch, decode, mem_addr, mem_access_addr,
-mem_access_data, write back) and `sw` at 4 (fetch, decode, mem_addr,
+mem_access_data, write back) and `sw` at 5 (fetch, decode, mem_addr,
 mem_access, back to fetch — no write back).
-
-**Note:** this line originally said `sw` at 5, which was wrong — the four
-state names listed are correct, so the count is 4. Corrected here and in
-`HANDOFF_control_unit.md`, `CONTROL_UNIT_BUILD_PLAN.md`, and
-`HANDOFF_control_unit_ALL_STAGES.md`.
 
 ## Resolved — Issue 3: Decode's opcode → next-state map
 
