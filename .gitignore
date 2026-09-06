@@ -2,6 +2,10 @@
 sim/*.vvp
 sim/*.vcd
 
+# simulation run logs (keep the folder, ignore contents)
+logs/*
+!logs/.gitkeep
+
 # OpenLane run artifacts (keep config.json, ignore generated runs)
 openlane/runs/
 
@@ -19,3 +23,6 @@ CLAUDE.local.md
 
 # OpenLane run artifacts at the design root
 runs/
+
+# chip inventor code
+chip-inventor/*

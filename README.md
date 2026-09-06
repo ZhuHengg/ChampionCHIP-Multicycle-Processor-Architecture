@@ -31,7 +31,8 @@ rvbl2-core/
 ├── openlane/               Physical design flow
 │   └── runs/               Synthesis output (gitignored)
 ├── scripts/                Build/automation helpers
-└── sim/                    Compiled .vvp / .vcd scratch (gitignored)
+├── sim/                    Compiled .vvp / .vcd scratch (gitignored)
+└── logs/                   iverilog/vvp run logs (gitignored)
 ```
 
 ### What each folder is for
@@ -47,6 +48,7 @@ rvbl2-core/
 | `firmware/` | Programs the core executes. The official validation firmware lands here when released. |
 | `openlane/` | `config.json` plus synthesis runs. Produces the GDSII and gate-level netlist for submission. |
 | `sim/` | Build scratch. Gitignored — nothing here is worth keeping. |
+| `logs/` | iverilog/vvp stdout captures per test run. Gitignored — regenerate by re-running the suite. |
 
 **Control unit vs datapath**, since the split isn't obvious: the control unit
 emits *select lines and enables* (`alu_op_o = 4'h2`, `reg_write_o = 1`) — it
