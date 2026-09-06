@@ -1,16 +1,5 @@
-// tb_lsu.v
-// Directed tests using guide Table 12 / §3.3.1 golden load vectors, and
-// §3.3.2's store example, per docs/MEMORY_BUILD_PLAN.md.
-//
-// DMEM word under test = 0xF4F3F2F1 (bytes F1/F2/F3/F4 at addresses
-// 0x10010000-0x10010003, guide Table 12).
-//
-// NOTE on the 6th vector (lb @ 0x10010002): guide §3.3.1's stated rule
-// and its own worked example CONTRADICT each other for this case — see
-// the long comment block at the top of rtl/memory/lsu.v. This testbench
-// checks the implementation (general sign-extension rule) against BOTH
-// readings and reports which one the current build satisfies, rather
-// than silently asserting one is "the" right answer.
+// tb_lsu.v — golden load/store vectors, guide Table 12 word 0xF4F3F2F1.
+// lb @ +2: guide's rule vs worked example disagree, see lsu.v header; tested here.
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"
@@ -78,14 +67,9 @@ module tb_lsu;
         core_address_o = 32'h10010000; op_size_o = `OP_SIZE_WORD; #1;
         check32("lw @ +0", core_data_i, GOLDEN_WORD);
 
-        // lb @ 0x10010002 -> guide's rule (§3.3.1 general statement) says
-        // sign-extend off byte 0xF3's MSB (set) -> 0xFFFFFFF3.
-        // guide's OWN worked example / Table-12-style vector claims
-        // 0x000000F3 instead — see FLAG comment in lsu.v. This build
-        // follows the general rule; report both outcomes explicitly.
+        // lb @ 0x10010002 -> general sign-extension rule (see lsu.v header)
         core_address_o = 32'h10010002; op_size_o = `OP_SIZE_BYTE_S; #1;
-        $display("INFO lb @ +2: got=%h (expected FFFFFFF3 — RESOLVED: guide §3.3.1's 0x000000F3 is the lbu result; that paragraph illustrates byte repositioning, not sign extension. See lsu.v header)", core_data_i);
-        check32("lb @ +2 (this build: general sign-extension rule)", core_data_i, 32'hFFFFFFF3);
+        check32("lb @ +2 (sign-extension rule)", core_data_i, 32'hFFFFFFF3);
 
         // lbu @ 0x10010002 -> 0x000000F3 (unsigned, unambiguous either way)
         core_address_o = 32'h10010002; op_size_o = `OP_SIZE_BYTE_U; #1;

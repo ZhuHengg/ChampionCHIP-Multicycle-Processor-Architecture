@@ -1,6 +1,4 @@
-// tb_imm_extend.v
-// One directed test per format minimum, negative immediate for I/S/B/J,
-// low-bit-zero assertion for B/J.
+// tb_imm_extend.v — one test per format, negative imm, B/J low-bit-zero check
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"

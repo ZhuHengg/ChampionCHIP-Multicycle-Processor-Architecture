@@ -1,12 +1,5 @@
-// tb_dmem.v
-// Directed tests per docs/MEMORY_BUILD_PLAN.md dmem.v section. Golden
-// data layout from guide Table 12: 0xF1/F2/F3/F4 at DMEM word 0
-// (absolute 0x10010000-0x10010003), i.e. word = 0xF4F3F2F1.
-//
-// Critical: proves the REGISTERED-READ timing, not just values — data
-// must NOT be valid in the address-presentation cycle, and IS valid the
-// next cycle. A combinational implementation would also pass a
-// values-only test, which defeats the point (per build plan).
+// tb_dmem.v — golden word 0xF4F3F2F1 (guide Table 12), proves registered-read
+// timing (data invalid same cycle as address, valid next), byte-write masks.
 
 `timescale 1ns/1ps
 
@@ -64,13 +57,12 @@ module tb_dmem;
         we = 1'b0;
         bw = 4'b0000;
 
-        // --- Timing proof: present address, check data_o NOT valid this
-        // cycle (still previous/reset value), then valid next cycle ---
-        data_in = 32'hDEAD_BEEF; // ensure data_o isn't accidentally right by coincidence
+        // Timing proof: data_o invalid this cycle, valid next
+        data_in = 32'hDEAD_BEEF;
         addr = 32'd0;
         oe = 1'b1;
         #1; // still within the address-presentation cycle, before the edge
-        check32("data_o NOT valid in address cycle", data_out, 32'h0); // reset value, unchanged
+        check32("data_o NOT valid in address cycle", data_out, 32'h0);
         @(posedge clk); #1;
         check32("data_o valid the cycle AFTER address", data_out, 32'hF4F3F2F1);
         oe = 1'b0;

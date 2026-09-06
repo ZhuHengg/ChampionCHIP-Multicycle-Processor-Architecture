@@ -1,11 +1,4 @@
-// tb_regfile.v
-// Directed tests per docs/MEMORY_BUILD_PLAN.md regfile.v section:
-//  1. write x1-x31, read back
-//  2. write x0, confirm still reads zero
-//  3. read x0 before any write
-//  4. simultaneous read of two different registers
-//  5. read-during-write of same register: async read sees OLD value
-//     (write lands on the edge, read is combinational off current regs)
+// tb_regfile.v — write/readback, x0 protect, dual read, read-during-write
 
 `timescale 1ns/1ps
 

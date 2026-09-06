@@ -1,6 +1,4 @@
-// tb_mult.v
-// All 4 MULT_* operations, negative x negative, negative x positive,
-// MULHSU mixed-sign trap, and the 0xFFFFFFFF x 0xFFFFFFFF stress case.
+// tb_mult.v — all 4 MULT ops, sign combos, MULHSU trap, 0xFFFFFFFF^2 stress
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"

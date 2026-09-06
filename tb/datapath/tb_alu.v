@@ -1,6 +1,4 @@
-// tb_alu.v
-// All 11 ALU_* operations, shift-amount masking (>31), SRA negative
-// operand, SLT/SLTU 0xFFFFFFFF vs 0x00000001 trap case.
+// tb_alu.v — all 11 ALU ops, shift masking, SRA negative, SLT/SLTU trap
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"

@@ -1,7 +1,4 @@
-// tb_crc.v
-// Golden vectors: firmware/crc_test.S three chains (crcb/crch/crcw), all
-// converging on 0x1E82. Plus width-masking and default-arm checks.
-// See docs/DATAPATH_BUILD_PLAN.md crc.v section.
+// tb_crc.v — golden vectors from firmware/crc_test.S, 3 chains -> 0x1E82, width masking
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"

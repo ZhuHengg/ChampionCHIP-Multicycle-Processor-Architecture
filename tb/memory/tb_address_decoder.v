@@ -1,12 +1,4 @@
-// tb_address_decoder.v
-// Directed tests per docs/MEMORY_BUILD_PLAN.md address_decoder.v section:
-//  - address in IMEM range routes to IMEM (imem_oe_o), not DMEM
-//  - address in DMEM range routes to DMEM (dmem_oe_o/dmem_we_o), not IMEM
-//  - we_i reaches dmem_we_o but NEVER imem (no imem_we_o port exists at all)
-//  - bw_o reaches DMEM only (zeroed when address is IMEM range)
-//  - bottom 2 bits dropped from address_o
-//  - read mux returns the right device's data
-//  - unmapped address returns zero
+// tb_address_decoder.v — IMEM/DMEM routing, we_i/bw_o isolation, unmapped address
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"
@@ -92,10 +84,7 @@ module tb_address_decoder;
         check32("DMEM addr -> data_o = dmem_data", data_o, dmem_data);
         check32("bottom 2 bits dropped (DMEM)", {address_o, 2'b00}, `DMEM_BASE + 32'h4);
 
-        // --- we_i never reaches IMEM (no imem_we_o port exists; confirm
-        // dmem_we_o stays clear when address is IMEM range even with
-        // we_i asserted, and that no such signal is wired to IMEM at all
-        // by construction — checked structurally via port list above) ---
+        // we_i never reaches IMEM (no imem_we_o port exists)
         address = `IMEM_BASE;
         we = 1'b1; oe = 1'b0; bw = 4'b1111;
         #1;

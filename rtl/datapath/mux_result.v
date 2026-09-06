@@ -1,17 +1,13 @@
-// =============================================================================
-// Module: mux_result
-// Description: 5-to-1 Result Multiplexer. Selects which computed result is
-//              written back into the destination register (rd) in the RegFile.
-// =============================================================================
+// mux_result.v — write-back result mux (alu/mult/crc/mem/pc4)
 
 module mux_result (
-    input  wire [2:0]  result_src_i,   // Select code from Control Unit (result_src_o)
-    input  wire [31:0] alu_out_i,      // ALU registered result (3'b000)
-    input  wire [31:0] mult_result_i,  // Multiplier registered result (3'b001)
-    input  wire [31:0] crc_result_i,   // CRC registered result (3'b010)
-    input  wire [31:0] mem_result_i,   // Memory loaded result from LSU (3'b011)
-    input  wire [31:0] old_pc_i,       // Old PC for JAL/JALR return address (3'b100 -> Old_PC + 4)
-    output reg  [31:0] result_o        // Selected 32-bit data to regfile.write_data_i
+    input  wire [2:0]  result_src_i,
+    input  wire [31:0] alu_out_i,
+    input  wire [31:0] mult_result_i,
+    input  wire [31:0] crc_result_i,
+    input  wire [31:0] mem_result_i,
+    input  wire [31:0] old_pc_i,
+    output reg  [31:0] result_o
 );
 
     localparam [2:0] RESULT_SRC_ALU = 3'b000;

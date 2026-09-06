@@ -1,6 +1,4 @@
-// tb_branch_comparator.v
-// Directed tests: all 6 branch instructions, taken + not-taken, plus the
-// signed/unsigned disagreement case (build plan trap).
+// tb_branch_comparator.v — directed tests, all 6 branches + signed/unsigned trap
 
 `timescale 1ns/1ps
 

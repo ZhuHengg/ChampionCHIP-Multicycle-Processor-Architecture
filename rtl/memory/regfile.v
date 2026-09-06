@@ -1,13 +1,4 @@
-// regfile.v
-// Guide §3.1.4. 32 general-purpose 32-bit registers (x0-x31). x0 is
-// hardwired to zero and cannot be modified — guarded here since nothing
-// upstream (control unit) checks rd before asserting reg_write_o.
-//
-// Asynchronous read of rs1/rs2 (guide: "simultaneous asynchronous reading
-// of the rs1 and rs2 operands"), synchronous write of rd in WRITE_BACK
-// ("synchronous writing of the rd target in the Write Back stage").
-//
-// Reset: synchronous, matching control_unit.v.
+// regfile.v — 32 GPRs, x0 hardwired zero, async read / sync write
 
 module regfile (
     input  wire        clk_i,
@@ -27,13 +18,10 @@ module regfile (
 
     integer i;
 
-    // Async reads — x0 forced to zero even if somehow never reset-cleared.
     assign rs1_data_o = (rs1_addr_i == 5'd0) ? 32'b0 : regs[rs1_addr_i];
     assign rs2_data_o = (rs2_addr_i == 5'd0) ? 32'b0 : regs[rs2_addr_i];
 
-    // Sync write, x0 write-protected (guide §3.1.4: "hardwired (fixed) at
-    // zero and cannot be modified"). Control unit asserts reg_write_o
-    // regardless of rd — this guard is the only place that catches it.
+    // x0 write-protected
     always @(posedge clk_i) begin
         if (rst_i) begin
             for (i = 0; i < 32; i = i + 1)

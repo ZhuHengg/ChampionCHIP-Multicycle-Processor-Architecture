@@ -1,8 +1,4 @@
-// tb_control_unit.v — Slice 1 directed tests (R-type ALU only)
-//
-// Verifies control_unit.v against HANDOFF_control_unit.md §4 and
-// scratchpad/SLICE1_PLAN.md step 3 state table, row by row, plus the
-// funct7[5] ADD/SUB and SRL/SRA disambiguation (handoff §6).
+// tb_control_unit.v — directed FSM/control-signal tests, all instruction classes
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"
@@ -44,10 +40,7 @@ module tb_control_unit;
     integer ill_errors;    // illegal-opcode silent-no-op check (handoff §8)
     integer k;             // loop index for the same
 
-    // Slice 2, highest-consequence assertion (see task spec): we_o must
-    // be 0 in every state except MEM_ACCESS_STORE. Checked every cycle
-    // via this always block rather than only at directed checkpoints, so
-    // a stray glitch anywhere can't slip through unnoticed.
+    // we_o guard: must be 0 outside MEM_ACCESS_STORE, checked every cycle
     always @(*) begin
         if (we_o && dut.state !== dut.MEM_ACCESS_STORE) begin
             $display("FAIL [we_o guard] we_o asserted outside MEM_ACCESS_STORE, state=%0d", dut.state);
@@ -55,11 +48,7 @@ module tb_control_unit;
         end
     end
 
-    // halt_o guard: halt_o must never assert before an ECALL has
-    // retired. Same continuous-check style as the we_o guard above, so
-    // a spurious assertion anywhere in the run is caught, not just at
-    // the directed checkpoints. ecall_seen is set by the testbench
-    // immediately before the one test that is supposed to trigger it.
+    // halt_o guard: must never assert before ECALL retires (ecall_seen arms it)
     reg ecall_seen;
     always @(*) begin
         if (halt_o && !ecall_seen) begin
@@ -68,18 +57,9 @@ module tb_control_unit;
         end
     end
 
-    // Slice 7a: adr_src_o guard. Checked continuously against every
-    // state, not just the memory ones — a wrong default is the failure
-    // mode that matters (task spec). Expected ADR_SRC_ALU in exactly the
-    // three memory-access states (D1); ADR_SRC_PC everywhere else,
-    // including RESET/FETCH/DECODE/EXECUTE_ALU/WRITE_BACK/MEM_ADDR.
+    // adr_src_o guard: ALU in the 3 memory-access states, PC elsewhere
     always @(*) begin
-        // Gated on !rst_i: at t=0, state is x for one delta before the
-        // first posedge latches RESET, and x !== 0/1 always reads true
-        // — a simulation artifact, not a real defect (adr_src_o's
-        // combinational default is provably ADR_SRC_PC whenever state
-        // is a known value, checked below). Not required reading during
-        // reset assertion anyway.
+        // gated on !rst_i: x !== 0/1 reads true during reset delta, not a real defect
         if (!rst_i) begin
             if (dut.state === dut.MEM_ACCESS_ADDR ||
                 dut.state === dut.MEM_ACCESS_DATA ||
@@ -130,9 +110,7 @@ module tb_control_unit;
     // 10ns clock
     always #5 clk_i = ~clk_i;
 
-    // -----------------------------------------------------------------
     // Checker task
-    // -----------------------------------------------------------------
     task check_state;
         input [127:0] label;
         input [3:0]   exp_state;
@@ -191,12 +169,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Runs one full FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH loop
-    // for the currently-set opcode/funct3/funct7, checking every state
-    // against the step-3 table. Also counts cycles for the §2 cycle
-    // check (R-type = 4 cycles).
-    // -----------------------------------------------------------------
+    // R-type/base loop: FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, 4 cycles
     task run_instruction;
         input [127:0] label;
         input [3:0]   exp_alu_op;
@@ -240,12 +213,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 2: runs a full load, FETCH->DECODE->MEM_ADDR->
-    // MEM_ACCESS_ADDR->MEM_ACCESS_DATA->WRITE_BACK->FETCH, 6 cycles.
-    // Checks state sequence, op_size_o/bw_o in the mem states, we_o
-    // stays 0 throughout (loads never write), and result_src_o.
-    // -----------------------------------------------------------------
+    // Load: FETCH->DECODE->MEM_ADDR->MEM_ACCESS_ADDR->MEM_ACCESS_DATA->WRITE_BACK, 6 cycles
     task run_load;
         input [127:0] label;
         input [2:0]   exp_op_size;
@@ -315,16 +283,12 @@ module tb_control_unit;
                 $display("FAIL [%0s-MEM_ACCESS_DATA] result_src_o: exp=MEM got=%b", label, result_src_o);
                 errors = errors + 1;
             end
-            // Trap 3: op_size_o must stay driven here, not fall back to
-            // the OP_SIZE_WORD default — this is where the LSU's
-            // extension logic actually consumes it.
+            // op_size_o must stay driven here, not fall back to WORD default
             if (op_size_o !== exp_op_size) begin
                 $display("FAIL [%0s-MEM_ACCESS_DATA] op_size_o: exp=%b got=%b", label, exp_op_size, op_size_o);
                 errors = errors + 1;
             end
-            // Trap 5: oe_o must be re-asserted here — imem.v is
-            // combinational and drops its output to 0 the instant oe_i
-            // is low, so a load from IMEM would read back zero.
+            // oe_o must be re-asserted here — imem.v drops output when oe_i low
             if (oe_o !== 1'b1) begin
                 $display("FAIL [%0s-MEM_ACCESS_DATA] oe_o: exp=1 got=%b", label, oe_o);
                 errors = errors + 1;
@@ -344,9 +308,7 @@ module tb_control_unit;
                 $display("FAIL [%0s-WRITE_BACK] result_src_o: exp=MEM got=%b", label, result_src_o);
                 errors = errors + 1;
             end
-            // Trap 3, second half: op_size_o must still be driven here
-            // too — this is the state reg_write_o actually commits the
-            // extended value.
+            // op_size_o must still be driven here too (commit state)
             if (op_size_o !== exp_op_size) begin
                 $display("FAIL [%0s-WRITE_BACK] op_size_o: exp=%b got=%b", label, exp_op_size, op_size_o);
                 errors = errors + 1;
@@ -367,11 +329,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 2: runs a full store, FETCH->DECODE->MEM_ADDR->
-    // MEM_ACCESS_STORE->FETCH, 5 cycles, no WRITE_BACK. Checks we_o is
-    // asserted only in MEM_ACCESS_STORE and reg_write_o never asserts.
-    // -----------------------------------------------------------------
+    // Store: FETCH->DECODE->MEM_ADDR->MEM_ACCESS_STORE->FETCH, no WRITE_BACK
     task run_store;
         input [127:0] label;
         input [2:0]   exp_op_size;
@@ -438,11 +396,7 @@ module tb_control_unit;
                 errors = errors + 1;
             end
 
-            // Store is 4 cycles (FETCH, DECODE, MEM_ADDR, MEM_ACCESS_STORE),
-            // matching the states==cycles convention used everywhere else
-            // in the handoff. The doc's "5 cycles" for store was a
-            // doc-only inconsistency, fixed alongside this test — see
-            // HANDOFF_control_unit_ALL_STAGES.md Slice 2 section.
+            // store is 4 cycles; handoff's "5 cycles" was a doc-only inconsistency
             if (cycle_count !== 4) begin
                 $display("FAIL [%0s] cycle count: exp=4 got=%0d", label, cycle_count);
                 errors = errors + 1;
@@ -452,13 +406,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 3: runs a full branch, FETCH->DECODE->EXECUTE_ALU->FETCH,
-    // 3 cycles, no WRITE_BACK. Drives branch_taken_i to the given value
-    // and asserts pc_write_o follows it exactly (handoff §9 footnote —
-    // the only output that isn't a pure function of state). Also
-    // asserts reg_write_o and we_o stay 0 throughout.
-    // -----------------------------------------------------------------
+    // Branch: FETCH->DECODE->EXECUTE_ALU->FETCH, 3 cycles, pc_write_o follows branch_taken_i
     task run_branch;
         input [127:0] label;
         input         taken;
@@ -523,11 +471,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 3: runs a full JAL or JALR, FETCH->DECODE->EXECUTE_ALU->
-    // WRITE_BACK->FETCH, 4 cycles. is_jalr selects JAL vs JALR-specific
-    // checks (pc_src_o, alu_src_a_o differ per handoff §9 Slice-3 table).
-    // -----------------------------------------------------------------
+    // JAL/JALR: FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, is_jalr selects check variant
     task run_jump;
         input [127:0] label;
         input         is_jalr;
@@ -623,12 +567,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 4: runs a full MUL or CRC instruction,
-    // FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, 4 cycles. is_crc
-    // selects which enable/op/result_src set to check (handoff §8 —
-    // mult_op_o/crc_op_o are direct funct3 passthrough, no lookup table).
-    // -----------------------------------------------------------------
+    // MUL/CRC: FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, mult_op_o/crc_op_o = funct3 passthrough
     task run_mulcrc;
         input [127:0] label;
         input         is_crc;
@@ -728,11 +667,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 5: runs a full LUI or AUIPC, FETCH->DECODE->EXECUTE_ALU->
-    // WRITE_BACK->FETCH, 4 cycles. is_auipc selects which alu_op_o/
-    // alu_src_a_o to check (handoff Slice-5 section).
-    // -----------------------------------------------------------------
+    // LUI/AUIPC: FETCH->DECODE->EXECUTE_ALU->WRITE_BACK->FETCH, is_auipc selects check variant
     task run_lui_auipc;
         input [127:0] label;
         input         is_auipc;
@@ -809,11 +744,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 5: runs a system no-op (ECALL/EBREAK/FENCE),
-    // FETCH->DECODE->EXECUTE_ALU->FETCH, 3 cycles, no WRITE_BACK.
-    // Asserts reg_write_o/we_o never assert (handoff Slice-5 tests).
-    // -----------------------------------------------------------------
+    // System no-op (ECALL/EBREAK/FENCE): FETCH->DECODE->EXECUTE_ALU->FETCH, 3 cycles
     task run_system_nop;
         input [127:0] label;
         input         exp_halt;   // halt_o expected once the instruction retires
@@ -835,10 +766,7 @@ module tb_control_unit;
                 $display("FAIL [%0s] expected DECODE, got=%0d", label, dut.state);
                 errors = errors + 1;
             end
-            // Retire-timing check: halt_o is latched by the posedge at
-            // the END of EXECUTE_ALU, so decoding an ECALL must not have
-            // moved it yet. A flag wired to DECODE instead of retire
-            // fails here.
+            // halt_o latches at end of EXECUTE_ALU, must not move during DECODE
             if (halt_o !== halt_at_entry) begin
                 $display("FAIL [%0s-DECODE] halt_o changed before retire: entry=%b got=%b",
                          label, halt_at_entry, halt_o);
@@ -889,12 +817,7 @@ module tb_control_unit;
         end
     endtask
 
-    // -----------------------------------------------------------------
-    // Slice 6: runs a full I-type ALU instruction, FETCH->DECODE->
-    // EXECUTE_ALU->WRITE_BACK->FETCH, 4 cycles. Same alu_op_o table as
-    // R-type, but alu_src_b_o=IMM and imm_sel_o=IMM_SEL_I instead of
-    // RS2 (handoff Slice-6 section "the one difference").
-    // -----------------------------------------------------------------
+    // I-type ALU: same as run_instruction but alu_src_b_o=IMM, imm_sel_o=I
     task run_itype;
         input [127:0] label;
         input [3:0]   exp_alu_op;
@@ -974,10 +897,7 @@ module tb_control_unit;
         opcode_i = `OPCODE_RTYPE;
         funct3_i = 3'b000;
         funct7_i = 7'b0000000;
-        // Default is EBREAK, deliberately NOT ECALL: funct12 is a
-        // don't-care for every opcode except OPCODE_SYSTEM, and holding
-        // it at the ECALL pattern would let an unrelated test latch
-        // halt_o by accident and mask a real bug.
+        // default EBREAK not ECALL, so no unrelated test latches halt_o by accident
         funct12_i = `FUNCT12_EBREAK;
         addr_lsb_i = 2'b00;
         branch_taken_i = 1'b0;
@@ -1003,8 +923,7 @@ module tb_control_unit;
         funct7_i = 7'b0000000;
         run_instruction("ADD", `ALU_ADD);
 
-        // ---- Test 2: sub x5, x6, x7 (funct3=000, funct7=0100000) ----
-        // Catches the funct7[5] bug if ADD/SUB aren't disambiguated.
+        // ---- Test 2: sub x5, x6, x7 -- funct7[5] ADD/SUB disambiguation ----
         opcode_i = `OPCODE_RTYPE;
         funct3_i = 3'b000;
         funct7_i = 7'b0100000;
@@ -1016,8 +935,7 @@ module tb_control_unit;
         funct7_i = 7'b0000000;
         run_instruction("SRL", `ALU_SRL);
 
-        // ---- Test 4: sra x5, x6, x7 (funct3=101, funct7=0100000) ----
-        // Same trap as SUB, different funct3.
+        // ---- Test 4: sra x5, x6, x7 -- same trap as SUB, different funct3 ----
         opcode_i = `OPCODE_RTYPE;
         funct3_i = 3'b101;
         funct7_i = 7'b0100000;
@@ -1042,12 +960,7 @@ module tb_control_unit;
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b111; funct7_i = 7'b0000000;
         run_instruction("AND", `ALU_AND);
 
-        // ---------------------------------------------------------------
-        // Slice 2: load / store. Test vectors from handoff's Table 12
-        // worked example — DMEM holds 0xF1/F2/F3/F4 at 0x10010000. At
-        // control-unit level this verifies op_size_o/bw_o/cycle counts,
-        // not the sign/zero extension itself (that's the LSU's job).
-        // ---------------------------------------------------------------
+        // Load/store: vectors from handoff Table 12 (DMEM 0xF1/F2/F3/F4 @ 0x10010000)
 
         // ---- lbu x5, 0(x6) @ 0x10010000 -> op_size=BYTE_U, addr[1:0]=00 -> bw=0001
         opcode_i = `OPCODE_LOAD; funct3_i = 3'b100; addr_lsb_i = 2'b00;
@@ -1085,15 +998,8 @@ module tb_control_unit;
         opcode_i = `OPCODE_STORE; funct3_i = 3'b010; addr_lsb_i = 2'b00;
         run_store("SW", `OP_SIZE_WORD, 4'b1111);
 
-        // ---------------------------------------------------------------
-        // Slice 3: branch / jump. Control unit does not decode branch
-        // funct3 (that's the comparator's job — handoff explicit
-        // warning), so all 6 branch instructions (beq/bne/blt/bge/
-        // bltu/bgeu, funct3 000/001/100/101/110/111) exercise identical
-        // control-unit behavior. Looping funct3 here anyway to document
-        // that fact and guard against an accidental future funct3
-        // dependency creeping in.
-        // ---------------------------------------------------------------
+        // Branch/jump: control unit doesn't decode branch funct3 (comparator's job);
+        // all 6 branches loop through to guard against future funct3 dependency
         opcode_i = `OPCODE_BRANCH; funct3_i = 3'b000; // beq
         run_branch("BEQ_NOTTAKEN", 1'b0);
         run_branch("BEQ_TAKEN", 1'b1);
@@ -1126,13 +1032,7 @@ module tb_control_unit;
         opcode_i = `OPCODE_JALR;
         run_jump("JALR", 1'b1);
 
-        // ---------------------------------------------------------------
-        // Slice 4: MUL / CRC. Both under OPCODE_RTYPE, disambiguated by
-        // funct7 (FUNCT7_MUL/FUNCT7_CRC, else -> ALU). Regression risk
-        // per handoff: re-running slice 1's SUB/SRA tests (already first
-        // in this file, funct7=0100000) after this covers the
-        // else-fallthrough-vs-equality-chain trap explicitly.
-        // ---------------------------------------------------------------
+        // MUL/CRC: both OPCODE_RTYPE, disambiguated by funct7; SUB/SRA regression follows
         opcode_i = `OPCODE_RTYPE; funct7_i = `FUNCT7_MUL; funct3_i = 3'b000; // mul
         run_mulcrc("MUL", 1'b0);
 
@@ -1154,43 +1054,29 @@ module tb_control_unit;
         opcode_i = `OPCODE_RTYPE; funct7_i = `FUNCT7_CRC; funct3_i = 3'b010; // crcw
         run_mulcrc("CRCW", 1'b1);
 
-        // ---- Regression: SUB/SRA (funct7=0100000) must still decode as
-        // ALU, not misroute into the MUL/CRC else-if branches above ----
+        // ---- Regression: SUB/SRA must not misroute into MUL/CRC branches ----
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b000; funct7_i = 7'b0100000;
         run_instruction("SUB_REGRESSION", `ALU_SUB);
 
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b101; funct7_i = 7'b0100000;
         run_instruction("SRA_REGRESSION", `ALU_MRS);
 
-        // ---------------------------------------------------------------
-        // Slice 5: LUI / AUIPC / system no-ops.
-        // ---------------------------------------------------------------
+        // LUI / AUIPC / system no-ops
         opcode_i = `OPCODE_LUI;
         run_lui_auipc("LUI", 1'b0);
 
         opcode_i = `OPCODE_AUIPC;
         run_lui_auipc("AUIPC", 1'b1);
 
-        // EBREAK: opcode SYSTEM, funct3 000, funct12 001. Must NOT
-        // halt — only ECALL does. This is the pair that funct7 alone
-        // cannot separate, so it is the real test of the funct12 decode.
+        // EBREAK must NOT halt (only ECALL does) -- real test of funct12 decode
         opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; funct12_i = `FUNCT12_EBREAK;
         run_system_nop("EBREAK", 1'b0);
 
-        // FENCE: different opcode entirely, shares the same no-op arm.
+        // FENCE: different opcode, shares the same no-op arm
         opcode_i = `OPCODE_FENCE;
         run_system_nop("FENCE", 1'b0);
 
-        // ---------------------------------------------------------------
-        // Slice 6: I-type ALU. 9 instructions (no SUBI). SRAI/SRLI is
-        // the specific trap case — bit 30 (funct7_i[5] position) must
-        // still disambiguate them, but funct3=000 (ADDI) must NOT
-        // consult that bit (no SUBI exists) even though R-type's
-        // funct3=000 does (ADD/SUB). Using funct7_i=0000000 as the
-        // "default" filler for non-shift I-type ops since those bits
-        // are immediate data, not a real funct7 — value is arbitrary/
-        // don't-care except where the test targets bit 30 specifically.
-        // ---------------------------------------------------------------
+        // I-type ALU: 9 ops (no SUBI); ADDI must NOT consult bit30 unlike SRAI/SRLI
         opcode_i = `OPCODE_ITYPE; funct3_i = 3'b000; funct7_i = 7'b0000000; // addi
         run_itype("ADDI", `ALU_ADD);
 
@@ -1221,10 +1107,7 @@ module tb_control_unit;
         opcode_i = `OPCODE_ITYPE; funct3_i = 3'b101; funct7_i = 7'b0100000; // srai, bit30=1
         run_itype("SRAI", `ALU_MRS);
 
-        // ---- Regression: shared decode path now serves two opcodes --
-        // re-run R-type after I-type to confirm OPCODE_RTYPE's ADD/SUB
-        // still uses funct7_i[5] correctly (the I-type ADDI fix must not
-        // have broken R-type's SUB path).
+        // ---- Regression: I-type ADDI fix must not break R-type's SUB path ----
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b000; funct7_i = 7'b0000000;
         run_instruction("ADD_REGRESSION2", `ALU_ADD);
 
@@ -1234,21 +1117,8 @@ module tb_control_unit;
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b101; funct7_i = 7'b0100000;
         run_instruction("SRA_REGRESSION2", `ALU_MRS);
 
-        // ---------------------------------------------------------------
-        // Illegal opcode — silent no-op (handoff §8, DECIDED).
-        //
-        // Must run BEFORE the ECALL block: halt_o is sticky, and once it
-        // latches, pc_write_o/ir_write_o are gated low for the rest of
-        // the run, so this test could never see a real FETCH.
-        //
-        // Requirements: 3 cycles (FETCH -> DECODE -> EXECUTE_ALU ->
-        // FETCH, never WRITE_BACK), reg_write_o never asserted, we_o
-        // never asserted. Before the fix this reached WRITE_BACK and
-        // asserted reg_write_o, executing as an ADD into rd.
-        // ---------------------------------------------------------------
-        // 7'b0001011 is RISC-V "custom-0" — a real encoding this core
-        // does not implement, so it exercises the path without relying
-        // on a bit pattern that could later become legal.
+        // Illegal opcode: silent no-op (handoff §8). Runs before ECALL block
+        // since halt_o is sticky. custom-0 (0001011) is unimplemented but real.
         opcode_i = 7'b0001011; funct3_i = 3'b000; funct7_i = 7'b0000000;
         funct12_i = `FUNCT12_EBREAK;
         ill_errors = 0;
@@ -1284,12 +1154,7 @@ module tb_control_unit;
             errors = errors + ill_errors;
         end
 
-        // ---------------------------------------------------------------
-        // ECALL / halt_o. Deliberately LAST: halt_o is sticky, so once
-        // it latches it stays high for the rest of the run. Placing
-        // these earlier would make every later test run with halt_o
-        // already set and weaken the guard above.
-        // ---------------------------------------------------------------
+        // ECALL / halt_o: deliberately LAST since halt_o is sticky
 
         // ---- halt_o still 0 after a full run of non-ECALL work ----
         if (halt_o !== 1'b0) begin
@@ -1299,20 +1164,12 @@ module tb_control_unit;
             $display("PASS [pre-ECALL] halt_o still 0 after all prior instructions");
         end
 
-        // ---- ECALL: same funct3 as EBREAK, funct12 000 instead of 001.
-        // Everything about execution is identical; only halt_o differs.
+        // ---- ECALL: same as EBREAK except funct12, only halt_o differs ----
         ecall_seen = 1'b1;   // arm the guard
         opcode_i = `OPCODE_SYSTEM; funct3_i = 3'b000; funct12_i = `FUNCT12_ECALL;
         run_system_nop("ECALL", 1'b1);
 
-        // ---- Halted: the core must now be STOPPED, not merely flagged.
-        // Handoff §8 "ECALL semantics" — RESOLVED 2026-08-26. This
-        // replaces the old ADD_AFTER_ECALL check, which asserted the
-        // opposite ("the core did not stall") under the earlier
-        // flag-only reading. Both pc_write_o and ir_write_o must stay
-        // low for the rest of the run: gating pc_write_o alone would
-        // leave ir reloading every FETCH and the instruction after the
-        // ECALL re-executing forever. ----
+        // ---- Halted: core must be STOPPED, not merely flagged (handoff §8) ----
         opcode_i = `OPCODE_RTYPE; funct3_i = 3'b000; funct7_i = 7'b0000000;
         funct12_i = `FUNCT12_EBREAK;
         halt_errors = 0;

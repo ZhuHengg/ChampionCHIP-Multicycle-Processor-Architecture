@@ -1,24 +1,11 @@
-// rvbl2_defines.vh
-// Single source of truth for every opcode/funct/op-code literal used across
-// the project. `include this in every module that switches on an opcode,
-// alu_op, mult_op_o, crc_op_o, result_src, pc_src, or alu_src value.
-//
-// DO NOT hardcode any of these numbers directly in control_unit.v, alu.v,
-// mult.v, crc.v, or anywhere else. If a value here is wrong, fixing it once
-// here fixes it everywhere — hardcoding it in five places means five
-// separate bugs when someone fixes only one.
-//
-// Source: HANDOFF_control_unit.md sections 5 and 6, verified against the
-// Stage 2 Block Guide Tables 7–11.
+// rvbl2_defines.vh — shared opcode/funct/op-code literals, include everywhere
 
 `ifndef RVBL2_DEFINES_VH
 `define RVBL2_DEFINES_VH
 
-// ---------------------------------------------------------------------
-// Opcodes (IR[6:0]) — handoff doc §5
-// ---------------------------------------------------------------------
-`define OPCODE_RTYPE   7'b0110011  // ALU R-type, MUL (Zmmul), CRC (Xicrc) — disambiguate via funct7
-`define OPCODE_ITYPE   7'b0010011  // ALU I-type
+// Opcodes (IR[6:0])
+`define OPCODE_RTYPE   7'b0110011  // ALU R-type, MUL, CRC — disambiguate via funct7
+`define OPCODE_ITYPE   7'b0010011
 `define OPCODE_LOAD    7'b0000011
 `define OPCODE_STORE   7'b0100011
 `define OPCODE_BRANCH  7'b1100011
@@ -29,44 +16,18 @@
 `define OPCODE_SYSTEM  7'b1110011  // ECALL / EBREAK
 `define OPCODE_FENCE   7'b0001111
 
-// ---------------------------------------------------------------------
 // funct12 disambiguation for OPCODE_SYSTEM — IR[31:20]
-// ---------------------------------------------------------------------
-// ECALL and EBREAK share opcode 1110011 AND funct3 000. The only field
-// that separates them is IR[31:20]. funct7 (IR[31:25]) is NOT enough:
-// both have funct7 = 0000000 and differ solely in IR[20].
-//
-// Cross-referenced against the RISC-V Unprivileged ISA spec, Chapter 2
-// (Environment Call and Breakpoints) — not from memory.
-//
-//   ECALL  = 0x00000073  → IR[31:20] = 12'h000
-//   EBREAK = 0x00100073  → IR[31:20] = 12'h001
-//
-// Both also require rs1 = 0, funct3 = 0, rd = 0. The CU checks funct3
-// and funct12 only; rs1/rd are datapath address fields it never sees.
 `define FUNCT12_ECALL  12'h000
 `define FUNCT12_EBREAK 12'h001
 
-// ---------------------------------------------------------------------
-// funct7 disambiguation for OPCODE_RTYPE — handoff doc §5
-// ---------------------------------------------------------------------
-// WARNING: category selection is an ELSE, not a three-way equality
-// check. SUB and SRA use funct7=0100000 — a fourth value that matches
-// neither FUNCT7_MUL nor FUNCT7_CRC. Correct logic:
-//     if      (funct7 == `FUNCT7_MUL) ...  // Zmmul
-//     else if (funct7 == `FUNCT7_CRC) ...  // Xicrc
-//     else                             ...  // R-type ALU (covers
-//                                            // 0000000 AND 0100000 AND
-//                                            // anything else)
-`define FUNCT7_MUL     7'b0000001  // Zmmul — exact match required
-`define FUNCT7_CRC     7'b1000000  // Xicrc — exact match required
-// No FUNCT7_ALU constant on purpose — ALU is "else", never an equality
-// target.
+// funct7 disambiguation for OPCODE_RTYPE
+// WARNING: category selection is an ELSE, not equality — SUB/SRA use
+// funct7=0100000, a fourth value matching neither MUL nor CRC.
+`define FUNCT7_MUL     7'b0000001
+`define FUNCT7_CRC     7'b1000000
+// No FUNCT7_ALU constant — ALU is "else", never an equality target.
 
-// ---------------------------------------------------------------------
-// alu_op — Table 9. Requires real decode (funct3 + funct7[5]), NOT a
-// passthrough — RV32I's standard funct3 numbering doesn't match these.
-// ---------------------------------------------------------------------
+// alu_op — Table 9
 `define ALU_PASS_B     4'h0
 `define ALU_ADD        4'h1
 `define ALU_SUB        4'h2
@@ -75,33 +36,22 @@
 `define ALU_XOR        4'h5
 `define ALU_SLL        4'h6
 `define ALU_SRL        4'h7
-`define ALU_MRS        4'h8  // arithmetic shift right (SRA)
+`define ALU_MRS        4'h8  // SRA
 `define ALU_SLT        4'h9
 `define ALU_SLTU       4'hA
 
-// ---------------------------------------------------------------------
-// mult_op_o — Table 10. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// mult_op_o = {2'b00, funct3}. Do not build a lookup table for this.
-// Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
-// ---------------------------------------------------------------------
+// mult_op_o — Table 10, direct funct3 passthrough
 `define MULT_MUL       4'h0
 `define MULT_MULH      4'h1
 `define MULT_MULHSU    4'h2
 `define MULT_MULHU     4'h3
 
-// ---------------------------------------------------------------------
-// crc_op_o — Table 11. DIRECT PASSTHROUGH of funct3 (zero-extended).
-// crc_op_o = {2'b00, funct3}. Do not build a lookup table for this.
-// Port width decided 4 bits (matches alu_op_o) — handoff §7 item 7.
-// ---------------------------------------------------------------------
+// crc_op_o — Table 11, direct funct3 passthrough
 `define CRC_CRCB       4'h0
 `define CRC_CRCH       4'h1
 `define CRC_CRCW       4'h2
 
-// ---------------------------------------------------------------------
-// Internal control signals — invented by us, NOT in the guide.
-// See HANDOFF_control_unit.md §3 for full rationale.
-// ---------------------------------------------------------------------
+// Internal control signals
 `define RESULT_SRC_ALU   3'b000
 `define RESULT_SRC_MUL   3'b001
 `define RESULT_SRC_CRC   3'b010
@@ -119,57 +69,26 @@
 `define ALU_SRC_B_IMM    2'b01
 `define ALU_SRC_B_CONST4 2'b10
 
-// adr_src_o — memory address mux select (top.v build plan §6 decision
-// D1). PC during FETCH, computed effective address (alu_out) during
-// the three memory-access states.
 `define ADR_SRC_PC       1'b0
 `define ADR_SRC_ALU      1'b1
 
-// ---------------------------------------------------------------------
-// Memory map — guide Table 13
-// ---------------------------------------------------------------------
-`define PC_RESET_ADDR    32'h00400000  // IMEM base
+// Memory map
+`define PC_RESET_ADDR    32'h00400000
 `define IMEM_BASE        32'h00400000
 `define DMEM_BASE        32'h10010000
 
-// ---------------------------------------------------------------------
-// op_size_o — decided (handoff §3, §7 item 9). [2:1]=size, [0]=sign.
-// Sign bit is don't-care for stores (stores never extend).
-// ---------------------------------------------------------------------
-`define OP_SIZE_BYTE_S   3'b000  // lb / sb
-`define OP_SIZE_BYTE_U   3'b001  // lbu
-`define OP_SIZE_HALF_S   3'b010  // lh / sh
-`define OP_SIZE_HALF_U   3'b011  // lhu
-`define OP_SIZE_WORD     3'b100  // lw / sw
+// op_size_o — [2:1]=size, [0]=sign; sign don't-care for stores
+`define OP_SIZE_BYTE_S   3'b000
+`define OP_SIZE_BYTE_U   3'b001
+`define OP_SIZE_HALF_S   3'b010
+`define OP_SIZE_HALF_U   3'b011
+`define OP_SIZE_WORD     3'b100
 
-// ---------------------------------------------------------------------
-// imm_sel_o — decided (handoff §3, §7 item 10). Fully internal
-// invention, no external spec to check against.
-// ---------------------------------------------------------------------
-`define IMM_SEL_I        3'b000  // I-type ALU, JALR, loads
-`define IMM_SEL_S        3'b001  // stores
-`define IMM_SEL_B        3'b010  // branches
-`define IMM_SEL_U        3'b011  // LUI, AUIPC
-`define IMM_SEL_J        3'b100  // JAL
-
-// ---------------------------------------------------------------------
-// RESOLVED — nothing in this file is open. Kept as a record of what was
-// decided and where the behavior lives. See HANDOFF_control_unit.md §8.
-// ---------------------------------------------------------------------
-// Illegal-opcode handling policy — RESOLVED 2026-08-26: silent no-op.
-//   An opcode outside the eleven this core implements skips WRITE_BACK
-//   and returns straight to FETCH (3 cycles), so it writes no register
-//   and no memory, and the PC advances normally. Implemented as
-//   control_unit.v's `opcode_legal` wire. No new macro needed — the
-//   eleven `OPCODE_* defines above are the whole legal set.
-// ECALL behavior — RESOLVED 2026-08-26. Was partially resolved
-//   2026-08-25 (sticky halt_o status flag, plus funct12_i to tell ECALL
-//   from EBREAK). Now completed: the core actually STOPS. control_unit.v
-//   gates both pc_write_o and ir_write_o on !halt_o — gating pc_write_o
-//   alone would leave ir reloading each FETCH and the instruction after
-//   the ECALL re-executing forever. Cleared only by reset.
-// x0 write protection — RESOLVED: implemented in regfile.v
-//   (`if (reg_write_i && rd_addr_i != 5'd0)`), per guide §3.1.4. Never
-//   was an FSM concern.
+// imm_sel_o
+`define IMM_SEL_I        3'b000
+`define IMM_SEL_S        3'b001
+`define IMM_SEL_B        3'b010
+`define IMM_SEL_U        3'b011
+`define IMM_SEL_J        3'b100
 
 `endif // RVBL2_DEFINES_VH

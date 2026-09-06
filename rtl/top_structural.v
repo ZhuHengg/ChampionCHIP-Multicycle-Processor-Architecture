@@ -1,9 +1,4 @@
-// =============================================================================
-// Module: top_structural
-// Description: Pure structural top-level module for ChampionCHIP multicycle core.
-//              Matches the ChipInventor block-diagram schematic 1-to-1.
-//              Contains ZERO behavioral always blocks — purely connects module instances!
-// =============================================================================
+// top_structural.v — pure structural top-level, wiring only
 
 `include "pkg/rvbl2_defines.vh"
 
@@ -17,9 +12,7 @@ module top_structural #(
     output wire halt_o
 );
 
-    // =========================================================================
-    // 1. Interconnect Wires
-    // =========================================================================
+    // Interconnect wires
 
     // Fetch-stage register outputs
     wire [31:0] pc;
@@ -86,11 +79,9 @@ module top_structural #(
     wire [31:0] lsu_mem_data_i;
     wire [31:0] mem_result;
 
-    // =========================================================================
-    // 2. Module Instances (Pure Wiring)
-    // =========================================================================
+    // Module instances
 
-    // --- Fetch Registers (PC, Old_PC, IR) ---
+    // Fetch registers
     fetch_registers #(
         .PC_RESET_ADDR (`PC_RESET_ADDR)
     ) u_fetch_registers (
@@ -105,7 +96,7 @@ module top_structural #(
         .ir_o       (ir)
     );
 
-    // --- Next PC Multiplexer ---
+    // pc_next mux
     mux_pc_next u_mux_pc_next (
         .pc_src_i     (pc_src_o),
         .pc_i         (pc),
@@ -113,7 +104,7 @@ module top_structural #(
         .pc_next_o    (pc_next)
     );
 
-    // --- Instruction Field Splitter ---
+    // IR split
     ir_splitter u_ir_splitter (
         .instr_i   (ir),
         .opcode_o  (opcode),
@@ -125,7 +116,7 @@ module top_structural #(
         .funct12_o (funct12)
     );
 
-    // --- Control Unit ---
+    // Control unit
     control_unit u_control_unit (
         .clk_i          (clk_i),
         .rst_i          (rst_i),
@@ -156,7 +147,7 @@ module top_structural #(
         .halt_o         (halt_o)
     );
 
-    // --- Register File (32 GPRs) ---
+    // Regfile
     regfile u_regfile (
         .clk_i        (clk_i),
         .rst_i        (rst_i),
@@ -169,14 +160,14 @@ module top_structural #(
         .rs2_data_o   (rs2_data)
     );
 
-    // --- Immediate Extender ---
+    // Imm extend
     imm_extend u_imm_extend (
         .instr_i   (ir),
         .imm_sel_i (imm_sel_o),
         .imm_o     (imm)
     );
 
-    // --- Branch Condition Comparator ---
+    // Branch cmp
     branch_comparator u_branch_comparator (
         .rs1_i          (rs1_data),
         .rs2_i          (rs2_data),
@@ -184,7 +175,7 @@ module top_structural #(
         .branch_taken_o (branch_taken)
     );
 
-    // --- ALU Input A Multiplexer ---
+    // ALU A mux
     mux_alu_a u_mux_alu_a (
         .alu_src_a_i (alu_src_a_o),
         .rs1_data_i  (rs1_data),
@@ -192,7 +183,7 @@ module top_structural #(
         .a_o         (mux_alu_a_out)
     );
 
-    // --- ALU Input B Multiplexer ---
+    // ALU B mux
     mux_alu_b u_mux_alu_b (
         .alu_src_b_i (alu_src_b_o),
         .rs2_data_i  (rs2_data),
@@ -200,7 +191,7 @@ module top_structural #(
         .b_o         (mux_alu_b_out)
     );
 
-    // --- Arithmetic Logic Unit (ALU) ---
+    // ALU
     alu u_alu (
         .a_i      (mux_alu_a_out),
         .b_i      (mux_alu_b_out),
@@ -208,7 +199,7 @@ module top_structural #(
         .result_o (alu_result)
     );
 
-    // --- ALU Output Register (with built-in 2-bit addr_lsb tap) ---
+    // ALU out reg
     alu_out_reg u_alu_out_reg (
         .clk_i        (clk_i),
         .rst_i        (rst_i),
@@ -218,7 +209,7 @@ module top_structural #(
         .addr_lsb_o   (addr_lsb)
     );
 
-    // --- Multiplier Accelerator & Capture Register ---
+    // Mult unit
     mult u_mult (
         .a_i       (rs1_data),
         .b_i       (rs2_data),
@@ -234,7 +225,7 @@ module top_structural #(
         .q_o   (mult_result_r)
     );
 
-    // --- CRC Accelerator & Capture Register ---
+    // CRC unit
     crc u_crc (
         .a_i      (rs1_data),
         .b_i      (rs2_data),
@@ -250,7 +241,7 @@ module top_structural #(
         .q_o   (crc_result_r)
     );
 
-    // --- Load/Store Unit (LSU) & Mem Result Register ---
+    // LSU
     lsu u_lsu (
         .core_data_o    (rs2_data),
         .core_address_o (alu_out),
@@ -268,7 +259,7 @@ module top_structural #(
         .q_o   (mem_result)
     );
 
-    // --- Write-Back Result Multiplexer ---
+    // Result mux
     mux_result u_mux_result (
         .result_src_i  (result_src_o),
         .alu_out_i     (alu_out),
@@ -279,7 +270,7 @@ module top_structural #(
         .result_o      (mux_result)
     );
 
-    // --- Memory Address Multiplexer ---
+    // Mem addr mux
     mux_mem_addr u_mux_mem_addr (
         .adr_src_i (adr_src_o),
         .pc_i      (pc),
@@ -287,7 +278,7 @@ module top_structural #(
         .address_o (mux_mem_addr)
     );
 
-    // --- Address Decoder ---
+    // Addr decoder
     address_decoder u_addr_decoder (
         .address_i   (mux_mem_addr),
         .we_i        (we_o),
@@ -303,7 +294,7 @@ module top_structural #(
         .data_o      (decoder_data_o)
     );
 
-    // --- Instruction Memory (IMEM) ---
+    // IMEM
     imem #(
         .DEPTH_WORDS (IMEM_DEPTH_WORDS),
         .INIT_FILE   (IMEM_INIT_FILE)
@@ -314,7 +305,7 @@ module top_structural #(
         .data_o (imem_data_o)
     );
 
-    // --- Data Memory (DMEM) ---
+    // DMEM
     dmem #(
         .DEPTH_WORDS (DMEM_DEPTH_WORDS)
     ) u_dmem (

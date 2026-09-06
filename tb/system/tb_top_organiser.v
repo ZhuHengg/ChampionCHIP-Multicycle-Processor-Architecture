@@ -1,24 +1,4 @@
-// tb_top_organiser.v -- runs the organiser-supplied Stage 2 validation
-// firmware (external/CCX_Malaysia_Edition_Firmware_Stage_2/firmware.s,
-// converted to firmware/organiser_validation.hex by
-// scripts/gen_organiser_fw.py) against this core.
-//
-// Per that repo's README.md: firmware starts at PC=0x00400000, and at
-// end of execution x4 == 0x00000000 means PASS, x4 == 0xFFFFFFFF means
-// FAIL. Unlike our own firmware/validation.hex, the organiser program
-// does NOT execute ECALL -- both its pass path (`all_good`) and fail
-// path (`_error`) end with `j .` (`jal x0,0`, a self-relative jump),
-// so halt_o never asserts. Termination is instead detected by watching
-// the PC stop advancing (two consecutive FETCH-state PC samples equal).
-//
-// DMEM_BASE note: this firmware's `.bss` addresses (test_ram/dest_data)
-// are baked into its own machine code via auipc-relative offsets --
-// decoded and hand-verified (scripts/rvbl2_decode.py) to resolve to
-// 0x10010000/0x10010010, i.e. this project's existing, unmodified
-// DMEM_BASE (`rtl/pkg/rvbl2_defines.vh`). crc_data/source_data resolve
-// into the IMEM range instead (auipc off a nearby label, guide §4.2
-// IMEM-as-data read), also unmodified. No memory-map changes were
-// needed for this firmware to run as-is.
+// tb_top_organiser.v — runs organiser-supplied Stage 2 validation firmware against this core
 
 `timescale 1ns/1ps
 `include "pkg/rvbl2_defines.vh"
@@ -105,11 +85,7 @@ module tb_top_organiser;
             errors = errors + 1;
         end
 
-        // ------------------------------------------------------------------
-        // Detect the self-loop (`j .`) termination: sample PC each time the
-        // FSM re-enters FETCH; if it repeats STUCK_THRESHOLD times in a row,
-        // the firmware has reached all_good or _error and is spinning.
-        // ------------------------------------------------------------------
+        // detect self-loop (`j .`) termination via repeated FETCH-PC
         cyc = 0;
         while (stuck_count < STUCK_THRESHOLD && cyc < CYCLE_BUDGET) begin
             @(posedge clk_i); #1;
@@ -131,9 +107,7 @@ module tb_top_organiser;
 
         $display("self-loop detected at pc=%h after %0d cycles", dut.pc, cyc);
 
-        // ------------------------------------------------------------------
-        // Check: x4 == 0 -> PASS, x4 == 0xFFFFFFFF -> FAIL (organiser spec).
-        // ------------------------------------------------------------------
+        // x4 == 0 -> PASS, x4 == 0xFFFFFFFF -> FAIL (organiser spec)
         if (dut.u_regfile.regs[4] === 32'h00000000) begin
             $display("PASS [organiser firmware self-check] x4 = 0x00000000 (PASS)");
         end else if (dut.u_regfile.regs[4] === 32'hFFFFFFFF) begin

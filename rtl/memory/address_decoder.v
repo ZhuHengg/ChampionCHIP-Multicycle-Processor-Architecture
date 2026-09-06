@@ -1,31 +1,6 @@
-// address_decoder.v
-// Guide §4.4, Figure 3. Routes core memory requests to IMEM or DMEM
-// based on address, and muxes the read data back to the core.
-//
-// - address_o: bottom 2 bits dropped (guide: "ignoring the bottom two
-//   bits, alignment at 4 bytes") — both memories are word-addressed.
-// - we_o -> DMEM only. IMEM has no write path at all (guide §4.4:
-//   "EXCEPT IMEM memory, which cannot be written").
-// - oe_o -> both devices.
-// - bw_o -> DMEM only (guide: "sends the Byte Write signal ... ONLY to
-//   the DMEM memory").
-//
-// Address ranges (guide Table 13):
-//   IMEM: `IMEM_BASE (0x00400000) + 4 MB
-//   DMEM: `DMEM_BASE (0x10010000) + 8 kB
-//
-// Unmapped addresses: guide is silent on behavior. Returns zero, asserts
-// nothing — no bus-error mechanism invented. Flagged per CLAUDE.md step
-// 8/MEMORY_BUILD_PLAN.md.
-//
-// FLAG: MEMORY_BUILD_PLAN.md's port table lists a core_data_i input
-// (store data heading out) but no corresponding output toward DMEM/IMEM,
-// and guide Figure 3 draws the decoder with only address/we/oe/bw
-// arrows — no data path through it at all. Read literally, store data
-// (LSU's mem_data_i) must wire directly from LSU to DMEM at top.v,
-// bypassing the decoder entirely. Omitted that port here rather than
-// wiring a dead input with no destination; flagging rather than
-// silently guessing a route the guide never draws.
+// address_decoder.v — routes core mem requests to IMEM/DMEM, muxes read data back
+// No store-data port: bypasses decoder, wired LSU->DMEM directly at top.v (guide Fig 3).
+// Unmapped address: returns zero, no bus error (guide silent on behavior).
 
 module address_decoder (
     input  wire [31:0] address_i,
@@ -44,7 +19,6 @@ module address_decoder (
     output reg  [31:0] data_o
 );
 
-    // Memory Map Base Addresses (Guide Table 13)
     localparam [31:0] IMEM_BASE = 32'h0040_0000;
     localparam [31:0] DMEM_BASE = 32'h1001_0000;
 
@@ -64,7 +38,7 @@ module address_decoder (
     assign bw_o      = is_dmem ? bw_i : 4'b0000;
 
     always @(*) begin
-        data_o = 32'b0; // default: unmapped address, guide silent (see header note)
+        data_o = 32'b0; // default: unmapped address
         if (is_dmem)
             data_o = dmem_data_i;
         else if (is_imem)

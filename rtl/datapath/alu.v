@@ -1,8 +1,4 @@
-// alu.v
-// Guide §3.1.1, Table 9. Used for ALU ops, load/store address calc, and
-// branch/jump target calc (reused hardware, not instruction-specific).
-//
-// Combinational only: values in, value out, no clock, no state.
+// alu.v — combinational ALU
 
 `include "pkg/rvbl2_defines.vh"
 
@@ -14,7 +10,7 @@ module alu (
 );
 
     always @(*) begin
-        result_o = 32'b0; // default (also covers illegal-opcode no-op, decision #13)
+        result_o = 32'b0; // default
         case (alu_op_i)
             `ALU_PASS_B: result_o = b_i;
             `ALU_ADD:    result_o = a_i + b_i;
