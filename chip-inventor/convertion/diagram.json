@@ -1,0 +1,160 @@
+{
+    "drawflow": {
+        "Home": {
+            "data": {
+                "95": {
+                    "id": 95,
+                    "name": "blk3550",
+                    "data": {
+                        "blkInputs": "a_i[31:0], b_i[31:0], alu_op_i[3:0]",
+                        "blkOutputs": "result_o[31:0]",
+                        "blkInouts": "",
+                        "parameters": []
+                    },
+                    "class": "blk3550",
+                    "html": "\n                  <div class=\"box\">\n                    <center>\n                      <img onload='updateConnectionList(editor.drawflow)' onload='updateConnectionList(editor.drawflow)' draggable=\"false\" style=\"user-select: none;\" onmousedown=\"return false;\" src=/beta/v1/admin/crud/assets/uploads/files/blockIcon-default.png width=100>\n                      <p><b>alu_eq26</b></p> \n                      <div class=\"parameters\">\n                        \n                      </div>\n                      <a href=\"#\" onclick=\"showInfoModal('Block', 3550); return false;\"> [info]</a> \n                      <a href=\"#\" onclick=\"showDetailsModal('Block', 3550); return false;\"> [details]</a>\n                    </center> \n                  </div>\n                ",
+                    "typenode": false,
+                    "inputs": {
+                        "input_1": {
+                            "connections": [
+                                {
+                                    "node": "96",
+                                    "input": "output_1"
+                                }
+                            ]
+                        },
+                        "input_2": {
+                            "connections": [
+                                {
+                                    "node": "97",
+                                    "input": "output_1"
+                                }
+                            ]
+                        },
+                        "input_3": {
+                            "connections": [
+                                {
+                                    "node": "98",
+                                    "input": "output_1"
+                                }
+                            ]
+                        }
+                    },
+                    "outputs": {
+                        "output_1": {
+                            "connections": [
+                                {
+                                    "node": "99",
+                                    "output": "input_1"
+                                }
+                            ]
+                        }
+                    },
+                    "inouts": {},
+                    "pos_x": 662.8,
+                    "pos_y": -19
+                },
+                "96": {
+                    "id": 96,
+                    "name": "input",
+                    "data": {
+                        "input_pin": "",
+                        "name101input": "a_i[31:0]"
+                    },
+                    "class": "input",
+                    "html": "\n          <div class=\"box\">\n            <p><b>Input Pin</b></p>\n            <input type=\"text\" df-name101input placeholder=\"\">\n          </div>\n        ",
+                    "typenode": false,
+                    "inputs": {},
+                    "outputs": {
+                        "output_1": {
+                            "connections": [
+                                {
+                                    "node": "95",
+                                    "output": "input_1"
+                                }
+                            ]
+                        }
+                    },
+                    "inouts": {},
+                    "pos_x": 377,
+                    "pos_y": -94
+                },
+                "97": {
+                    "id": 97,
+                    "name": "input",
+                    "data": {
+                        "input_pin": "",
+                        "name101input": "b_i[31:0]"
+                    },
+                    "class": "input",
+                    "html": "\n          <div class=\"box\">\n            <p><b>Input Pin</b></p>\n            <input type=\"text\" df-name101input placeholder=\"\">\n          </div>\n        ",
+                    "typenode": false,
+                    "inputs": {},
+                    "outputs": {
+                        "output_1": {
+                            "connections": [
+                                {
+                                    "node": "95",
+                                    "output": "input_2"
+                                }
+                            ]
+                        }
+                    },
+                    "inouts": {},
+                    "pos_x": 343,
+                    "pos_y": 29
+                },
+                "98": {
+                    "id": 98,
+                    "name": "input",
+                    "data": {
+                        "input_pin": "",
+                        "name101input": "alu_op_i[3:0]"
+                    },
+                    "class": "input",
+                    "html": "\n          <div class=\"box\">\n            <p><b>Input Pin</b></p>\n            <input type=\"text\" df-name101input placeholder=\"\">\n          </div>\n        ",
+                    "typenode": false,
+                    "inputs": {},
+                    "outputs": {
+                        "output_1": {
+                            "connections": [
+                                {
+                                    "node": "95",
+                                    "output": "input_3"
+                                }
+                            ]
+                        }
+                    },
+                    "inouts": {},
+                    "pos_x": 341.2,
+                    "pos_y": 147
+                },
+                "99": {
+                    "id": 99,
+                    "name": "output",
+                    "data": {
+                        "output_pin": "",
+                        "name101output": "result_o[31:0]"
+                    },
+                    "class": "output",
+                    "html": "\n          <div class=\"box\">\n            <p><b>Output pin</b></p>\n            <input type=\"text\" df-name101output placeholder=\"\">\n          </div>\n        ",
+                    "typenode": false,
+                    "inputs": {
+                        "input_1": {
+                            "connections": [
+                                {
+                                    "node": "95",
+                                    "input": "output_1"
+                                }
+                            ]
+                        }
+                    },
+                    "outputs": {},
+                    "inouts": {},
+                    "pos_x": 1200,
+                    "pos_y": 9.2
+                }
+            }
+        }
+    }
+}

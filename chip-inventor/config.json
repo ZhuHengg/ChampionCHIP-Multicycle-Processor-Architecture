@@ -1,0 +1,59 @@
+{
+    "//": "ChampionCHIP RVBL-2 multicycle RISC-V core — chip-inventor variant.",
+    "//1": "OpenLane 1 config. Design dir is chip-inventor/ (OpenLane 1 expects",
+    "//2": "config.json there). Mirrors the root repo's config.json but points",
+    "//3": "at chip-inventor/rtl instead — see repo CLAUDE.md: chip-inventor is",
+    "//4": "normally figure-only and out of the OpenLane flow; this config was",
+    "//5": "added as an explicit one-off exception.",
+
+    "DESIGN_NAME": "top",
+
+    "VERILOG_FILES": [
+        "dir::rtl/top.v",
+        "dir::rtl/fetch_registers.v",
+        "dir::rtl/mux_pc_next.v",
+        "dir::rtl/ir_splitter_eq26.v",
+        "dir::rtl/control_unit_eq26.v",
+        "dir::rtl/regfile_eq.v",
+        "dir::rtl/imm_extend_eq26.v",
+        "dir::rtl/branch_comparator_eq26.v",
+        "dir::rtl/mux_alu_a.v",
+        "dir::rtl/mux_alu_b.v",
+        "dir::rtl/alu_eq26.v",
+        "dir::rtl/alu_out_reg.v",
+        "dir::rtl/adr_src_inv.v",
+        "dir::rtl/mult_eq26.v",
+        "dir::rtl/reg32_dff_eq26.v",
+        "dir::rtl/crc.eq26.v",
+        "dir::rtl/lsu_eq26.v",
+        "dir::rtl/result_src_mem_eq.v",
+        "dir::rtl/mux_result.v",
+        "dir::rtl/mux_mem_addr.v",
+        "dir::rtl/address_decoder.v",
+        "dir::rtl/imem.v",
+        "dir::rtl/dmem_eq26.v"
+    ],
+
+    "//6": "clk_i / rst_i are the only architectural top-level inputs; halt_o",
+    "//7": "the primary output. pc_dbg_o / x4_dbg_o are simulation-only",
+    "//8": "observability taps (see testbench.v) left in for synthesis since",
+    "//9": "removing them would require re-touching verified RTL.",
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_NET": "clk_i",
+
+    "//10": "Same starting frequency as the root config — 40 ns = 25 MHz.",
+    "CLOCK_PERIOD": 40,
+
+    "PDK": "sky130A",
+    "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+
+    "FP_SIZING": "relative",
+    "FP_CORE_UTIL": 35,
+    "PL_TARGET_DENSITY": 0.45,
+
+    "SYNTH_STRATEGY": "AREA 0",
+
+    "RUN_LINTER": 1,
+    "QUIT_ON_LINTER_WARNINGS": 0,
+    "RUN_CVC": 1
+}
