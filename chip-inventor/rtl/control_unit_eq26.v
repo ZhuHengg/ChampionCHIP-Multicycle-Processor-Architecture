@@ -240,8 +240,23 @@ module control_unit_eq26(
     // Status output — not a datapath control signal, drives nothing
     // inside the core. Sticky: set when an ECALL retires, cleared only
     // by reset. See the halt_o block below for the full rationale.
-    output reg         halt_o
+    output reg         halt_o,
+
+    // Derived enable outputs. top_structural.v (main rtl/) computes both
+    // of these as inline expressions at the consuming instance's port:
+    //   alu_out_reg.en_i     = !adr_src_o
+    //   reg_mem_result.en_i  = (result_src_o == RESULT_SRC_MEM)
+    // ChipInventor blocks only connect port-to-port with no inline-
+    // expression nets, and its block library has no home for a bare gate,
+    // so the same two expressions are computed here instead — in the
+    // module that already owns both source signals. Not new architectural
+    // signals: identical logic, moved upstream of the wire.
+    output wire        not_adr_src_o,
+    output wire        result_src_is_mem_o
 );
+
+    assign not_adr_src_o       = !adr_src_o;
+    assign result_src_is_mem_o = (result_src_o == `RESULT_SRC_MEM);
 
     // ------------------------------------------------------------------
     // State encoding — localparam, not in defines.vh (never crosses a

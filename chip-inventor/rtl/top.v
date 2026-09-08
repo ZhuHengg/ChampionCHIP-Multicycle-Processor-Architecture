@@ -129,7 +129,9 @@ control_unit_eq26 u_control_unit (
          .bw_o (bw_o[3:0]),
          .op_size_o (op_size_o[2:0]),
          .adr_src_o (adr_src_o),
-         .halt_o (halt_o)
+         .halt_o (halt_o),
+         .not_adr_src_o (not_adr_src_o),
+         .result_src_is_mem_o (is_result_src_mem)
      );
 
 regfile_eq u_regfile (
@@ -190,11 +192,6 @@ alu_out_reg u_alu_out_reg (
          .addr_lsb_o (addr_lsb[1:0])
      );
 
-adr_src_inv u_adr_src_inv (
-         .adr_src_i (adr_src_o),
-         .not_adr_src_o (not_adr_src_o)
-     );
-
 mult_eq26 u_mult (
          .a_i (rs1_data[31:0]),
          .b_i (rs2_data[31:0]),
@@ -242,11 +239,6 @@ reg32_dff_eq26 u_reg_mem_result (
          .q_o (mem_result[31:0])
      );
 
-result_src_mem_eq u_result_src_mem_eq (
-         .result_src_i (result_src_o[2:0]),
-         .is_result_src_mem_o (is_result_src_mem)
-     );
-
 mux_result u_mux_result (
          .result_src_i (result_src_o[2:0]),
          .alu_out_i (alu_out[31:0]),
@@ -271,7 +263,7 @@ address_decoder u_addr_decoder (
          .bw_i (bw_o[3:0]),
          .dmem_data_i (dmem_data_o[31:0]),
          .imem_data_i (imem_data_o[31:0]),
-         .address_o (decoder_address_o[29:0]),
+         .address_o (decoder_address_o[31:0]),
          .dmem_we_o (dmem_we_o),
          .dmem_oe_o (dmem_oe_o),
          .imem_oe_o (imem_oe_o),

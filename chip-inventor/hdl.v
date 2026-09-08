@@ -317,8 +317,23 @@ module control_unit_eq26(
     // Status output — not a datapath control signal, drives nothing
     // inside the core. Sticky: set when an ECALL retires, cleared only
     // by reset. See the halt_o block below for the full rationale.
-    output reg         halt_o
+    output reg         halt_o,
+
+    // Derived enable outputs. top_structural.v (main rtl/) computes both
+    // of these as inline expressions at the consuming instance's port:
+    //   alu_out_reg.en_i     = !adr_src_o
+    //   reg_mem_result.en_i  = (result_src_o == RESULT_SRC_MEM)
+    // ChipInventor blocks only connect port-to-port with no inline-
+    // expression nets, and its block library has no home for a bare gate,
+    // so the same two expressions are computed here instead — in the
+    // module that already owns both source signals. Not new architectural
+    // signals: identical logic, moved upstream of the wire.
+    output wire        not_adr_src_o,
+    output wire        result_src_is_mem_o
 );
+
+    assign not_adr_src_o       = !adr_src_o;
+    assign result_src_is_mem_o = (result_src_o == `RESULT_SRC_MEM);
 
     // ------------------------------------------------------------------
     // State encoding — localparam, not in defines.vh (never crosses a
@@ -1059,22 +1074,6 @@ module alu_out_reg #(
 endmodule
 
 
-//  ---------- INLCUDED BLOCK: adr_src_inv  ---------- 
-// adr_src_inv.v
-// Canvas-only glue block. top_structural.v (main rtl/) wires
-// alu_out_reg.en_i to the inline expression !adr_src_o directly at the
-// instance port; ChipInventor blocks only connect port-to-port with no
-// inline-expression nets, so that inversion needs its own block here.
-// Combinational, single gate -- not a new architectural signal, just
-// the same logic top_structural.v computes inline, given a home.
-module adr_src_inv (
-    input  wire adr_src_i,
-    output wire not_adr_src_o
-);
-    assign not_adr_src_o = !adr_src_i;
-endmodule
-
-
 //  ---------- INLCUDED BLOCK: mult_eq26  ---------- 
 // mult.v
 // Guide §3.1.2, Table 10. 32x32 -> 64-bit multiply, mux selects result half.
@@ -1380,25 +1379,6 @@ module lsu_eq26(
         endcase
     end
 
-endmodule
-
-
-//  ---------- INLCUDED BLOCK: result_src_mem_eq  ---------- 
-// result_src_mem_eq.v
-// Canvas-only glue block. top_structural.v (main rtl/) wires
-// reg_mem_result.en_i to the inline expression
-// (result_src_o == `RESULT_SRC_MEM) directly at the instance port;
-// ChipInventor blocks only connect port-to-port with no inline-
-// expression nets, so that comparison needs its own block here.
-// RESULT_SRC_MEM = 3'b011 (Table in control_unit_eq26.v). Combinational,
-// single comparison -- not a new architectural signal, just the same
-// logic top_structural.v computes inline, given a home.
-module result_src_mem_eq (
-    input  wire [2:0] result_src_i,
-    output wire       is_result_src_mem_o
-);
-    localparam [2:0] RESULT_SRC_MEM = 3'b011;
-    assign is_result_src_mem_o = (result_src_i == RESULT_SRC_MEM);
 endmodule
 
 
@@ -2010,7 +1990,9 @@ control_unit_eq26 u_control_unit (
          .bw_o (bw_o[3:0]),
          .op_size_o (op_size_o[2:0]),
          .adr_src_o (adr_src_o),
-         .halt_o (halt_o)
+         .halt_o (halt_o),
+         .not_adr_src_o (not_adr_src_o),
+         .result_src_is_mem_o (is_result_src_mem)
      );
 
 regfile_eq u_regfile (
@@ -2071,11 +2053,6 @@ alu_out_reg u_alu_out_reg (
          .addr_lsb_o (addr_lsb[1:0])
      );
 
-adr_src_inv u_adr_src_inv (
-         .adr_src_i (adr_src_o),
-         .not_adr_src_o (not_adr_src_o)
-     );
-
 mult_eq26 u_mult (
          .a_i (rs1_data[31:0]),
          .b_i (rs2_data[31:0]),
@@ -2123,11 +2100,6 @@ reg32_dff_eq26 u_reg_mem_result (
          .q_o (mem_result[31:0])
      );
 
-result_src_mem_eq u_result_src_mem_eq (
-         .result_src_i (result_src_o[2:0]),
-         .is_result_src_mem_o (is_result_src_mem)
-     );
-
 mux_result u_mux_result (
          .result_src_i (result_src_o[2:0]),
          .alu_out_i (alu_out[31:0]),
@@ -2152,7 +2124,7 @@ address_decoder u_addr_decoder (
          .bw_i (bw_o[3:0]),
          .dmem_data_i (dmem_data_o[31:0]),
          .imem_data_i (imem_data_o[31:0]),
-         .address_o (decoder_address_o[29:0]),
+         .address_o (decoder_address_o[31:0]),
          .dmem_we_o (dmem_we_o),
          .dmem_oe_o (dmem_oe_o),
          .imem_oe_o (imem_oe_o),

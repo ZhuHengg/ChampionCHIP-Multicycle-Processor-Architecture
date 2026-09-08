@@ -1,0 +1,7 @@
+VCD info: dumpfile /var/www/html/beta/v1/editor/efs-users/1605/w/design/testbench/testbench.vcd opened for output.
+FAIL [entry pc] exp=00400000 got=zzzzzzzz
+t=9996: pc=zzzzzzzz x4=zzzzzzzz (after 999 cycles)
+FAIL [terminal pc] exp=004003ec got=zzzzzzzz -- program has not settled at the expected self-loop address
+FAIL [organiser firmware self-check] x4 = zzzzzzzz -- neither PASS (0) nor FAIL (0xFFFFFFFF)
+3 CHECK(S) FAILED
+/var/www/html/beta/v1/editor/efs-users/1605/w/design/testbench/testbench.v:93: $finish called at 9996 (1s)
