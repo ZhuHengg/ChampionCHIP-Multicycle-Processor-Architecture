@@ -6,8 +6,12 @@
  clk_i 
    input wire rst_i, ---inputwirerst_i, 
  rst_i 
-   output wire halt_o ---outputwirehalt_o 
+   output wire halt_o, ---outputwirehalt_o, 
  halt_o 
+   output wire [31:0] 31, ---outputwire[31:0] 
+ 31 
+   output wire [31:0] 31 ---outputwire[31:0] 
+ 31 
   --- 
   
  ); --- 
@@ -26,71 +30,71 @@
   
   wire w_5; ---w_5; 
   
-  wire w_6; ---w_6; 
-  
   wire [31:0] w_7; ---[31:0]w_7; 
+  
+  wire [31:0] w_8; ---[31:0]w_8; 
   
   wire [31:0] w_9; ---[31:0]w_9; 
   
-  wire [31:0] w_11; ---[31:0]w_11; 
+  wire [6:0] w_10; ---[6:0]w_10; 
   
-  wire w_13; ---w_13; 
+  wire [4:0] w_11; ---[4:0]w_11; 
   
-  wire [31:0] w_14; ---[31:0]w_14; 
+  wire [2:0] w_12; ---[2:0]w_12; 
   
-  wire [31:0] w_15; ---[31:0]w_15; 
+  wire [4:0] w_14; ---[4:0]w_14; 
+  
+  wire [4:0] w_15; ---[4:0]w_15; 
   
   wire [6:0] w_16; ---[6:0]w_16; 
   
-  wire [4:0] w_17; ---[4:0]w_17; 
+  wire [11:0] w_17; ---[11:0]w_17; 
   
-  wire [2:0] w_18; ---[2:0]w_18; 
+  wire [2:0] w_19; ---[2:0]w_19; 
   
-  wire [4:0] w_20; ---[4:0]w_20; 
+  wire [31:0] w_20; ---[31:0]w_20; 
   
-  wire [4:0] w_21; ---[4:0]w_21; 
+  wire w_21; ---w_21; 
   
-  wire [6:0] w_22; ---[6:0]w_22; 
+  wire [31:0] w_22; ---[31:0]w_22; 
   
-  wire [11:0] w_23; ---[11:0]w_23; 
+  wire [31:0] w_23; ---[31:0]w_23; 
   
-  wire [2:0] w_24; ---[2:0]w_24; 
+  wire [31:0] w_24; ---[31:0]w_24; 
   
-  wire [31:0] w_25; ---[31:0]w_25; 
+  wire [1:0] w_25; ---[1:0]w_25; 
   
-  wire w_26; ---w_26; 
+  wire [31:0] w_26; ---[31:0]w_26; 
   
   wire [31:0] w_27; ---[31:0]w_27; 
   
-  wire [31:0] w_28; ---[31:0]w_28; 
-  
-  wire [1:0] w_29; ---[1:0]w_29; 
+  wire [3:0] w_28; ---[3:0]w_28; 
   
   wire [31:0] w_30; ---[31:0]w_30; 
   
-  wire [31:0] w_31; ---[31:0]w_31; 
+  wire [1:0] w_33; ---[1:0]w_33; 
   
-  wire [3:0] w_32; ---[3:0]w_32; 
+  wire [3:0] w_36; ---[3:0]w_36; 
   
-  wire [31:0] w_34; ---[31:0]w_34; 
-  
-  wire [1:0] w_37; ---[1:0]w_37; 
+  wire [31:0] w_37; ---[31:0]w_37; 
   
   wire [3:0] w_40; ---[3:0]w_40; 
   
   wire [31:0] w_41; ---[31:0]w_41; 
   
-  wire [3:0] w_44; ---[3:0]w_44; 
+  wire w_42; ---w_42; 
+  
+  wire [31:0] w_43; ---[31:0]w_43; 
+  
+  wire w_44; ---w_44; 
   
   wire [31:0] w_45; ---[31:0]w_45; 
   
-  wire w_46; ---w_46; 
+  wire [31:0] w_46; ---[31:0]w_46; 
   
-  wire [31:0] w_47; ---[31:0]w_47; 
+  wire w_47; ---w_47; 
   
-  wire w_48; ---w_48; 
-  
-  wire [31:0] w_49; ---[31:0]w_49; 
+  wire [31:0] w_48; ---[31:0]w_48; 
   
   wire w_50; ---w_50; 
   
@@ -102,32 +106,38 @@
   
   wire [31:0] w_54; ---[31:0]w_54; 
   
-  wire [31:0] w_55; ---[31:0]w_55; 
+  wire [2:0] w_56; ---[2:0]w_56; 
   
-  wire w_57; ---w_57; 
+  wire [31:0] w_57; ---[31:0]w_57; 
   
-  wire w_58; ---w_58; 
+  wire [31:0] w_58; ---[31:0]w_58; 
   
-  wire w_59; ---w_59; 
+  wire [2:0] w_59; ---[2:0]w_59; 
   
-  wire [3:0] w_60; ---[3:0]w_60; 
+  wire [31:0] w_60; ---[31:0]w_60; 
   
   wire [31:0] w_62; ---[31:0]w_62; 
   
-  wire [2:0] w_64; ---[2:0]w_64; 
+  wire w_63; ---w_63; 
   
-  wire [31:0] w_65; ---[31:0]w_65; 
+  wire w_64; ---w_64; 
   
-  wire [2:0] w_66; ---[2:0]w_66; 
+  wire w_65; ---w_65; 
   
-  wire [31:0] w_67; ---[31:0]w_67; 
-  
-  wire [31:0] w_68; ---[31:0]w_68; 
-  
-  wire w_69; ---w_69; 
+  wire w_66; ---w_66; 
   
   wire w_70; ---w_70; 
   
+  wire w_71; ---w_71; 
+  
+  wire [3:0] w_72; ---[3:0]w_72; 
+  
+  --- 
+  
+ //Interface Assigns --- 
+ //Interface 
+ assign [31:0] pg_dbg_o = w_2; ---pg_dbg_o=w_2; 
+ w_2;assign 
   --- 
   
  //Instances of Modules ---Modules 
@@ -146,39 +156,15 @@
   
   --- 
   
- fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_13 ( ---blk3804_13( 
- fetch_registers 
-          .clk_i (clk_i), --- 
-  
-          .rst_i (rst_i), --- 
-  
-          .pc_o (w_2), --- 
-  
-          .pc_next_i (w_4), --- 
-  
-          .pc_write_i (w_5), --- 
-  
-          .ir_write_i (w_6), --- 
-  
-          .mem_data_i (w_7), --- 
-  
-          .old_pc_o (w_9), --- 
-  
-          .ir_o (w_11) --- 
-  
-      ); --- 
-  
-  --- 
-  
  mux_mem_addr blk3808_14 ( ---( 
  mux_mem_addr 
+          .adr_src_i (w_5), --- 
+  
           .pc_i (w_2), --- 
   
-          .adr_src_i (w_13), --- 
+          .alu_out_i (w_7), --- 
   
-          .alu_out_i (w_14), --- 
-  
-          .address_o (w_15) --- 
+          .address_o (w_8) --- 
   
       ); --- 
   
@@ -186,21 +172,21 @@
   
  ir_splitter_eq26 blk3781_15 ( ---( 
  ir_splitter_eq26 
-          .instr_i (w_11), --- 
+          .instr_i (w_9), --- 
   
-          .opcode_o (w_16), --- 
+          .opcode_o (w_10), --- 
   
-          .rd_o (w_17), --- 
+          .rd_o (w_11), --- 
   
-          .funct3_o (w_18), --- 
+          .funct3_o (w_12), --- 
   
-          .rs1_o (w_20), --- 
+          .rs1_o (w_14), --- 
   
-          .rs2_o (w_21), --- 
+          .rs2_o (w_15), --- 
   
-          .funct7_o (w_22), --- 
+          .funct7_o (w_16), --- 
   
-          .funct12_o (w_23) --- 
+          .funct12_o (w_17) --- 
   
       ); --- 
   
@@ -208,11 +194,11 @@
   
  imm_extend_eq26 blk3556_17 ( ---( 
  imm_extend_eq26 
-          .instr_i (w_11), --- 
+          .instr_i (w_9), --- 
   
-          .imm_sel_i (w_24), --- 
+          .imm_sel_i (w_19), --- 
   
-          .imm_o (w_25) --- 
+          .imm_o (w_20) --- 
   
       ); --- 
   
@@ -220,13 +206,13 @@
   
  mux_alu_a blk3795_18 ( ---( 
  mux_alu_a 
-          .old_pc_i (w_9), --- 
+          .alu_src_a_i (w_21), --- 
   
-          .alu_src_a_i (w_26), --- 
+          .rs1_data_i (w_22), --- 
   
-          .rs1_data_i (w_27), --- 
+          .old_pc_i (w_23), --- 
   
-          .a_o (w_28) --- 
+          .a_o (w_24) --- 
   
       ); --- 
   
@@ -234,13 +220,13 @@
   
  mux_alu_b blk3796_19 ( ---( 
  mux_alu_b 
-          .imm_i (w_25), --- 
+          .imm_i (w_20), --- 
   
-          .alu_src_b_i (w_29), --- 
+          .alu_src_b_i (w_25), --- 
   
-          .rs2_data_i (w_30), --- 
+          .rs2_data_i (w_26), --- 
   
-          .b_o (w_31) --- 
+          .b_o (w_27) --- 
   
       ); --- 
   
@@ -250,11 +236,11 @@
  alu_eq26 
           .result_o (w_3), --- 
   
-          .a_i (w_28), --- 
+          .a_i (w_24), --- 
   
-          .b_i (w_31), --- 
+          .b_i (w_27), --- 
   
-          .alu_op_i (w_32) --- 
+          .alu_op_i (w_28) --- 
   
       ); --- 
   
@@ -268,11 +254,11 @@
   
           .en_i (1'b1), --- 
   
-          .alu_out_o (w_14), --- 
+          .alu_out_o (w_7), --- 
   
           .alu_result_i (w_3), --- 
   
-          .addr_lsb_o (w_37) --- 
+          .addr_lsb_o (w_33) --- 
   
       ); --- 
   
@@ -280,13 +266,13 @@
   
  mult_eq26 blk3557_22 ( ---( 
  mult_eq26 
-          .a_i (w_27), --- 
+          .a_i (w_22), --- 
   
-          .b_i (w_30), --- 
+          .b_i (w_26), --- 
   
-          .mult_op_i (w_40), --- 
+          .mult_op_i (w_36), --- 
   
-          .result_o (w_41) --- 
+          .result_o (w_37) --- 
   
       ); --- 
   
@@ -294,13 +280,13 @@
   
  crc_eq26 #(.POLY(16'h1021), .XOR_OUT(16'h0000)) blk3553_23 ( ---.XOR_OUT(16'h0000))blk3553_23( 
  (crc_eq26 
-          .a_i (w_27), --- 
+          .a_i (w_22), --- 
   
-          .b_i (w_30), --- 
+          .b_i (w_26), --- 
   
-          .crc_op_i (w_44), --- 
+          .crc_op_i (w_40), --- 
   
-          .result_o (w_45) --- 
+          .result_o (w_41) --- 
   
       ); --- 
   
@@ -312,11 +298,11 @@
   
           .rst_i (rst_i), --- 
   
-          .d_i (w_41), --- 
+          .d_i (w_37), --- 
   
-          .en_i (w_46), --- 
+          .en_i (w_42), --- 
   
-          .q_o (w_47) --- 
+          .q_o (w_43) --- 
   
       ); --- 
   
@@ -328,41 +314,11 @@
   
           .rst_i (rst_i), --- 
   
-          .d_i (w_45), --- 
+          .d_i (w_41), --- 
   
-          .en_i (w_48), --- 
+          .en_i (w_44), --- 
   
-          .q_o (w_49) --- 
-  
-      ); --- 
-  
-  --- 
-  
- address_decoder blk3566_26 ( ---( 
- address_decoder 
-          .data_o (w_7), --- 
-  
-          .address_i (w_15), --- 
-  
-          .we_i (w_50), --- 
-  
-          .oe_i (w_51), --- 
-  
-          .bw_i (w_52), --- 
-  
-          .dmem_data_i (w_53), --- 
-  
-          .imem_data_i (w_54), --- 
-  
-          .address_o (w_55), --- 
-  
-          .dmem_we_o (w_57), --- 
-  
-          .dmem_oe_o (w_58), --- 
-  
-          .imem_oe_o (w_59), --- 
-  
-          .bw_o (w_60) --- 
+          .q_o (w_45) --- 
   
       ); --- 
   
@@ -372,11 +328,11 @@
  imem 
           .clk_i (clk_i), --- 
   
-          .data_o (w_54), --- 
+          .addr_i (w_46), --- 
   
-          .addr_i (w_55), --- 
+          .oe_i (w_47), --- 
   
-          .oe_i (w_59) --- 
+          .data_o (w_48) --- 
   
       ); --- 
   
@@ -388,17 +344,17 @@
   
           .rst_i (rst_i), --- 
   
-          .data_o (w_53), --- 
+          .addr_i (w_46), --- 
   
-          .addr_i (w_55), --- 
+          .we_i (w_50), --- 
   
-          .we_i (w_57), --- 
+          .oe_i (w_51), --- 
   
-          .oe_i (w_58), --- 
+          .bw_i (w_52), --- 
   
-          .bw_i (w_60), --- 
+          .data_i (w_53), --- 
   
-          .data_i (w_62) --- 
+          .data_o (w_54) --- 
   
       ); --- 
   
@@ -406,17 +362,17 @@
   
  lsu_eq26 blk3562_30 ( ---( 
  lsu_eq26 
-          .core_address_o (w_14), --- 
+          .core_address_o (w_7), --- 
   
-          .mem_data_o (w_7), --- 
+          .mem_data_i (w_53), --- 
   
-          .mem_data_i (w_62), --- 
+          .core_data_o (w_26), --- 
   
-          .core_data_o (w_30), --- 
+          .op_size_o (w_56), --- 
   
-          .op_size_o (w_64), --- 
+          .mem_data_o (w_57), --- 
   
-          .core_data_i (w_65) --- 
+          .core_data_i (w_58) --- 
   
       ); --- 
   
@@ -424,19 +380,19 @@
   
  mux_result blk3724_31 ( ---( 
  mux_result 
-          .old_pc_i (w_9), --- 
+          .alu_out_i (w_7), --- 
   
-          .alu_out_i (w_14), --- 
+          .mult_result_i (w_43), --- 
   
-          .mult_result_i (w_47), --- 
+          .crc_result_i (w_45), --- 
   
-          .crc_result_i (w_49), --- 
+          .result_src_i (w_59), --- 
   
-          .result_src_i (w_66), --- 
+          .mem_result_i (w_60), --- 
   
-          .mem_result_i (w_67), --- 
+          .old_pc_i (w_23), --- 
   
-          .result_o (w_68) --- 
+          .result_o (w_62) --- 
   
       ); --- 
   
@@ -450,15 +406,75 @@
   
           .en_i (1'b1), --- 
   
-          .d_i (w_65), --- 
+          .d_i (w_58), --- 
   
-          .q_o (w_67) --- 
+          .q_o (w_60) --- 
   
       ); --- 
   
   --- 
   
- control_unit_eq26 blk3567_33 ( ---( 
+ branch_comparator_eq26 blk3552_34 ( ---( 
+ branch_comparator_eq26 
+          .funct3_i (w_12), --- 
+  
+          .branch_taken_o (w_63) --- 
+  
+      ); --- 
+  
+  --- 
+  
+ regfile_eq blk3560_44 ( ---( 
+ regfile_eq 
+          .clk_i (clk_i), --- 
+  
+          .rst_i (rst_i), --- 
+  
+          .x4_dbg_o ([31:0] x4_dbg_o), --- 
+  
+          .rd_addr_i (w_11), --- 
+  
+          .rs1_addr_i (w_14), --- 
+  
+          .rs2_addr_i (w_15), --- 
+  
+          .rs1_data_o (w_22), --- 
+  
+          .rs2_data_o (w_26), --- 
+  
+          .write_data_i (w_62), --- 
+  
+          .reg_write_i (w_64) --- 
+  
+      ); --- 
+  
+  --- 
+  
+ fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_45 ( ---blk3804_45( 
+ fetch_registers 
+          .clk_i (clk_i), --- 
+  
+          .rst_i (rst_i), --- 
+  
+          .pc_o (w_2), --- 
+  
+          .pc_next_i (w_4), --- 
+  
+          .ir_o (w_9), --- 
+  
+          .old_pc_o (w_23), --- 
+  
+          .pc_write_i (w_65), --- 
+  
+          .ir_write_i (w_66), --- 
+  
+          .mem_data_i (w_57) --- 
+  
+      ); --- 
+  
+  --- 
+  
+ control_unit_eq26 blk3567_46 ( ---( 
  control_unit_eq26 
           .clk_i (clk_i), --- 
   
@@ -468,85 +484,81 @@
   
           .pc_src_o (w_1), --- 
   
-          .pc_write_o (w_5), --- 
+          .adr_src_o (w_5), --- 
   
-          .ir_write_o (w_6), --- 
+          .opcode_i (w_10), --- 
   
-          .adr_src_o (w_13), --- 
+          .funct3_i (w_12), --- 
   
-          .opcode_i (w_16), --- 
+          .funct7_i (w_16), --- 
   
-          .funct3_i (w_18), --- 
+          .funct12_i (w_17), --- 
   
-          .funct7_i (w_22), --- 
+          .imm_sel_o (w_19), --- 
   
-          .funct12_i (w_23), --- 
+          .alu_src_a_o (w_21), --- 
   
-          .imm_sel_o (w_24), --- 
+          .alu_src_b_o (w_25), --- 
   
-          .alu_src_a_o (w_26), --- 
+          .alu_op_o (w_28), --- 
   
-          .alu_src_b_o (w_29), --- 
+          .addr_lsb_i (w_33), --- 
   
-          .alu_op_o (w_32), --- 
+          .mult_op_o (w_36), --- 
   
-          .addr_lsb_i (w_37), --- 
+          .crc_op_o (w_40), --- 
   
-          .mult_op_o (w_40), --- 
+          .mult_en_o (w_42), --- 
   
-          .crc_op_o (w_44), --- 
+          .crc_en_o (w_44), --- 
   
-          .mult_en_o (w_46), --- 
+          .op_size_o (w_56), --- 
   
-          .crc_en_o (w_48), --- 
+          .result_src_o (w_59), --- 
   
-          .we_o (w_50), --- 
+          .branch_taken_i (w_63), --- 
   
-          .oe_o (w_51), --- 
+          .reg_write_o (w_64), --- 
+  
+          .pc_write_o (w_65), --- 
+  
+          .ir_write_o (w_66), --- 
+  
+          .we_o (w_70), --- 
+  
+          .oe_o (w_71), --- 
+  
+          .bw_o (w_72) --- 
+  
+      ); --- 
+  
+  --- 
+  
+ address_decoder blk3566_47 ( ---( 
+ address_decoder 
+          .address_i (w_8), --- 
+  
+          .address_o (w_46), --- 
+  
+          .imem_oe_o (w_47), --- 
+  
+          .imem_data_i (w_48), --- 
+  
+          .dmem_we_o (w_50), --- 
+  
+          .dmem_oe_o (w_51), --- 
   
           .bw_o (w_52), --- 
   
-          .op_size_o (w_64), --- 
+          .dmem_data_i (w_54), --- 
   
-          .result_src_o (w_66), --- 
+          .data_o (w_57), --- 
   
-          .branch_taken_i (w_69), --- 
+          .we_i (w_70), --- 
   
-          .reg_write_o (w_70) --- 
+          .oe_i (w_71), --- 
   
-      ); --- 
-  
-  --- 
-  
- branch_comparator_eq26 blk3552_34 ( ---( 
- branch_comparator_eq26 
-          .funct3_i (w_18), --- 
-  
-          .branch_taken_o (w_69) --- 
-  
-      ); --- 
-  
-  --- 
-  
- regfile_eq blk3560_40 ( ---( 
- regfile_eq 
-          .clk_i (clk_i), --- 
-  
-          .rst_i (rst_i), --- 
-  
-          .rd_addr_i (w_17), --- 
-  
-          .rs1_addr_i (w_20), --- 
-  
-          .rs2_addr_i (w_21), --- 
-  
-          .rs1_data_o (w_27), --- 
-  
-          .rs2_data_o (w_30), --- 
-  
-          .write_data_i (w_68), --- 
-  
-          .reg_write_i (w_70) --- 
+          .bw_i (w_72) --- 
   
       ); --- 
   

@@ -74,7 +74,7 @@ module top #(
     wire        adr_src_o;
 
     // Memory-path nets
-    wire [29:0] decoder_address_o;
+    wire [31:0] decoder_address_o;
     wire [31:0] decoder_data_o;
     wire        imem_oe_o;
     wire [31:0] imem_data_o;
@@ -256,7 +256,7 @@ module top #(
         .INIT_FILE   (IMEM_INIT_FILE)
     ) u_imem (
         .clk_i  (clk_i),
-        .addr_i ({2'b00, decoder_address_o}),
+        .addr_i (decoder_address_o),
         .oe_i   (imem_oe_o),
         .data_o (imem_data_o)
     );
@@ -314,7 +314,7 @@ module top #(
     ) u_dmem (
         .clk_i  (clk_i),
         .rst_i  (rst_i),
-        .addr_i ({2'b00, decoder_address_o}),
+        .addr_i (decoder_address_o),
         .we_i   (dmem_we_o),
         .oe_i   (dmem_oe_o),
         .bw_i   (dmem_bw_o),

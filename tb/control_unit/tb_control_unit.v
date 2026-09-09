@@ -603,8 +603,8 @@ module tb_control_unit;
                     $display("FAIL [%0s-EXECUTE] mult_en_o: exp=0 got=%b", label, mult_en_o);
                     errors = errors + 1;
                 end
-                if (crc_op_o !== {2'b00, funct3_i}) begin
-                    $display("FAIL [%0s-EXECUTE] crc_op_o: exp=%h got=%h", label, {2'b00, funct3_i}, crc_op_o);
+                if (crc_op_o !== {1'b0, funct3_i}) begin
+                    $display("FAIL [%0s-EXECUTE] crc_op_o: exp=%h got=%h", label, {1'b0, funct3_i}, crc_op_o);
                     errors = errors + 1;
                 end
                 if (result_src_o !== `RESULT_SRC_CRC) begin
@@ -620,8 +620,8 @@ module tb_control_unit;
                     $display("FAIL [%0s-EXECUTE] crc_en_o: exp=0 got=%b", label, crc_en_o);
                     errors = errors + 1;
                 end
-                if (mult_op_o !== {2'b00, funct3_i}) begin
-                    $display("FAIL [%0s-EXECUTE] mult_op_o: exp=%h got=%h", label, {2'b00, funct3_i}, mult_op_o);
+                if (mult_op_o !== {1'b0, funct3_i}) begin
+                    $display("FAIL [%0s-EXECUTE] mult_op_o: exp=%h got=%h", label, {1'b0, funct3_i}, mult_op_o);
                     errors = errors + 1;
                 end
                 if (result_src_o !== `RESULT_SRC_MUL) begin

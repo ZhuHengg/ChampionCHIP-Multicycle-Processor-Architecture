@@ -1,18 +1,3 @@
-// imem.v
-//
-// INLINED FIRMWARE (ChipInventor constraint): ChipInventor's per-block
-// canvas compiler cannot resolve `$readmemh("firmware/...")` any more
-// than it can resolve `\`include "pkg/..."` -- both are file-path
-// lookups outside the block's own text, and ChipInventor only ever sees
-// one block's source at a time. Same fix as control_unit_eq26.v's
-// inlined defines: no external file link, the data lives in the file.
-//
-// Content is firmware/organiser_validation.hex (259 words, official
-// Stage 2 validation firmware) transcribed 1:1 into a case table,
-// word-addressed (addr_i is already a word address from the address
-// decoder, matching the main repo's imem.v/$readmemh addressing).
-// Regenerate this table from the .hex file if the firmware is reissued
-// -- do not hand-edit individual words.
 module imem (
     input  wire        clk_i,
     input  wire [31:0] addr_i,

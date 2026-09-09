@@ -350,12 +350,12 @@ module control_unit (
                 end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_MUL) begin
                     // Zmmul — combinational, single-cycle
                     mult_en_o    = 1'b1;
-                    mult_op_o      = {2'b00, funct3_i};
+                    mult_op_o      = {1'b0, funct3_i};
                     result_src_o = `RESULT_SRC_MUL;
                 end else if (opcode_i == `OPCODE_RTYPE && funct7_i == `FUNCT7_CRC) begin
                     // Xicrc
                     crc_en_o     = 1'b1;
-                    crc_op_o       = {2'b00, funct3_i};
+                    crc_op_o       = {1'b0, funct3_i};
                     result_src_o = `RESULT_SRC_CRC;
                 end else begin
                     // R-type / I-type ALU
