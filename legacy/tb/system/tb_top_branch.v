@@ -1,0 +1,274 @@
+// tb_top_branch.v — directed tests: branches, JAL, JALR, backward loop
+
+// Program layout (firmware/branch_test.hex, base 0x00400000):
+//   0x400000 addi x1,x0,5            0x400004 addi x2,x0,3
+//   0x400008 addi x4,x0,5            0x40000c addi x3,x0,-1      (=0xFFFFFFFF)
+//   0x400010 beq  x1,x4,+8    [T]    0x400014 addi x16,x0,0x7FF  poison BEQ_T
+//   0x400018 beq  x1,x2,TRAP0 [NT]
+//   0x40001c bne  x1,x2,+8    [T]    0x400020 addi x18,x0,0x7FF  poison BNE_T
+//   0x400024 bne  x1,x4,TRAP1 [NT]
+//   0x400028 blt  x3,x2,+8    [T]    0x40002c addi x20,x0,0x7FF  poison BLT_T
+//   0x400030 blt  x1,x2,TRAP2 [NT]
+//   0x400034 bge  x1,x2,+8    [T]    0x400038 addi x22,x0,0x7FF  poison BGE_T
+//   0x40003c bge  x3,x2,TRAP3 [NT]
+//   0x400040 bltu x2,x1,+8    [T]    0x400044 addi x24,x0,0x7FF  poison BLTU_T
+//   0x400048 bltu x3,x2,TRAP4 [NT]   -- signed/unsigned disagree on same pair
+//   0x40004c bgeu x3,x2,+8    [T]    0x400050 addi x26,x0,0x7FF  poison BGEU_T
+//   0x400054 bgeu x2,x1,TRAP5 [NT]
+//   0x400058 addi x5,x0,3            (loop counter = 3)
+//   0x40005c addi x6,x6,1     <LOOP> (iteration counter, backward target)
+//   0x400060 addi x5,x5,-1
+//   0x400064 bne  x5,x0,LOOP  (backward, taken x2 then not-taken on 3rd)
+//   0x400068 jal  x28,CALL_TARGET (+20 -> 0x40007c)
+//   0x40006c addi x7,x0,1     <RETURN_ADDR> (only reached via jalr return)
+//   0x400070 auipc x31,0      <ODDJALR_BASE>
+//   0x400074 addi x31,x31,68  (x31 = 0x400070+68 = 0x4000b4 = HALT, even)
+//   0x400078 jalr x0,x31,1    (sum=0x4000b5 odd; must clear bit0 -> 0x4000b4)
+//   0x40007c addi x29,x0,1    <CALL_TARGET> (landed-in-callee marker)
+//   0x400080 jalr x30,x28,0   (return to x28 = RETURN_ADDR = 0x40006c)
+//   0x400084.. TRAP0..TRAP5: dead code, reached only if a branch mis-taken
+//   0x4000b4 jal x0,self      <HALT/HALT_SPIN> -- self-loop, not ecall
+
+`timescale 1ns/1ps
+`include "pkg/rvbl2_defines.vh"
+
+module tb_top_branch;
+
+    reg clk_i;
+    reg rst_i;
+    wire halt_o;
+
+    integer errors;
+    integer i;
+
+    localparam CYCLE_BUDGET = 1000;
+    integer cycle_count;
+
+    top #(
+        .IMEM_DEPTH_WORDS (1024),
+        .IMEM_INIT_FILE   ("firmware/branch_test.hex")
+    ) dut (
+        .clk_i  (clk_i),
+        .rst_i  (rst_i),
+        .halt_o (halt_o)
+    );
+
+    // 10ns clock
+    always #5 clk_i = ~clk_i;
+
+    // Debug trace
+    always @(posedge clk_i) begin
+        #1;
+        $display("t=%0t state=%0d pc=%h ir=%h branch_taken=%b mux_pc_next=%h",
+                  $time, dut.u_control_unit.state, dut.pc, dut.ir,
+                  dut.branch_taken, dut.mux_pc_next);
+    end
+
+    // Watchdog: guards against infinite loop from mis-wired branch.
+    always @(posedge clk_i) begin
+        if (!rst_i) begin
+            cycle_count = cycle_count + 1;
+            if (cycle_count > CYCLE_BUDGET) begin
+                $fatal(1, "WATCHDOG: exceeded %0d cycles without finishing — likely infinite loop", CYCLE_BUDGET);
+            end
+        end
+    end
+
+    // halt_o guard: this firmware never executes ecall (check 8).
+    always @(*) begin
+        if (!rst_i && halt_o !== 1'b0) begin
+            $display("FAIL [halt_o guard] exp=0 got=%b, t=%0t", halt_o, $time);
+            errors = errors + 1;
+        end
+    end
+
+    // regs[0] guard (check 7).
+    always @(*) begin
+        if (!rst_i && dut.u_regfile.regs[0] !== 32'b0) begin
+            $display("FAIL [x0 guard] regs[0] exp=0 got=%h, t=%0t",
+                      dut.u_regfile.regs[0], $time);
+            errors = errors + 1;
+        end
+    end
+
+    // run_one: executes one instruction from FETCH, detects WRITE_BACK vs branch path.
+    task run_one;
+        input [8*20-1:0] label;
+        input [31:0]     exp_entry_pc;
+        output [31:0]    landed_pc;
+        output           took_wb;
+        begin
+            if (dut.u_control_unit.state !== dut.u_control_unit.FETCH) begin
+                $display("FAIL [%0s] expected FETCH at entry, got state=%0d pc=%h",
+                          label, dut.u_control_unit.state, dut.pc);
+                errors = errors + 1;
+            end
+            if (dut.pc !== exp_entry_pc) begin
+                $display("FAIL [%0s] entry pc mismatch exp=%h got=%h", label, exp_entry_pc, dut.pc);
+                errors = errors + 1;
+            end
+            @(posedge clk_i); #1; // DECODE
+            @(posedge clk_i); #1; // EXECUTE_ALU
+            @(posedge clk_i); #1; // WRITE_BACK (addi/jal/jalr/auipc) or FETCH (branch)
+            if (dut.u_control_unit.state === dut.u_control_unit.WRITE_BACK) begin
+                took_wb = 1'b1;
+                @(posedge clk_i); #1; // FETCH
+            end else begin
+                took_wb = 1'b0;
+            end
+            landed_pc = dut.pc;
+        end
+    endtask
+
+    task check_wb;
+        input [8*20-1:0] label;
+        input             exp_wb;
+        input             got_wb;
+        begin
+            if (got_wb !== exp_wb) begin
+                $display("FAIL [%0s] cycle count: exp=%0d got=%0d (handoff Sec 2: branches=3cyc, others=4cyc)",
+                          label, exp_wb ? 4 : 3, got_wb ? 4 : 3);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // Expected dynamic execution trace (33 steps, taken-branch path only).
+    reg [31:0] EXP_PC [0:32];
+    reg        EXP_WB [0:32];
+    reg [31:0] landed;
+    reg        wb;
+    reg [8*20-1:0] step_label;
+
+    initial begin
+        EXP_PC[0]  = 32'h00400000; EXP_WB[0]  = 1'b1; // addi x1
+        EXP_PC[1]  = 32'h00400004; EXP_WB[1]  = 1'b1; // addi x2
+        EXP_PC[2]  = 32'h00400008; EXP_WB[2]  = 1'b1; // addi x4
+        EXP_PC[3]  = 32'h0040000c; EXP_WB[3]  = 1'b1; // addi x3=-1
+        EXP_PC[4]  = 32'h00400010; EXP_WB[4]  = 1'b0; // beq  T
+        EXP_PC[5]  = 32'h00400018; EXP_WB[5]  = 1'b0; // beq  NT
+        EXP_PC[6]  = 32'h0040001c; EXP_WB[6]  = 1'b0; // bne  T
+        EXP_PC[7]  = 32'h00400024; EXP_WB[7]  = 1'b0; // bne  NT
+        EXP_PC[8]  = 32'h00400028; EXP_WB[8]  = 1'b0; // blt  T
+        EXP_PC[9]  = 32'h00400030; EXP_WB[9]  = 1'b0; // blt  NT
+        EXP_PC[10] = 32'h00400034; EXP_WB[10] = 1'b0; // bge  T
+        EXP_PC[11] = 32'h0040003c; EXP_WB[11] = 1'b0; // bge  NT
+        EXP_PC[12] = 32'h00400040; EXP_WB[12] = 1'b0; // bltu T
+        EXP_PC[13] = 32'h00400048; EXP_WB[13] = 1'b0; // bltu NT (discriminator)
+        EXP_PC[14] = 32'h0040004c; EXP_WB[14] = 1'b0; // bgeu T
+        EXP_PC[15] = 32'h00400054; EXP_WB[15] = 1'b0; // bgeu NT
+        EXP_PC[16] = 32'h00400058; EXP_WB[16] = 1'b1; // addi x5=3
+        EXP_PC[17] = 32'h0040005c; EXP_WB[17] = 1'b1; // LOOP addi x6++ (iter1)
+        EXP_PC[18] = 32'h00400060; EXP_WB[18] = 1'b1; // addi x5-- (iter1)
+        EXP_PC[19] = 32'h00400064; EXP_WB[19] = 1'b0; // bne T (iter1)
+        EXP_PC[20] = 32'h0040005c; EXP_WB[20] = 1'b1; // LOOP (iter2)
+        EXP_PC[21] = 32'h00400060; EXP_WB[21] = 1'b1;
+        EXP_PC[22] = 32'h00400064; EXP_WB[22] = 1'b0; // bne T (iter2)
+        EXP_PC[23] = 32'h0040005c; EXP_WB[23] = 1'b1; // LOOP (iter3)
+        EXP_PC[24] = 32'h00400060; EXP_WB[24] = 1'b1;
+        EXP_PC[25] = 32'h00400064; EXP_WB[25] = 1'b0; // bne NT (iter3, exits)
+        EXP_PC[26] = 32'h00400068; EXP_WB[26] = 1'b1; // jal
+        EXP_PC[27] = 32'h0040007c; EXP_WB[27] = 1'b1; // CALL_TARGET addi x29
+        EXP_PC[28] = 32'h00400080; EXP_WB[28] = 1'b1; // jalr return
+        EXP_PC[29] = 32'h0040006c; EXP_WB[29] = 1'b1; // RETURN_ADDR addi x7
+        EXP_PC[30] = 32'h00400070; EXP_WB[30] = 1'b1; // auipc
+        EXP_PC[31] = 32'h00400074; EXP_WB[31] = 1'b1; // addi x31
+        EXP_PC[32] = 32'h00400078; EXP_WB[32] = 1'b1; // jalr odd-target
+
+        $dumpfile("sim/tb_top_branch.vcd");
+        $dumpvars(0, tb_top_branch);
+
+        errors = 0;
+        cycle_count = 0;
+        clk_i = 0;
+        rst_i = 1;
+
+        @(posedge clk_i); #1; // RESET latched
+        if (dut.u_control_unit.state !== dut.u_control_unit.RESET) begin
+            $display("FAIL [reset] state exp=RESET got=%0d", dut.u_control_unit.state);
+            errors = errors + 1;
+        end
+
+        rst_i = 0;
+        @(posedge clk_i); #1; // RESET -> FETCH
+
+        for (i = 0; i < 33; i = i + 1) begin
+            $sformat(step_label, "step%0d_pc%h", i, EXP_PC[i]);
+            run_one(step_label, EXP_PC[i], landed, wb);
+            check_wb(step_label, EXP_WB[i], wb);
+        end
+
+        // Check 5a: jalr must clear LSB, landing on even HALT address.
+        if (landed !== 32'h004000b4) begin
+            $display("FAIL [jalr odd-target] pc exp=004000b4 got=%h (odd LSB means PC_SRC_JALR is not clearing bit0)", landed);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [jalr odd-target] landed on even address 004000b4");
+        end
+
+        // Check 4: jal link register holds return address, not jump target.
+        if (dut.u_regfile.regs[28] !== 32'h0040006c) begin
+            $display("FAIL [TRAP6: jal x28,CALL_TARGET] x28 exp=0040006c (return addr) got=%h — if this reads the jump target (0040007c) instead, RESULT_SRC_PC4 is tapping the redirected pc, not old_pc+4",
+                      dut.u_regfile.regs[28]);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [TRAP6] x28 (jal link) = return address 0040006c");
+        end
+
+        // Check 5b: callee-landed marker and return confirmation.
+        if (dut.u_regfile.regs[29] !== 32'd1) begin
+            $display("FAIL [CALL_TARGET] x29 exp=1 got=%0d — callee body never ran, jal target wrong", dut.u_regfile.regs[29]);
+            errors = errors + 1;
+        end
+        if (dut.u_regfile.regs[7] !== 32'd1) begin
+            $display("FAIL [RETURN_ADDR] x7 exp=1 got=%0d — jalr return never reached RETURN_ADDR", dut.u_regfile.regs[7]);
+            errors = errors + 1;
+        end
+
+        // Check 3: backward loop ran exactly 3 iterations.
+        if (dut.u_regfile.regs[6] !== 32'd3) begin
+            $display("FAIL [backward loop] x6 (iteration count) exp=3 got=%0d", dut.u_regfile.regs[6]);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [backward loop] ran exactly 3 iterations (x6=3)");
+        end
+        if (dut.u_regfile.regs[5] !== 32'd0) begin
+            $display("FAIL [backward loop] x5 (countdown) exp=0 got=%0d", dut.u_regfile.regs[5]);
+            errors = errors + 1;
+        end
+
+        // Check 2: every poison register still zero, each named.
+        check_poison("BEQ_TAKEN",     16);
+        check_poison("BEQ_NOTTAKEN",  17);
+        check_poison("BNE_TAKEN",     18);
+        check_poison("BNE_NOTTAKEN",  19);
+        check_poison("BLT_TAKEN",     20);
+        check_poison("BLT_NOTTAKEN",  21);
+        check_poison("BGE_TAKEN",     22);
+        check_poison("BGE_NOTTAKEN",  23);
+        check_poison("BLTU_TAKEN",    24);
+        check_poison("BLTU_NOTTAKEN", 25);
+        check_poison("BGEU_TAKEN",    26);
+        check_poison("BGEU_NOTTAKEN", 27);
+
+        if (errors == 0)
+            $display("ALL TESTS PASSED");
+        else
+            $display("%0d CHECK(S) FAILED", errors);
+
+        $finish;
+    end
+
+    task check_poison;
+        input [8*20-1:0] label;
+        input integer    reg_idx;
+        begin
+            if (dut.u_regfile.regs[reg_idx] !== 32'b0) begin
+                $display("FAIL [POISON: %0s] regs[%0d] exp=0 got=%h — the %0s path wrongly executed",
+                          label, reg_idx, dut.u_regfile.regs[reg_idx], label);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+endmodule

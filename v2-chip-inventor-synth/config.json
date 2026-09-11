@@ -1,0 +1,18 @@
+{
+    "DESIGN_NAME": "top",
+    "PDK": "sky130A",
+    "VERILOG_FILES": "dir::hdl.v",
+    "CLOCK_TREE_SYNTH": true,
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_PERIOD": 50.0,
+    "PL_RANDOM_GLB_PLACEMENT": false,
+    "FP_SIZING": "relative",
+    "FP_CORE_UTIL": 25,
+    "PL_TARGET_DENSITY": 0.35,
+    "FP_PDN_AUTO_ADJUST": false,
+    "FP_PDN_VPITCH": 25,
+    "FP_PDN_HPITCH": 25,
+    "FP_PDN_VOFFSET": 5,
+    "FP_PDN_HOFFSET": 5,
+    "DIODE_INSERTION_STRATEGY": 3
+}

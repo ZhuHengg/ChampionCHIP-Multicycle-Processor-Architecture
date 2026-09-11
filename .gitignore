@@ -1,10 +1,10 @@
 # simulation scratch output
-sim/*.vvp
-sim/*.vcd
+**/sim/*.vvp
+**/sim/*.vcd
 
 # simulation run logs (keep the folder, ignore contents)
-logs/*
-!logs/.gitkeep
+**/logs/*
+!**/logs/.gitkeep
 
 # OpenLane run artifacts (keep config.json, ignore generated runs)
 openlane/runs/

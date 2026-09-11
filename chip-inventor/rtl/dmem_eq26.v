@@ -46,9 +46,17 @@
 // DMEM_BASE (0x10010000) has its low bits clear, so the base always maps
 // to index 0 regardless of depth; depth only limits how far above the base
 // the firmware may reach.
+//
+// Default overridden to 4 (2026-09-10) for the OpenLane synth-flow test
+// only (organiser feedback) -- ChipInventor canvas's blk3565 DEPTH_WORDS
+// parameter is also set to 4 (convertion/diagram.json) so a fresh export
+// regenerates this same value into hdl.v. This module is only instantiated
+// from chip-inventor/hdl.v; no other testbench in the repo relies on the
+// prior default of 8, so changing it here does not affect functional
+// simulation elsewhere.
 
 module dmem_eq26 #(
-    parameter DEPTH_WORDS = 8
+    parameter DEPTH_WORDS = 4
 ) (
     input  wire        clk_i,
     input  wire         rst_i,

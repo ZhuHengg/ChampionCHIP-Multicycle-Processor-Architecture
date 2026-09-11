@@ -7,48 +7,56 @@ RV32I + Zmmul (multiply) + Xicrc (CRC), targeting Sky130 via OpenLane.
 handoff covering the control unit spec, all build slices, and the decision
 log. `.claude/CLAUDE.md` has the AI-agent working rules.
 
+⚠ **Repo has three build tracks** — see below. `legacy/` is the original
+hand-written first version (pre chip-inventor); it's what all the paths and
+history in this README describe, but it is no longer the active build.
+`chip-inventor/` is the current complete version under ChipInventor-assisted
+testing. `v2-chip-inventor-synth/` is the chip-inventor synthesis version.
+
 ---
 
 ## Folder structure
 
 ```
 rvbl2-core/
-├── rtl/                    Hardware description (Verilog) — the chip itself
-│   ├── control_unit.v      FSM: decides what happens each cycle
-│   ├── top.v               Top-level wiring (not built yet)
-│   ├── pkg/                Shared constants — every module includes this
-│   ├── datapath/           Combinational compute blocks
-│   └── memory/             Stateful storage + memory interface
-├── tb/                     Testbenches — one folder per owner
-│   ├── control_unit/
-│   ├── datapath/
-│   ├── memory/
-│   └── system/             Full-core test, firmware validation
-├── docs/                   Specs, build plans, report assets
-│   ├── figures/            ChipInventor diagrams for the report
-│   └── report/             Report drafts
-├── firmware/               Validation firmware (official + team test programs)
-├── openlane/               Physical design flow
-│   └── runs/               Synthesis output (gitignored)
-├── scripts/                Build/automation helpers
-├── sim/                    Compiled .vvp / .vcd scratch (gitignored)
-└── logs/                   iverilog/vvp run logs (gitignored)
+├── legacy/                  First version (superseded) — everything below is inside this folder
+│   ├── rtl/                Hardware description (Verilog) — the chip itself
+│   │   ├── control_unit.v  FSM: decides what happens each cycle
+│   │   ├── top.v           Top-level wiring (not built yet)
+│   │   ├── pkg/            Shared constants — every module includes this
+│   │   ├── datapath/       Combinational compute blocks
+│   │   └── memory/         Stateful storage + memory interface
+│   ├── tb/                 Testbenches — one folder per owner
+│   │   ├── control_unit/
+│   │   ├── datapath/
+│   │   ├── memory/
+│   │   └── system/         Full-core test, firmware validation
+│   ├── firmware/           Validation firmware (official + team test programs)
+│   ├── scripts/            Build/automation helpers
+│   ├── sim/                Compiled .vvp / .vcd scratch (gitignored)
+│   ├── logs/               iverilog/vvp run logs (gitignored)
+│   └── config.json         OpenLane synthesis config (legacy version)
+├── chip-inventor/          Complete version, correct spec, ChipInventor-assisted testing
+├── v2-chip-inventor-synth/ Chip-inventor synthesis version, lighter test/size
+└── docs/                   Specs, build plans, report assets
+    ├── figures/            ChipInventor diagrams for the report
+    └── report/             Report drafts
 ```
 
 ### What each folder is for
 
 | Folder | Contents |
 |---|---|
-| `rtl/` | The actual hardware. Everything here becomes silicon. |
-| `rtl/pkg/` | `rvbl2_defines.vh` — every opcode, op-code value, and encoding, in one place. See the golden rule below. |
-| `rtl/datapath/` | **Combinational** blocks: values in, value out, no clock, no state. ALU, multiplier, CRC, branch comparator, immediate extender. Each takes a select line from the control unit and does one transform. |
-| `rtl/memory/` | **Stateful** blocks: register file, LSU, address decoder, IMEM, DMEM. These hold data and need a clock. |
-| `tb/` | Testbenches. Simulation only — never synthesized, never becomes hardware. |
+| `legacy/rtl/` | The actual hardware. Everything here becomes silicon. |
+| `legacy/rtl/pkg/` | `rvbl2_defines.vh` — every opcode, op-code value, and encoding, in one place. See the golden rule below. |
+| `legacy/rtl/datapath/` | **Combinational** blocks: values in, value out, no clock, no state. ALU, multiplier, CRC, branch comparator, immediate extender. Each takes a select line from the control unit and does one transform. |
+| `legacy/rtl/memory/` | **Stateful** blocks: register file, LSU, address decoder, IMEM, DMEM. These hold data and need a clock. |
+| `legacy/tb/` | Testbenches. Simulation only — never synthesized, never becomes hardware. |
 | `docs/` | Specs and build plans. `docs/report/` and `docs/figures/` hold submission assets. |
-| `firmware/` | Programs the core executes. The official validation firmware lands here when released. |
-| `openlane/` | `config.json` plus synthesis runs. Produces the GDSII and gate-level netlist for submission. |
-| `sim/` | Build scratch. Gitignored — nothing here is worth keeping. |
-| `logs/` | iverilog/vvp stdout captures per test run. Gitignored — regenerate by re-running the suite. |
+| `legacy/firmware/` | Programs the core executes. The official validation firmware lands here when released. |
+| `chip-inventor/` | `config.json` plus synthesis runs for the current complete version. Produces the GDSII and gate-level netlist for submission. |
+| `legacy/sim/` | Build scratch. Gitignored — nothing here is worth keeping. |
+| `legacy/logs/` | iverilog/vvp stdout captures per test run. Gitignored — regenerate by re-running the suite. |
 
 **Control unit vs datapath**, since the split isn't obvious: the control unit
 emits *select lines and enables* (`alu_op_o = 4'h2`, `reg_write_o = 1`) — it
@@ -68,26 +76,26 @@ responsible," not "whoever gets there first wins."
 
 | Folder | Owner | Contents |
 |---|---|---|
-| `rtl/control_unit.v`, `rtl/top.v` | **FSM pair** | FSM, top-level integration |
-| `tb/control_unit/` | **FSM pair** | Control unit testbench |
-| `rtl/memory/` | **Memory pair** | Register file, LSU, address decoder, IMEM, DMEM |
-| `tb/memory/` | **Memory pair** | Per-module memory-side testbenches |
-| `rtl/datapath/` | **Shared — all four** | ALU, multiplier, CRC, branch comparator, immediate extender |
-| `tb/datapath/` | **Shared — all four** | Per-module datapath testbenches |
-| `rtl/pkg/` | **Shared — read freely, edit only by team agreement** | `rvbl2_defines.vh` |
-| `tb/system/` | **Shared — all four** | Full-core testbench, firmware validation |
-| `firmware/` | **Shared — all four** | Validation firmware |
-| `openlane/` | **Shared — all four** | `config.json`, synthesis runs |
+| `legacy/rtl/control_unit.v`, `legacy/rtl/top.v` | **FSM pair** | FSM, top-level integration |
+| `legacy/tb/control_unit/` | **FSM pair** | Control unit testbench |
+| `legacy/rtl/memory/` | **Memory pair** | Register file, LSU, address decoder, IMEM, DMEM |
+| `legacy/tb/memory/` | **Memory pair** | Per-module memory-side testbenches |
+| `legacy/rtl/datapath/` | **Shared — all four** | ALU, multiplier, CRC, branch comparator, immediate extender |
+| `legacy/tb/datapath/` | **Shared — all four** | Per-module datapath testbenches |
+| `legacy/rtl/pkg/` | **Shared — read freely, edit only by team agreement** | `rvbl2_defines.vh` |
+| `legacy/tb/system/` | **Shared — all four** | Full-core testbench, firmware validation |
+| `legacy/firmware/` | **Shared — all four** | Validation firmware |
+| `chip-inventor/` | **Shared — all four** | `config.json`, synthesis runs |
 | `docs/` | **Shared — all four** | Specs, report assets, diagrams |
-| `sim/` | **Nobody — gitignored** | Scratch output |
+| `legacy/sim/` | **Nobody — gitignored** | Scratch output |
 
-⚠ **`rtl/datapath/` being shared means nobody owns any given module by
+⚠ **`legacy/rtl/datapath/` being shared means nobody owns any given module by
 default** — which is how you end up with two `alu.v` implementations and no
 `crc.v`. Assign a name to each module before starting.
 
 ---
 
-## Golden rule for `rtl/pkg/rvbl2_defines.vh`
+## Golden rule for `legacy/rtl/pkg/rvbl2_defines.vh`
 
 About to write a raw opcode, `alu_op_o`, `mult_op_o`, `crc_op_o`, `result_src_o`, or
 `pc_src` literal into your module? Stop. `` `include "pkg/rvbl2_defines.vh" ``
@@ -101,6 +109,9 @@ compile error.
 ---
 
 ## Build / simulate
+
+Applies to `legacy/` (the original hand-written slice). Run these from inside
+`legacy/`, or prefix paths with `legacy/` from the repo root.
 
 Requires [Icarus Verilog](http://iverilog.icarus.com/) (`iverilog`, `vvp`) and
 optionally [GTKWave](http://gtkwave.sourceforge.net/) for waveforms.
@@ -250,7 +261,7 @@ would have computed the CRC of the wrong operand and still looked correct.
 | `docs/HANDOFF_control_unit.md` | Original spec doc |
 | `docs/fsm_control_signal_table.md` | Scaffold with issue-resolution history |
 | `docs/Championchip-stage-2-guide.pdf` | Competition block guide — source of truth for guide-fixed signals |
-| `rtl/pkg/rvbl2_defines.vh` | **All constants — what the RTL actually compiles against** |
+| `legacy/rtl/pkg/rvbl2_defines.vh` | **All constants — what the RTL actually compiles against (legacy version)** |
 | `.claude/CLAUDE.md` | 9-step workflow, RTL coding standards |
 
 ## Submission checklist (guide §9)

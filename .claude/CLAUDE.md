@@ -115,6 +115,9 @@ ask before guessing.
 
 ## Build / simulate / view
 
+Note: this is the legacy (first version) slice, superseded by chip-inventor
+for full testing. Paths below are relative to `legacy/`.
+
 ```bash
 iverilog -o sim/<name>.vvp rtl/<file>.v tb/tb_<name>.v
 vvp sim/<name>.vvp
@@ -127,11 +130,18 @@ to produce a waveform GTKWave can open.
 ## Repo layout
 
 ```
-rtl/     module implementations (control_unit.v, alu.v, mult.v, crc.v,
-         lsu.v, regfile.v, address_decoder.v, imem.v, dmem.v, top.v)
-tb/      one testbench per module, named tb_<module>.v
-sim/     compiled .vvp / .vcd output — gitignored
-config.json   OpenLane synthesis config
+legacy/            first-version slice (pre chip-inventor), not the active build
+  rtl/            module implementations (control_unit.v, alu.v, mult.v, crc.v,
+                  lsu.v, regfile.v, address_decoder.v, imem.v, dmem.v, top.v)
+  tb/             one testbench per module, named tb_<module>.v
+  sim/            compiled .vvp / .vcd output — gitignored
+  firmware/       test firmware/hex images
+  logs/           simulation logs
+  scripts/        python helper scripts (asm, decode, sim, firmware gen)
+  config.json     OpenLane synthesis config (legacy version)
+chip-inventor/          complete version under ChipInventor-assisted testing
+v2-chip-inventor-synth/ chip-inventor synthesis version, lighter test/size
+docs/             specs, handoff docs, build plans, figures
 ```
 
 ## Workflow preference

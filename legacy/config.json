@@ -1,0 +1,60 @@
+{
+    "//": "ChampionCHIP RVBL-2 multicycle RISC-V core — OpenLane 1 config.",
+    "//1": "Design dir is the repo root (OpenLane 1 expects config.json there).",
+    "//2": "hence the dir::rtl/... paths. Runs land in ./runs/ which is",
+    "//3": "gitignored; config.json itself is a required submission file",
+    "//4": "(guide section 9).",
+
+    "DESIGN_NAME": "top",
+
+    "VERILOG_FILES": [
+        "dir::rtl/top.v",
+        "dir::rtl/control_unit.v",
+        "dir::rtl/datapath/alu.v",
+        "dir::rtl/datapath/imm_extend.v",
+        "dir::rtl/datapath/branch_comparator.v",
+        "dir::rtl/datapath/mult.v",
+        "dir::rtl/datapath/crc.v",
+        "dir::rtl/memory/regfile.v",
+        "dir::rtl/memory/lsu.v",
+        "dir::rtl/memory/address_decoder.v",
+        "dir::rtl/memory/imem.v",
+        "dir::rtl/memory/dmem.v"
+    ],
+
+    "//5": "Every RTL file does `include \"pkg/rvbl2_defines.vh\"`, which",
+    "//6": "resolves against rtl/ — the same -I rtl the iverilog builds use.",
+    "VERILOG_INCLUDE_DIRS": ["dir::rtl"],
+
+    "//7": "clk_i / rst_i are the only top-level inputs; halt_o the only",
+    "//8": "output. Reset is synchronous throughout (handoff decision 12),",
+    "//9": "so rst_i is an ordinary data input, not a reset pin to the PDK.",
+    "CLOCK_PORT": "clk_i",
+    "CLOCK_NET": "clk_i",
+
+    "//10": "STARTING POINT ONLY — 40 ns = 25 MHz. The guide never states a",
+    "//11": "target frequency, so this is ours to choose. The 32x32 combinational",
+    "//12": "multiplier (mult.v, flagged as the design's largest block) is the",
+    "//13": "expected critical path. Read the post-STA slack from the first run",
+    "//14": "and tighten or relax from there rather than guessing again.",
+    "CLOCK_PERIOD": 40,
+
+    "PDK": "sky130A",
+    "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+
+    "//15": "Let the floorplanner size the die from utilisation on the first",
+    "//16": "run. Once area is known, switch to an explicit DIE_AREA if a",
+    "//17": "fixed footprint is needed for the report's GDSII image.",
+    "FP_SIZING": "relative",
+    "FP_CORE_UTIL": 35,
+    "PL_TARGET_DENSITY": 0.45,
+
+    "//18": "imem/dmem are behavioural arrays with no PDK macro behind them,",
+    "//19": "so yosys maps them to standard-cell flops and mux trees. See the",
+    "//20": "memory-sizing note in the report before trusting the area number.",
+    "SYNTH_STRATEGY": "AREA 0",
+
+    "RUN_LINTER": 1,
+    "QUIT_ON_LINTER_WARNINGS": 0,
+    "RUN_CVC": 1
+}

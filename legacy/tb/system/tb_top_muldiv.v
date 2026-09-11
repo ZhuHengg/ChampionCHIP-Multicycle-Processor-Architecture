@@ -1,0 +1,291 @@
+// tb_top_muldiv.v — top.v directed tests: MUL/CRC end-to-end, trap-9 op-select regression
+//
+// Checks mult_op_o/crc_op_o only drive from control_unit.v's EXECUTE_ALU, not a stale live tap.
+// Firmware hand-assembled (no riscv-elf toolchain on PATH); round-tripped through an independent decoder.
+// mulh x7,x1,x2 @0x40002c=0x022093b3 (trap-9 MULH half); crcb x1,x9,x1 @0x4000ac=0x801480b3 (chain final; rs1=data,rs2/rd=seed).
+// CRC seed/data constants use li-style lui+addi with +1 adjustment for values with imm[11] set (e.g. 0xFFFF, 0xCDEF, 0x90ABCDEF).
+// Group A (x1-15): tb_mult.v golden vectors + trap-9 pair (x6=mul,x7=mulh,x8=mulhu, same operands 0x80000000,2).
+// Group B (x1-9): crcb chain, seed 0xFFFF, 8x8-bit data -> 0x00001E82.
+// Group C (x10-14): crch chain, seed 0xFFFF, 4x16-bit data -> 0x00001E82.
+// Group D (x20-22): crcw chain, seed 0xFFFF, 2x32-bit data -> 0x00001E82.
+
+`timescale 1ns/1ps
+`include "pkg/rvbl2_defines.vh"
+
+module tb_top_muldiv;
+
+    reg clk_i;
+    reg rst_i;
+    wire halt_o;
+
+    integer errors;
+    integer i;
+
+    localparam CYCLE_BUDGET = 500;
+    integer cycle_count;
+
+    top #(
+        .IMEM_DEPTH_WORDS (1024),
+        .IMEM_INIT_FILE   ("firmware/muldiv_test.hex")
+    ) dut (
+        .clk_i  (clk_i),
+        .rst_i  (rst_i),
+        .halt_o (halt_o)
+    );
+
+    // 10ns clock
+    always #5 clk_i = ~clk_i;
+
+    // Debug trace: state/pc/ir + mult/crc op/en/result
+    always @(posedge clk_i) begin
+        #1;
+        $display("t=%0t state=%0d pc=%h ir=%h mult_op=%h crc_op=%h mult_en=%b crc_en=%b mult_result_r=%h crc_result_r=%h",
+                  $time, dut.u_control_unit.state, dut.pc, dut.ir,
+                  dut.mult_op_o, dut.crc_op_o, dut.mult_en_o, dut.crc_en_o,
+                  dut.mult_result_r, dut.crc_result_r);
+    end
+
+    // Watchdog: guards against FSM hang
+    always @(posedge clk_i) begin
+        if (!rst_i) begin
+            cycle_count = cycle_count + 1;
+            if (cycle_count > CYCLE_BUDGET) begin
+                $fatal(1, "WATCHDOG: exceeded %0d cycles without finishing", CYCLE_BUDGET);
+            end
+        end
+    end
+
+    // halt_o guard: no ECALL in this firmware (check 5).
+    always @(*) begin
+        if (!rst_i && halt_o !== 1'b0) begin
+            $display("FAIL [halt_o guard] exp=0 got=%b, t=%0t", halt_o, $time);
+            errors = errors + 1;
+        end
+    end
+
+    // regs[0] guard (check 5).
+    always @(*) begin
+        if (!rst_i && dut.u_regfile.regs[0] !== 32'b0) begin
+            $display("FAIL [x0 guard] regs[0] exp=0 got=%h, t=%0t",
+                      dut.u_regfile.regs[0], $time);
+            errors = errors + 1;
+        end
+    end
+
+    // run_instr/check_cyc/check_no_x/check_reg: all ALU/MUL/CRC, expect 4 cycles/instr
+    task run_instr;
+        input [8*24-1:0] label;
+        input [31:0]     exp_entry_pc;
+        output [31:0]    landed_pc;
+        output integer   cyc;
+        begin
+            if (dut.u_control_unit.state !== dut.u_control_unit.FETCH) begin
+                $display("FAIL [%0s] expected FETCH at entry, got state=%0d pc=%h",
+                          label, dut.u_control_unit.state, dut.pc);
+                errors = errors + 1;
+            end
+            if (dut.pc !== exp_entry_pc) begin
+                $display("FAIL [%0s] entry pc mismatch exp=%h got=%h", label, exp_entry_pc, dut.pc);
+                errors = errors + 1;
+            end
+            cyc = 0;
+            @(posedge clk_i); #1; cyc = cyc + 1;
+            while (dut.u_control_unit.state !== dut.u_control_unit.FETCH) begin
+                @(posedge clk_i); #1; cyc = cyc + 1;
+            end
+            landed_pc = dut.pc;
+        end
+    endtask
+
+    task check_cyc;
+        input [8*24-1:0] label;
+        input integer     exp_cyc;
+        input integer     got_cyc;
+        begin
+            if (got_cyc !== exp_cyc) begin
+                $display("FAIL [%0s] cycle count exp=%0d got=%0d (handoff Sec 2 / decision 1: MUL/CRC are 4-cycle, no wait state)",
+                          label, exp_cyc, got_cyc);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    // Check 6: no-x-propagation guard
+    task check_no_x;
+        input [8*24-1:0] label;
+        input [31:0]     val;
+        begin
+            if (^val === 1'bx) begin
+                $display("FAIL [%0s] result is X (unwired/undriven port or bad register gating): got=%h", label, val);
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    task check_reg;
+        input [8*24-1:0] label;
+        input integer     reg_idx;
+        input [31:0]      exp_val;
+        begin
+            check_no_x(label, dut.u_regfile.regs[reg_idx]);
+            if (dut.u_regfile.regs[reg_idx] !== exp_val) begin
+                $display("FAIL [%0s] regs[%0d] exp=%h got=%h", label, reg_idx, exp_val, dut.u_regfile.regs[reg_idx]);
+                errors = errors + 1;
+            end else begin
+                $display("PASS [%0s] regs[%0d] = %h", label, reg_idx, exp_val);
+            end
+        end
+    endtask
+
+    // Program trace: 66 straight-line instructions, every step checked
+    reg [31:0] EXP_PC  [0:65];
+    integer    EXP_RD  [0:65];
+    reg [31:0] EXP_VAL [0:65];
+    reg [8*24-1:0] STEP_LABEL [0:65];
+
+    reg [31:0] landed;
+    integer    cyc;
+    reg [8*24-1:0] step_label;
+
+    // Captured at production (i=10/11/12) — x6/x7/x8 later reused as CRC data regs
+    reg [31:0] trap9_mul_val;
+    reg [31:0] trap9_mulh_val;
+    reg [31:0] disagree_mulhu_val;
+
+    initial begin
+        EXP_PC[0]=32'h00400000; EXP_RD[0]= 1; EXP_VAL[0]=32'h00000006; STEP_LABEL[0]="addi_x1";
+        EXP_PC[1]=32'h00400004; EXP_RD[1]= 2; EXP_VAL[1]=32'h00000007; STEP_LABEL[1]="addi_x2";
+        EXP_PC[2]=32'h00400008; EXP_RD[2]= 3; EXP_VAL[2]=32'h0000002a; STEP_LABEL[2]="mul_x3_6x7";
+        EXP_PC[3]=32'h0040000c; EXP_RD[3]= 1; EXP_VAL[3]=32'hfffffffa; STEP_LABEL[3]="addi_x1_neg6";
+        EXP_PC[4]=32'h00400010; EXP_RD[4]= 4; EXP_VAL[4]=32'hffffffd6; STEP_LABEL[4]="mul_x4_neg6x7";
+        EXP_PC[5]=32'h00400014; EXP_RD[5]= 1; EXP_VAL[5]=32'hfffffffe; STEP_LABEL[5]="addi_x1_neg2";
+        EXP_PC[6]=32'h00400018; EXP_RD[6]= 2; EXP_VAL[6]=32'hfffffffd; STEP_LABEL[6]="addi_x2_neg3";
+        EXP_PC[7]=32'h0040001c; EXP_RD[7]= 5; EXP_VAL[7]=32'h00000000; STEP_LABEL[7]="mulh_x5_neg2xneg3";
+        EXP_PC[8]=32'h00400020; EXP_RD[8]= 1; EXP_VAL[8]=32'h80000000; STEP_LABEL[8]="lui_x1_80000000";
+        EXP_PC[9]=32'h00400024; EXP_RD[9]= 2; EXP_VAL[9]=32'h00000002; STEP_LABEL[9]="addi_x2_2";
+        EXP_PC[10]=32'h00400028; EXP_RD[10]= 6; EXP_VAL[10]=32'h00000000; STEP_LABEL[10]="TRAP9_mul_x6";
+        EXP_PC[11]=32'h0040002c; EXP_RD[11]= 7; EXP_VAL[11]=32'hffffffff; STEP_LABEL[11]="TRAP9_mulh_x7";
+        EXP_PC[12]=32'h00400030; EXP_RD[12]= 8; EXP_VAL[12]=32'h00000001; STEP_LABEL[12]="DISAGREE_mulhu_x8";
+        EXP_PC[13]=32'h00400034; EXP_RD[13]= 1; EXP_VAL[13]=32'hffffffff; STEP_LABEL[13]="addi_x1_negone";
+        EXP_PC[14]=32'h00400038; EXP_RD[14]= 2; EXP_VAL[14]=32'hffffffff; STEP_LABEL[14]="addi_x2_negone";
+        EXP_PC[15]=32'h0040003c; EXP_RD[15]= 9; EXP_VAL[15]=32'hfffffffe; STEP_LABEL[15]="mulhu_x9_stress";
+        EXP_PC[16]=32'h00400040; EXP_RD[16]=10; EXP_VAL[16]=32'h00000001; STEP_LABEL[16]="mul_x10_stress";
+        EXP_PC[17]=32'h00400044; EXP_RD[17]=11; EXP_VAL[17]=32'h00000000; STEP_LABEL[17]="mulh_x11_stress";
+        EXP_PC[18]=32'h00400048; EXP_RD[18]= 2; EXP_VAL[18]=32'h00000001; STEP_LABEL[18]="addi_x2_1";
+        EXP_PC[19]=32'h0040004c; EXP_RD[19]=12; EXP_VAL[19]=32'hffffffff; STEP_LABEL[19]="mulhsu_x12_trap";
+        EXP_PC[20]=32'h00400050; EXP_RD[20]= 2; EXP_VAL[20]=32'hffffffff; STEP_LABEL[20]="addi_x2_negone_2";
+        EXP_PC[21]=32'h00400054; EXP_RD[21]=13; EXP_VAL[21]=32'hffffffff; STEP_LABEL[21]="mulhsu_x13";
+        EXP_PC[22]=32'h00400058; EXP_RD[22]= 1; EXP_VAL[22]=32'h00000003; STEP_LABEL[22]="addi_x1_3";
+        EXP_PC[23]=32'h0040005c; EXP_RD[23]= 2; EXP_VAL[23]=32'h00000004; STEP_LABEL[23]="addi_x2_4";
+        EXP_PC[24]=32'h00400060; EXP_RD[24]=14; EXP_VAL[24]=32'h00000000; STEP_LABEL[24]="mulhsu_x14_small";
+        EXP_PC[25]=32'h00400064; EXP_RD[25]=15; EXP_VAL[25]=32'h0000000c; STEP_LABEL[25]="mul_x15_small";
+        EXP_PC[26]=32'h00400068; EXP_RD[26]= 1; EXP_VAL[26]=32'h00010000; STEP_LABEL[26]="lui_x1_crcbseed_ADJ";
+        EXP_PC[27]=32'h0040006c; EXP_RD[27]= 1; EXP_VAL[27]=32'h0000ffff; STEP_LABEL[27]="addi_x1_crcbseed";
+        EXP_PC[28]=32'h00400070; EXP_RD[28]= 2; EXP_VAL[28]=32'h00000012; STEP_LABEL[28]="addi_x2_data12";
+        EXP_PC[29]=32'h00400074; EXP_RD[29]= 3; EXP_VAL[29]=32'h00000034; STEP_LABEL[29]="addi_x3_data34";
+        EXP_PC[30]=32'h00400078; EXP_RD[30]= 4; EXP_VAL[30]=32'h00000056; STEP_LABEL[30]="addi_x4_data56";
+        EXP_PC[31]=32'h0040007c; EXP_RD[31]= 5; EXP_VAL[31]=32'h00000078; STEP_LABEL[31]="addi_x5_data78";
+        EXP_PC[32]=32'h00400080; EXP_RD[32]= 6; EXP_VAL[32]=32'h00000090; STEP_LABEL[32]="addi_x6_data90";
+        EXP_PC[33]=32'h00400084; EXP_RD[33]= 7; EXP_VAL[33]=32'h000000ab; STEP_LABEL[33]="addi_x7_dataAB";
+        EXP_PC[34]=32'h00400088; EXP_RD[34]= 8; EXP_VAL[34]=32'h000000cd; STEP_LABEL[34]="addi_x8_dataCD";
+        EXP_PC[35]=32'h0040008c; EXP_RD[35]= 9; EXP_VAL[35]=32'h000000ef; STEP_LABEL[35]="addi_x9_dataEF";
+        EXP_PC[36]=32'h00400090; EXP_RD[36]= 1; EXP_VAL[36]=32'h0000d383; STEP_LABEL[36]="crcb_step0";
+        EXP_PC[37]=32'h00400094; EXP_RD[37]= 1; EXP_VAL[37]=32'h00000ec9; STEP_LABEL[37]="crcb_step1";
+        EXP_PC[38]=32'h00400098; EXP_RD[38]= 1; EXP_VAL[38]=32'h000012fd; STEP_LABEL[38]="crcb_step2";
+        EXP_PC[39]=32'h0040009c; EXP_RD[39]= 1; EXP_VAL[39]=32'h000030ec; STEP_LABEL[39]="crcb_step3";
+        EXP_PC[40]=32'h004000a0; EXP_RD[40]= 1; EXP_VAL[40]=32'h000059ea; STEP_LABEL[40]="crcb_step4";
+        EXP_PC[41]=32'h004000a4; EXP_RD[41]= 1; EXP_VAL[41]=32'h0000255d; STEP_LABEL[41]="crcb_step5";
+        EXP_PC[42]=32'h004000a8; EXP_RD[42]= 1; EXP_VAL[42]=32'h00002126; STEP_LABEL[42]="crcb_step6";
+        EXP_PC[43]=32'h004000ac; EXP_RD[43]= 1; EXP_VAL[43]=32'h00001e82; STEP_LABEL[43]="CRCB_CHAIN_FINAL";
+        EXP_PC[44]=32'h004000b0; EXP_RD[44]=10; EXP_VAL[44]=32'h00010000; STEP_LABEL[44]="lui_x10_crchseed_ADJ";
+        EXP_PC[45]=32'h004000b4; EXP_RD[45]=10; EXP_VAL[45]=32'h0000ffff; STEP_LABEL[45]="addi_x10_crchseed";
+        EXP_PC[46]=32'h004000b8; EXP_RD[46]=11; EXP_VAL[46]=32'h00001000; STEP_LABEL[46]="lui_x11_data1234";
+        EXP_PC[47]=32'h004000bc; EXP_RD[47]=11; EXP_VAL[47]=32'h00001234; STEP_LABEL[47]="addi_x11_data1234";
+        EXP_PC[48]=32'h004000c0; EXP_RD[48]=12; EXP_VAL[48]=32'h00005000; STEP_LABEL[48]="lui_x12_data5678";
+        EXP_PC[49]=32'h004000c4; EXP_RD[49]=12; EXP_VAL[49]=32'h00005678; STEP_LABEL[49]="addi_x12_data5678";
+        EXP_PC[50]=32'h004000c8; EXP_RD[50]=13; EXP_VAL[50]=32'h00009000; STEP_LABEL[50]="lui_x13_data90AB";
+        EXP_PC[51]=32'h004000cc; EXP_RD[51]=13; EXP_VAL[51]=32'h000090ab; STEP_LABEL[51]="addi_x13_data90AB";
+        EXP_PC[52]=32'h004000d0; EXP_RD[52]=14; EXP_VAL[52]=32'h0000d000; STEP_LABEL[52]="lui_x14_dataCDEF_ADJ";
+        EXP_PC[53]=32'h004000d4; EXP_RD[53]=14; EXP_VAL[53]=32'h0000cdef; STEP_LABEL[53]="addi_x14_dataCDEF";
+        EXP_PC[54]=32'h004000d8; EXP_RD[54]=10; EXP_VAL[54]=32'h00000ec9; STEP_LABEL[54]="crch_step0";
+        EXP_PC[55]=32'h004000dc; EXP_RD[55]=10; EXP_VAL[55]=32'h000030ec; STEP_LABEL[55]="crch_step1";
+        EXP_PC[56]=32'h004000e0; EXP_RD[56]=10; EXP_VAL[56]=32'h0000255d; STEP_LABEL[56]="crch_step2";
+        EXP_PC[57]=32'h004000e4; EXP_RD[57]=10; EXP_VAL[57]=32'h00001e82; STEP_LABEL[57]="CRCH_CHAIN_FINAL";
+        EXP_PC[58]=32'h004000e8; EXP_RD[58]=20; EXP_VAL[58]=32'h00010000; STEP_LABEL[58]="lui_x20_crcwseed_ADJ";
+        EXP_PC[59]=32'h004000ec; EXP_RD[59]=20; EXP_VAL[59]=32'h0000ffff; STEP_LABEL[59]="addi_x20_crcwseed";
+        EXP_PC[60]=32'h004000f0; EXP_RD[60]=21; EXP_VAL[60]=32'h12345000; STEP_LABEL[60]="lui_x21_data12345678";
+        EXP_PC[61]=32'h004000f4; EXP_RD[61]=21; EXP_VAL[61]=32'h12345678; STEP_LABEL[61]="addi_x21_data12345678";
+        EXP_PC[62]=32'h004000f8; EXP_RD[62]=22; EXP_VAL[62]=32'h90abd000; STEP_LABEL[62]="lui_x22_data90ABCDEF_ADJ";
+        EXP_PC[63]=32'h004000fc; EXP_RD[63]=22; EXP_VAL[63]=32'h90abcdef; STEP_LABEL[63]="addi_x22_data90ABCDEF";
+        EXP_PC[64]=32'h00400100; EXP_RD[64]=20; EXP_VAL[64]=32'h000030ec; STEP_LABEL[64]="crcw_step0";
+        EXP_PC[65]=32'h00400104; EXP_RD[65]=20; EXP_VAL[65]=32'h00001e82; STEP_LABEL[65]="CRCW_CHAIN_FINAL";
+
+        $dumpfile("sim/tb_top_muldiv.vcd");
+        $dumpvars(0, tb_top_muldiv);
+
+        errors = 0;
+        cycle_count = 0;
+        clk_i = 0;
+        rst_i = 1;
+
+        @(posedge clk_i); #1; // RESET latched
+        if (dut.u_control_unit.state !== dut.u_control_unit.RESET) begin
+            $display("FAIL [reset] state exp=RESET got=%0d", dut.u_control_unit.state);
+            errors = errors + 1;
+        end
+
+        rst_i = 0;
+        @(posedge clk_i); #1; // RESET -> FETCH
+
+        for (i = 0; i < 66; i = i + 1) begin
+            step_label = STEP_LABEL[i];
+            run_instr(step_label, EXP_PC[i], landed, cyc);
+            check_cyc(step_label, 4, cyc);
+            check_reg(step_label, EXP_RD[i], EXP_VAL[i]);
+            // capture trap-9/disagreement values before x6-8 get reused as CRC data
+            if (i == 10) trap9_mul_val      = dut.u_regfile.regs[6];
+            if (i == 11) trap9_mulh_val     = dut.u_regfile.regs[7];
+            if (i == 12) disagree_mulhu_val = dut.u_regfile.regs[8];
+        end
+
+        // Check 2: trap-9 detector — mulh must not equal mul on same operands
+        if (trap9_mul_val === trap9_mulh_val) begin
+            $display("FAIL [TRAP9] mulh result (%h) equals mul result (%h) -- op-select was dropped between EXECUTE_ALU and WRITE_BACK",
+                      trap9_mulh_val, trap9_mul_val);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [TRAP9] mulh (%h) != mul (%h)", trap9_mulh_val, trap9_mul_val);
+        end
+
+        // mulh/mulhu disagreement pair (same operands)
+        if (trap9_mulh_val === disagree_mulhu_val) begin
+            $display("FAIL [DISAGREE] mulh (%h) equals mulhu (%h) on the same operands -- test does not distinguish the two ops",
+                      trap9_mulh_val, disagree_mulhu_val);
+            errors = errors + 1;
+        end else begin
+            $display("PASS [DISAGREE] mulh (%h) != mulhu (%h)", trap9_mulh_val, disagree_mulhu_val);
+        end
+
+        // Check 3: all three CRC chains land on 0x00001E82
+        if (dut.u_regfile.regs[1] !== 32'h00001E82) begin
+            $display("FAIL [CRCB_CHAIN] final exp=00001e82 got=%h", dut.u_regfile.regs[1]);
+            errors = errors + 1;
+        end
+        if (dut.u_regfile.regs[10] !== 32'h00001E82) begin
+            $display("FAIL [CRCH_CHAIN] final exp=00001e82 got=%h", dut.u_regfile.regs[10]);
+            errors = errors + 1;
+        end
+        if (dut.u_regfile.regs[20] !== 32'h00001E82) begin
+            $display("FAIL [CRCW_CHAIN] final exp=00001e82 got=%h", dut.u_regfile.regs[20]);
+            errors = errors + 1;
+        end
+
+        if (errors == 0)
+            $display("ALL TESTS PASSED");
+        else
+            $display("%0d CHECK(S) FAILED", errors);
+
+        $finish;
+    end
+
+endmodule
