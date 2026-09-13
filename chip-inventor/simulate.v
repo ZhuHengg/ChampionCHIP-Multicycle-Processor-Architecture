@@ -253,13 +253,8 @@ module regfile_eq(
     input  wire        reg_write_i,
 
     output wire [31:0] rs1_data_o,
-    output wire [31:0] rs2_data_o,
-    // Debug tap for testbench observability (ChipInventor's canvas
-    // compiler rejects hierarchical dot-refs into instance internals, so
-    // x4 -- the organiser firmware's PASS/FAIL result register -- needs a
-    // real port to be checkable from testbench.v). Not part of the guide
-    // or team-fixed interface; simulation-only observability signal.
-    output wire [31:0] x4_dbg_o
+  	output wire [31:0] rs2_data_o,
+	output wire [31:0] x4_dbg_o
 );
 
     reg [31:0] regs [0:31];
@@ -270,7 +265,6 @@ module regfile_eq(
     assign rs1_data_o = (rs1_addr_i == 5'd0) ? 32'b0 : regs[rs1_addr_i];
     assign rs2_data_o = (rs2_addr_i == 5'd0) ? 32'b0 : regs[rs2_addr_i];
     assign x4_dbg_o   = regs[4];
-
     // Sync write, x0 write-protected (guide §3.1.4: "hardwired (fixed) at
     // zero and cannot be modified"). Control unit asserts reg_write_o
     // regardless of rd — this guard is the only place that catches it.
@@ -454,6 +448,16 @@ module imem (
     input  wire        oe_i,
     output reg  [31:0] data_o
 );
+    // Mock program for OpenLane synthesis-only test run (organiser feedback,
+    // 2026-09-10): full validation firmware replaced by organiser's
+    // 3-instruction mock (external/CCX_Malaysia_Edition_Firmware_Stage_2/
+    // README.md) so the synthesized case block doesn't balloon cell count,
+    // plus a 4th instruction (`add x4, x7, x0`) added here so the result
+    // (expected x7 = 15) lands in x4 -- the only register with a debug
+    // port wired out to testbench.v (x4_dbg_o). This is NOT the
+    // functional-validation firmware -- that still runs in tb_top
+    // simulation against the full imem content (see git history for the
+    // 259-word table).
     always @(*) begin
         if (!oe_i) begin
             data_o = 32'h00000000;
@@ -727,57 +731,8 @@ endmodule
 
 
 //  ---------- INLCUDED BLOCK: dmem_eq26  ---------- 
-// dmem.v
-// Guide §4.3. 8 kB data SRAM at `DMEM_BASE (0x10010000).
-//
-// TIMING-CRITICAL: guide §4.3 states writes/reads via SRAM "will only be
-// completed after a clock cycle" — registered-output, NOT combinational.
-// The control unit's FSM has separate MEM_ACCESS_ADDR (present address,
-// oe_o=1) and MEM_ACCESS_DATA (result_src_o=RESULT_SRC_MEM) states
-// specifically because data isn't ready until the cycle after the
-// address is presented. A combinational `assign data_o = mem[index]`
-// would pass simulation (data arrives early, FSM reads a cycle late,
-// looks fine) but fail in real SRAM. Built registered from the start.
-//
-// Byte-write: bw_i is a MASK (one bit per byte), not a binary selector
-// (guide §4.3/§3.3.2, control unit computes it — decision #11, this
-// module only applies it).
-//
-// Sizing: guide Table 13 maps DMEM as 8 kB (2048 words), but there is no
-// SRAM macro behind this array -- it synthesises to DEPTH_WORDS*32
-// flip-flops plus a DEPTH_WORDS-way read mux. At 2048 that is 65,536 DFFs,
-// which dominates area and made OpenLane place-and-route run 11 h+ before
-// failing in detailed routing. Deliberate area tradeoff, to be stated in
-// the report: the address map stays 8 kB (address_decoder's DMEM_HIGH is
-// unchanged), only the physical backing store is shrunk.
-//
-// DEPTH_WORDS = 8 (32 B) is sized from the validation firmware's .bss,
-// which is the whole of its DMEM usage:
-//     test_ram:  .space 16  -> DMEM_BASE+0x00..0x0F = words 0..3
-//     dest_data: .space 12  -> DMEM_BASE+0x10..0x1B = words 4..6
-// Highest word index touched is 6, so 7 words are required; rounded up to
-// the next power of two because `index` is a bit-slice, not a compare --
-// a non-power-of-2 depth leaves indices above the array bound (see below).
-// DEPTH_WORDS must stay a power of two for that reason.
-//
-// DEPTH_WORDS = 4 (16 B) also passes the validation firmware, but only by
-// accident: it aliases dest_data (words 4..6) onto test_ram (words 0..2),
-// which is harmless ONLY because the LSU test completes and self-checks
-// before the memcpy test starts, so nothing reads test_ram after the
-// clobber, and the copy loop's readback happens to hit the same aliased
-// words it wrote. Verified: depth 4 and 8 both reach ALL TESTS PASSED;
-// depth 2 fails (x4=0xFFFFFFFF, stuck at _error) because dest_data[0] and
-// dest_data[2] then collide with each other. 8 is chosen over 4 for margin
-// -- it holds the full .bss with no aliasing, so a firmware change that
-// interleaves the two regions cannot break it silently, and the extra 128
-// flip-flops are negligible against the 65,536 being removed.
-//
-// DMEM_BASE (0x10010000) has its low bits clear, so the base always maps
-// to index 0 regardless of depth; depth only limits how far above the base
-// the firmware may reach.
-
 module dmem_eq26 #(
-    parameter DEPTH_WORDS = 8
+    parameter DEPTH_WORDS = 4
 ) (
     input  wire        clk_i,
     input  wire         rst_i,
@@ -1695,9 +1650,9 @@ module reg32_dff_eq26 #(
 endmodule
 /* With a D Flip-Flop:
  Cycle 4: LSU outputs 0x00000042.
-          At the clock edge, the Flip-Flop SNAPS A PHOTO 📸 and freezes 0x00000042.
+          At the clock edge, the Flip-Flop SNAPS A PHOTO and freezes 0x00000042.
  Cycle 5: Even though the LSU input changes, the Flip-Flop holds the frozen photo!
-          RegFile safely writes 0x00000042 into rd! 🎉
+          RegFile safely writes 0x00000042 into rd!
 Summary:
 A Wire changes instantaneously (0 delay).
 A D Flip-Flop acts as a 1-cycle memory buffer (takes a snapshot at the clock edge and holds it stable for the next cycle). */
@@ -1897,283 +1852,282 @@ module top (
 
   input wire clk_i,
   input wire rst_i,
-  output wire halt_o,
-  output wire [31:0] 31,
-  output wire [31:0] 31
+  output wire halt_o
 
 );
 
 //Internal Wires
- wire [1:0] w_1;
+ wire w_1;
  wire [31:0] w_2;
  wire [31:0] w_3;
- wire [31:0] w_4;
- wire w_5;
+ wire w_4;
+ wire [31:0] w_5;
+ wire [31:0] w_6;
  wire [31:0] w_7;
- wire [31:0] w_8;
- wire [31:0] w_9;
- wire [6:0] w_10;
- wire [4:0] w_11;
- wire [2:0] w_12;
- wire [4:0] w_14;
- wire [4:0] w_15;
- wire [6:0] w_16;
- wire [11:0] w_17;
- wire [2:0] w_19;
- wire [31:0] w_20;
- wire w_21;
+ wire w_8;
+ wire w_9;
+ wire [3:0] w_10;
+ wire [31:0] w_11;
+ wire [31:0] w_12;
+ wire [31:0] w_13;
+ wire w_15;
+ wire w_16;
+ wire w_17;
+ wire [3:0] w_18;
+ wire [31:0] w_19;
+ wire [31:0] w_21;
  wire [31:0] w_22;
- wire [31:0] w_23;
+ wire [3:0] w_23;
  wire [31:0] w_24;
- wire [1:0] w_25;
- wire [31:0] w_26;
+ wire w_26;
  wire [31:0] w_27;
- wire [3:0] w_28;
- wire [31:0] w_30;
- wire [1:0] w_33;
- wire [3:0] w_36;
- wire [31:0] w_37;
- wire [3:0] w_40;
- wire [31:0] w_41;
+ wire [1:0] w_30;
+ wire [31:0] w_31;
+ wire [31:0] w_32;
+ wire [2:0] w_33;
+ wire w_34;
+ wire [6:0] w_35;
+ wire [6:0] w_37;
+ wire [11:0] w_38;
+ wire w_39;
+ wire [1:0] w_40;
+ wire w_41;
  wire w_42;
- wire [31:0] w_43;
+ wire [2:0] w_43;
  wire w_44;
- wire [31:0] w_45;
- wire [31:0] w_46;
- wire w_47;
- wire [31:0] w_48;
+ wire [1:0] w_45;
+ wire [2:0] w_46;
+ wire [3:0] w_47;
+ wire [3:0] w_48;
+ wire w_49;
  wire [2:0] w_50;
- wire [31:0] w_51;
- wire [31:0] w_52;
- wire [31:0] w_53;
- wire [2:0] w_54;
+ wire w_51;
+ wire [31:0] w_54;
  wire [31:0] w_55;
- wire [31:0] w_57;
- wire w_58;
- wire w_59;
- wire w_60;
- wire w_61;
- wire w_65;
- wire w_66;
- wire [3:0] w_67;
- wire [31:0] w_68;
- wire w_70;
- wire w_71;
- wire [3:0] w_72;
-
-//Interface Assigns
-assign [31:0] pg_dbg_o = w_2;
+ wire [31:0] w_56;
+ wire [31:0] w_58;
+ wire [31:0] w_60;
+ wire [31:0] w_62;
+ wire [4:0] w_63;
+ wire [4:0] w_64;
+ wire [4:0] w_65;
+ wire [31:0] w_67;
+ wire [31:0] w_72;
+ wire [31:0] w_73;
 
 //Instances of Modules
-mux_pc_next blk3807_12 (
-         .pc_src_i (w_1),
-         .pc_i (w_2),
-         .alu_result_i (w_3),
-         .pc_next_o (w_4)
-     );
-
-mux_mem_addr blk3808_14 (
-         .adr_src_i (w_5),
-         .pc_i (w_2),
-         .alu_out_i (w_7),
-         .address_o (w_8)
-     );
-
-ir_splitter_eq26 blk3781_15 (
-         .instr_i (w_9),
-         .opcode_o (w_10),
-         .rd_o (w_11),
-         .funct3_o (w_12),
-         .rs1_o (w_14),
-         .rs2_o (w_15),
-         .funct7_o (w_16),
-         .funct12_o (w_17)
-     );
-
-imm_extend_eq26 blk3556_17 (
-         .instr_i (w_9),
-         .imm_sel_i (w_19),
-         .imm_o (w_20)
-     );
-
-mux_alu_a blk3795_18 (
-         .alu_src_a_i (w_21),
-         .rs1_data_i (w_22),
-         .old_pc_i (w_23),
-         .a_o (w_24)
-     );
-
-mux_alu_b blk3796_19 (
-         .imm_i (w_20),
-         .alu_src_b_i (w_25),
-         .rs2_data_i (w_26),
-         .b_o (w_27)
-     );
-
-alu_eq26 blk3550_20 (
-         .result_o (w_3),
-         .a_i (w_24),
-         .b_i (w_27),
-         .alu_op_i (w_28)
-     );
-
-alu_out_reg #(.RESET_VALUE(32'h00000000)) blk3811_21 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .en_i (1'b1),
-         .alu_out_o (w_7),
-         .alu_result_i (w_3),
-         .addr_lsb_o (w_33)
-     );
-
-mult_eq26 blk3557_22 (
-         .a_i (w_22),
-         .b_i (w_26),
-         .mult_op_i (w_36),
-         .result_o (w_37)
-     );
-
-crc_eq26 #(.POLY(16'h1021), .XOR_OUT(16'h0000)) blk3553_23 (
-         .a_i (w_22),
-         .b_i (w_26),
-         .crc_op_i (w_40),
-         .result_o (w_41)
-     );
-
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_24 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .d_i (w_37),
-         .en_i (w_42),
-         .q_o (w_43)
-     );
-
-reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_25 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .d_i (w_41),
-         .en_i (w_44),
-         .q_o (w_45)
-     );
-
-imem blk3564_28 (
-         .clk_i (clk_i),
-         .addr_i (w_46),
-         .oe_i (w_47),
-         .data_o (w_48)
-     );
-
-lsu_eq26 blk3562_30 (
-         .core_address_o (w_7),
-         .core_data_o (w_26),
-         .op_size_o (w_50),
-         .mem_data_o (w_51),
-         .core_data_i (w_52),
-         .mem_data_i (w_53)
-     );
-
-mux_result blk3724_31 (
-         .alu_out_i (w_7),
-         .mult_result_i (w_43),
-         .crc_result_i (w_45),
-         .result_src_i (w_54),
-         .mem_result_i (w_55),
-         .old_pc_i (w_23),
-         .result_o (w_57)
+         .en_i (w_1),
+         .d_i (w_2),
+         .q_o (w_3)
      );
 
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_32 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .en_i (1'b1),
-         .d_i (w_52),
-         .q_o (w_55)
+         .en_i (w_4),
+         .d_i (w_5),
+         .q_o (w_6)
      );
 
-branch_comparator_eq26 blk3552_34 (
-         .funct3_i (w_12),
-         .branch_taken_o (w_58)
+address_decoder blk3566_49 (
+         .address_i (w_7),
+         .we_i (w_8),
+         .oe_i (w_9),
+         .bw_i (w_10),
+         .dmem_data_i (w_11),
+         .imem_data_i (w_12),
+         .address_o (w_13),
+         .dmem_we_o (w_15),
+         .dmem_oe_o (w_16),
+         .imem_oe_o (w_17),
+         .bw_o (w_18),
+         .data_o (w_19)
      );
 
-regfile_eq blk3560_44 (
+alu_eq26 blk3550_50 (
+         .a_i (w_21),
+         .b_i (w_22),
+         .alu_op_i (w_23),
+         .result_o (w_24)
+     );
+
+alu_out_reg #(.RESET_VALUE(32'h00000000)) blk3811_51 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .x4_dbg_o ([31:0] x4_dbg_o),
-         .rd_addr_i (w_11),
-         .rs1_addr_i (w_14),
-         .rs2_addr_i (w_15),
-         .rs1_data_o (w_22),
-         .rs2_data_o (w_26),
-         .write_data_i (w_57),
-         .reg_write_i (w_59)
+         .alu_result_i (w_24),
+         .en_i (w_26),
+         .alu_out_o (w_27),
+         .addr_lsb_o (w_30)
      );
 
-fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_45 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .pc_o (w_2),
-         .pc_next_i (w_4),
-         .ir_o (w_9),
-         .old_pc_o (w_23),
-         .pc_write_i (w_60),
-         .ir_write_i (w_61),
-         .mem_data_i (w_51)
+branch_comparator_eq26 blk3552_52 (
+         .rs1_i (w_31),
+         .rs2_i (w_32),
+         .funct3_i (w_33),
+         .branch_taken_o (w_34)
      );
 
-control_unit_eq26 blk3567_46 (
+control_unit_eq26 blk3567_53 (
          .clk_i (clk_i),
          .rst_i (rst_i),
          .halt_o (halt_o),
-         .pc_src_o (w_1),
-         .adr_src_o (w_5),
-         .opcode_i (w_10),
-         .funct3_i (w_12),
-         .funct7_i (w_16),
-         .funct12_i (w_17),
-         .imm_sel_o (w_19),
-         .alu_src_a_o (w_21),
-         .alu_src_b_o (w_25),
-         .alu_op_o (w_28),
-         .addr_lsb_i (w_33),
-         .mult_op_o (w_36),
-         .crc_op_o (w_40),
-         .mult_en_o (w_42),
-         .crc_en_o (w_44),
+         .mult_en_o (w_1),
+         .result_src_is_mem_o (w_4),
+         .we_o (w_8),
+         .oe_o (w_9),
+         .bw_o (w_10),
+         .alu_op_o (w_23),
+         .not_adr_src_o (w_26),
+         .addr_lsb_i (w_30),
+         .branch_taken_i (w_34),
+         .opcode_i (w_35),
+         .funct3_i (w_33),
+         .funct7_i (w_37),
+         .funct12_i (w_38),
+         .pc_write_o (w_39),
+         .pc_src_o (w_40),
+         .ir_write_o (w_41),
+         .reg_write_o (w_42),
+         .result_src_o (w_43),
+         .alu_src_a_o (w_44),
+         .alu_src_b_o (w_45),
+         .imm_sel_o (w_46),
+         .mult_op_o (w_47),
+         .crc_op_o (w_48),
+         .crc_en_o (w_49),
          .op_size_o (w_50),
-         .result_src_o (w_54),
-         .branch_taken_i (w_58),
-         .reg_write_o (w_59),
-         .pc_write_o (w_60),
-         .ir_write_o (w_61),
-         .we_o (w_65),
-         .oe_o (w_66),
-         .bw_o (w_67)
+         .adr_src_o (w_51)
      );
 
-address_decoder blk3566_47 (
-         .address_i (w_8),
-         .address_o (w_46),
-         .imem_oe_o (w_47),
-         .imem_data_i (w_48),
-         .data_o (w_51),
-         .we_i (w_65),
-         .oe_i (w_66),
-         .bw_i (w_67),
-         .dmem_data_i (w_68),
-         .dmem_we_o (w_70),
-         .dmem_oe_o (w_71),
-         .bw_o (w_72)
+crc_eq26 #(.POLY(16'h1021), .XOR_OUT(16'h0000)) blk3553_54 (
+         .crc_op_i (w_48),
+         .a_i (w_31),
+         .b_i (w_32),
+         .result_o (w_54)
      );
 
-dmem_eq26 #(.DEPTH_WORDS(8)) blk3565_48 (
+fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_56 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .data_i (w_53),
-         .data_o (w_68),
-         .addr_i (w_46),
-         .we_i (w_70),
-         .oe_i (w_71),
-         .bw_i (w_72)
+         .mem_data_i (w_19),
+         .pc_write_i (w_39),
+         .ir_write_i (w_41),
+         .pc_next_i (w_55),
+         .pc_o (w_56),
+         .old_pc_o (w_58),
+         .ir_o (w_60)
+     );
+
+imm_extend_eq26 blk3556_58 (
+         .imm_sel_i (w_46),
+         .instr_i (w_60),
+         .imm_o (w_62)
+     );
+
+ir_splitter_eq26 blk3781_59 (
+         .funct3_o (w_33),
+         .opcode_o (w_35),
+         .funct7_o (w_37),
+         .funct12_o (w_38),
+         .instr_i (w_60),
+         .rd_o (w_63),
+         .rs1_o (w_64),
+         .rs2_o (w_65)
+     );
+
+lsu_eq26 blk3562_60 (
+         .core_data_i (w_5),
+         .mem_data_o (w_19),
+         .core_address_o (w_27),
+         .op_size_o (w_50),
+         .core_data_o (w_32),
+         .mem_data_i (w_67)
+     );
+
+mult_eq26 blk3557_61 (
+         .result_o (w_2),
+         .mult_op_i (w_47),
+         .a_i (w_31),
+         .b_i (w_32)
+     );
+
+mux_alu_a blk3795_62 (
+         .a_o (w_21),
+         .alu_src_a_i (w_44),
+         .old_pc_i (w_58),
+         .rs1_data_i (w_31)
+     );
+
+mux_alu_b blk3796_63 (
+         .b_o (w_22),
+         .alu_src_b_i (w_45),
+         .imm_i (w_62),
+         .rs2_data_i (w_32)
+     );
+
+mux_mem_addr blk3808_64 (
+         .address_o (w_7),
+         .alu_out_i (w_27),
+         .adr_src_i (w_51),
+         .pc_i (w_56)
+     );
+
+mux_pc_next blk3807_65 (
+         .alu_result_i (w_24),
+         .pc_src_i (w_40),
+         .pc_next_o (w_55),
+         .pc_i (w_56)
+     );
+
+mux_result blk3724_66 (
+         .mult_result_i (w_3),
+         .mem_result_i (w_6),
+         .alu_out_i (w_27),
+         .result_src_i (w_43),
+         .old_pc_i (w_58),
+         .crc_result_i (w_72),
+         .result_o (w_73)
+     );
+
+reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_67 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .en_i (w_49),
+         .d_i (w_54),
+         .q_o (w_72)
+     );
+
+regfile_eq blk3560_68 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .rs1_data_o (w_31),
+         .rs2_data_o (w_32),
+         .reg_write_i (w_42),
+         .rd_addr_i (w_63),
+         .rs1_addr_i (w_64),
+         .rs2_addr_i (w_65),
+         .write_data_i (w_73)
+     );
+
+dmem_eq26 #(.DEPTH_WORDS(4)) blk3565_69 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .data_o (w_11),
+         .addr_i (w_13),
+         .we_i (w_15),
+         .oe_i (w_16),
+         .bw_i (w_18),
+         .data_i (w_67)
+     );
+
+imem blk3564_70 (
+         .clk_i (clk_i),
+         .data_o (w_12),
+         .addr_i (w_13),
+         .oe_i (w_17)
      );
 
 

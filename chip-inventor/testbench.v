@@ -1,29 +1,16 @@
-// testbench.v -- runs the organiser-supplied Stage 2 validation firmware
-// (baked into this canvas's imem block -- see hdl.v's imem module header)
-// against the ChipInventor wiring of the full multicycle core.
+// testbench.v -- runs organiser Stage 2 validation firmware (baked into
+// hdl.v's imem) against ChipInventor wiring of the full multicycle core.
+// Pass/fail contract matches tb/system/tb_top_organiser.v: firmware
+// self-loops (`j .`) when done, x4==0 -> PASS, x4==0xFFFFFFFF -> FAIL.
 //
-// Same pass/fail contract as the main repo's tb/system/tb_top_organiser.v:
-// firmware self-loops (`j .`) when done, x4==0 -> PASS, x4==0xFFFFFFFF -> FAIL.
+// Uses only top-level ports (pc_dbg_o, x4_dbg_o) -- ChipInventor's canvas
+// compiler rejects hierarchical dot-refs into instance internals.
 //
-// ChipInventor's canvas compiler rejects hierarchical dot-refs into
-// instance internals (dut.pc, dut.u_control_unit.state, dut.u_regfile.regs[4]
-// all fail elaboration there even though local iverilog accepts them) --
-// block instances are opaque outside their own declared ports. So `top`
-// (hdl.v) and `regfile_eq` (hdl.v) were each given a debug-only output
-// port -- pc_dbg_o and x4_dbg_o -- purely for this testbench to observe
-// state through, and this testbench uses only top-level ports.
-//
-// CYCLE COUNT, not self-loop detection: the organiser firmware contains a
-// real backward loop (copy_loop, 3 iterations) before its terminal `j .`,
-// so a generic "PC revisited an earlier address" detector cannot tell
-// that loop apart from the terminal one without also tracking iteration
-// counts. The main repo's rtl/top.v (same firmware, same FSM design) was
-// run against tb/system/tb_top_organiser.v and independently confirmed to
-// settle at the terminal self-loop (pc=0x004003ec) after exactly 979
-// cycles -- see that testbench for the state-based (FSM state ==
-// DECODE/FETCH) detection this canvas cannot replicate. This testbench
-// reuses that already-verified cycle count directly: run exactly
-// EXPECTED_CYCLES, then read x4_dbg_o once settled.
+// Fixed cycle count instead of self-loop detection: firmware has a real
+// backward loop (copy_loop, 3 iterations) before its terminal `j .`, so
+// a generic revisited-PC detector can't tell them apart. rtl/top.v +
+// tb/system/tb_top_organiser.v already confirmed settling at pc=0x004003ec
+// after exactly 979 cycles; reused directly here as EXPECTED_CYCLES.
 
 module testbench();
 
