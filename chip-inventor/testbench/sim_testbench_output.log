@@ -1,0 +1,5 @@
+VCD info: dumpfile testbench.vcd opened for output.
+t=9996: pc=004003ec x4=00000000 (after 999 cycles)
+PASS [organiser firmware self-check] x4 = 0x00000000 (PASS)
+ALL TESTS PASSED
+testbench.v:85: $finish called at 9996 (1s)
