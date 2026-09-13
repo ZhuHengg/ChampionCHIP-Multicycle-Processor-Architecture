@@ -253,13 +253,8 @@ module regfile_eq(
     input  wire        reg_write_i,
 
     output wire [31:0] rs1_data_o,
-    output wire [31:0] rs2_data_o,
-    // Debug tap for testbench observability (ChipInventor's canvas
-    // compiler rejects hierarchical dot-refs into instance internals, so
-    // x4 -- the organiser firmware's PASS/FAIL result register -- needs a
-    // real port to be checkable from testbench.v). Not part of the guide
-    // or team-fixed interface; simulation-only observability signal.
-    output wire [31:0] x4_dbg_o
+  	output wire [31:0] rs2_data_o,
+	output wire [31:0] x4_dbg_o
 );
 
     reg [31:0] regs [0:31];
@@ -270,7 +265,6 @@ module regfile_eq(
     assign rs1_data_o = (rs1_addr_i == 5'd0) ? 32'b0 : regs[rs1_addr_i];
     assign rs2_data_o = (rs2_addr_i == 5'd0) ? 32'b0 : regs[rs2_addr_i];
     assign x4_dbg_o   = regs[4];
-
     // Sync write, x0 write-protected (guide §3.1.4: "hardwired (fixed) at
     // zero and cannot be modified"). Control unit asserts reg_write_o
     // regardless of rd — this guard is the only place that catches it.
@@ -454,21 +448,271 @@ module imem (
     input  wire        oe_i,
     output reg  [31:0] data_o
 );
-    // Mock program for OpenLane synthesis-only test run (organiser feedback,
-    // 2026-09-10): full validation firmware replaced by 3-instruction mock
-    // per external/CCX_Malaysia_Edition_Firmware_Stage_2/README.md so the
-    // synthesized case block doesn't balloon cell count. This is NOT the
-    // functional-validation firmware — that still runs in tb_top simulation
-    // against the full imem content (see git history for the 259-word table).
+    // Full Stage 2 validation firmware.
     always @(*) begin
         if (!oe_i) begin
             data_o = 32'h00000000;
         end else begin
             case (addr_i[9:0])
-                10'd0: data_o = 32'h00A00293; // addi x5, x0, 10
-                10'd1: data_o = 32'h00500313; // addi x6, x0, 5
-                10'd2: data_o = 32'h006283B3; // add  x7, x5, x6
-                10'd3: data_o = 32'h00038233; // add  x4, x7, x0  (debug-tap copy)
+                10'd0: data_o = 32'h123452B7;
+                10'd1: data_o = 32'h12345337;
+                10'd2: data_o = 32'h3E629463;
+                10'd3: data_o = 32'h00001297;
+                10'd4: data_o = 32'h3E028063;
+                10'd5: data_o = 32'h00A00293;
+                10'd6: data_o = 32'hFFD28313;
+                10'd7: data_o = 32'h00700393;
+                10'd8: data_o = 32'h3C731863;
+                10'd9: data_o = 32'h006283B3;
+                10'd10: data_o = 32'h01100E13;
+                10'd11: data_o = 32'h3DC39263;
+                10'd12: data_o = 32'h405E03B3;
+                10'd13: data_o = 32'h3A639E63;
+                10'd14: data_o = 32'h0FF00293;
+                10'd15: data_o = 32'h0F02C313;
+                10'd16: data_o = 32'h00F00393;
+                10'd17: data_o = 32'h3A731663;
+                10'd18: data_o = 32'h7002E313;
+                10'd19: data_o = 32'h7FF00393;
+                10'd20: data_o = 32'h3A731063;
+                10'd21: data_o = 32'h0F02F313;
+                10'd22: data_o = 32'h0F000393;
+                10'd23: data_o = 32'h38731A63;
+                10'd24: data_o = 32'h0AA00293;
+                10'd25: data_o = 32'h05500313;
+                10'd26: data_o = 32'h0062C3B3;
+                10'd27: data_o = 32'h0FF00E13;
+                10'd28: data_o = 32'h39C39063;
+                10'd29: data_o = 32'h0062E3B3;
+                10'd30: data_o = 32'h37C39C63;
+                10'd31: data_o = 32'h0062F3B3;
+                10'd32: data_o = 32'h36039863;
+                10'd33: data_o = 32'h00100293;
+                10'd34: data_o = 32'h00429313;
+                10'd35: data_o = 32'h01000393;
+                10'd36: data_o = 32'h36731063;
+                10'd37: data_o = 32'h0023D313;
+                10'd38: data_o = 32'h00400E13;
+                10'd39: data_o = 32'h35C31A63;
+                10'd40: data_o = 32'hFF000293;
+                10'd41: data_o = 32'h4022D313;
+                10'd42: data_o = 32'hFFC00393;
+                10'd43: data_o = 32'h34731263;
+                10'd44: data_o = 32'h00100293;
+                10'd45: data_o = 32'h00400313;
+                10'd46: data_o = 32'h006293B3;
+                10'd47: data_o = 32'h01000E13;
+                10'd48: data_o = 32'h33C39863;
+                10'd49: data_o = 32'h00200313;
+                10'd50: data_o = 32'h006E53B3;
+                10'd51: data_o = 32'h00400E93;
+                10'd52: data_o = 32'h33D39063;
+                10'd53: data_o = 32'hFF000293;
+                10'd54: data_o = 32'h4062D3B3;
+                10'd55: data_o = 32'hFFC00E93;
+                10'd56: data_o = 32'h31D39863;
+                10'd57: data_o = 32'h00A00293;
+                10'd58: data_o = 32'h0142A313;
+                10'd59: data_o = 32'h00100393;
+                10'd60: data_o = 32'h30731063;
+                10'd61: data_o = 32'hFF600293;
+                10'd62: data_o = 32'h0142B313;
+                10'd63: data_o = 32'h2E031A63;
+                10'd64: data_o = 32'h00A00293;
+                10'd65: data_o = 32'h01400313;
+                10'd66: data_o = 32'h0062A3B3;
+                10'd67: data_o = 32'h00100E13;
+                10'd68: data_o = 32'h2FC39063;
+                10'd69: data_o = 32'h005333B3;
+                10'd70: data_o = 32'h2C039C63;
+                10'd71: data_o = 32'h0FC10417;
+                10'd72: data_o = 32'hEE440413;
+                10'd73: data_o = 32'h12345337;
+                10'd74: data_o = 32'h67830313;
+                10'd75: data_o = 32'h00642023;
+                10'd76: data_o = 32'h0000B3B7;
+                10'd77: data_o = 32'hABB38393;
+                10'd78: data_o = 32'h00741223;
+                10'd79: data_o = 32'h0CC00E13;
+                10'd80: data_o = 32'h01C40423;
+                10'd81: data_o = 32'h00042E83;
+                10'd82: data_o = 32'h2A6E9463;
+                10'd83: data_o = 32'h00441F03;
+                10'd84: data_o = 32'hFFFFBFB7;
+                10'd85: data_o = 32'hABBF8F93;
+                10'd86: data_o = 32'h29FF1C63;
+                10'd87: data_o = 32'h00445F03;
+                10'd88: data_o = 32'h0000BFB7;
+                10'd89: data_o = 32'hABBF8F93;
+                10'd90: data_o = 32'h29FF1463;
+                10'd91: data_o = 32'h00840F03;
+                10'd92: data_o = 32'hFCC00F93;
+                10'd93: data_o = 32'h27FF1E63;
+                10'd94: data_o = 32'h00844F03;
+                10'd95: data_o = 32'h0CC00F93;
+                10'd96: data_o = 32'h27FF1863;
+                10'd97: data_o = 32'h00500293;
+                10'd98: data_o = 32'h00A00313;
+                10'd99: data_o = 32'h00500393;
+                10'd100: data_o = 32'hFF600E13;
+                10'd101: data_o = 32'hFF600E93;
+                10'd102: data_o = 32'h00728463;
+                10'd103: data_o = 32'h2540006F;
+                10'd104: data_o = 32'h01DE0463;
+                10'd105: data_o = 32'h24C0006F;
+                10'd106: data_o = 32'h00629463;
+                10'd107: data_o = 32'h2440006F;
+                10'd108: data_o = 32'h01C29463;
+                10'd109: data_o = 32'h23C0006F;
+                10'd110: data_o = 32'h0062C463;
+                10'd111: data_o = 32'h2340006F;
+                10'd112: data_o = 32'h005E4463;
+                10'd113: data_o = 32'h22C0006F;
+                10'd114: data_o = 32'h00535463;
+                10'd115: data_o = 32'h2240006F;
+                10'd116: data_o = 32'h01C2D463;
+                10'd117: data_o = 32'h21C0006F;
+                10'd118: data_o = 32'h0062E463;
+                10'd119: data_o = 32'h2140006F;
+                10'd120: data_o = 32'h01C2E463;
+                10'd121: data_o = 32'h20C0006F;
+                10'd122: data_o = 32'h00537463;
+                10'd123: data_o = 32'h2040006F;
+                10'd124: data_o = 32'h005E7463;
+                10'd125: data_o = 32'h1FC0006F;
+                10'd126: data_o = 32'h00800F6F;
+                10'd127: data_o = 32'h1F40006F;
+                10'd128: data_o = 32'h00000F97;
+                10'd129: data_o = 32'h010F8F93;
+                10'd130: data_o = 32'h000F8067;
+                10'd131: data_o = 32'h1E40006F;
+                10'd132: data_o = 32'h00100013;
+                10'd133: data_o = 32'h1C001E63;
+                10'd134: data_o = 32'hDEADC2B7;
+                10'd135: data_o = 32'hEEF28293;
+                10'd136: data_o = 32'h00028313;
+                10'd137: data_o = 32'h00030393;
+                10'd138: data_o = 32'h00038F93;
+                10'd139: data_o = 32'hDEADC2B7;
+                10'd140: data_o = 32'hEEF28293;
+                10'd141: data_o = 32'h1A5F9E63;
+                10'd142: data_o = 32'h000185B7;
+                10'd143: data_o = 32'h6A058593;
+                10'd144: data_o = 32'h00200613;
+                10'd145: data_o = 32'hEE6B36B7;
+                10'd146: data_o = 32'h80068693;
+                10'd147: data_o = 32'h000312B7;
+                10'd148: data_o = 32'hD4028293;
+                10'd149: data_o = 32'hDCD65337;
+                10'd150: data_o = 32'hFFF00393;
+                10'd151: data_o = 32'h00100E13;
+                10'd152: data_o = 32'h02C58533;
+                10'd153: data_o = 32'h18551663;
+                10'd154: data_o = 32'h02C68533;
+                10'd155: data_o = 32'h18651263;
+                10'd156: data_o = 32'h02C59533;
+                10'd157: data_o = 32'h16051E63;
+                10'd158: data_o = 32'h02C69533;
+                10'd159: data_o = 32'h16751A63;
+                10'd160: data_o = 32'h02C6B533;
+                10'd161: data_o = 32'h17C51663;
+                10'd162: data_o = 32'h02C6A533;
+                10'd163: data_o = 32'h16751263;
+                10'd164: data_o = 32'h02D62533;
+                10'd165: data_o = 32'h15C51E63;
+                10'd166: data_o = 32'h000028B7;
+                10'd167: data_o = 32'hE8288893;
+                10'd168: data_o = 32'h00010437;
+                10'd169: data_o = 32'hFFF40413;
+                10'd170: data_o = 32'h01200493;
+                10'd171: data_o = 32'h03400913;
+                10'd172: data_o = 32'h05600993;
+                10'd173: data_o = 32'h07800A13;
+                10'd174: data_o = 32'h09000A93;
+                10'd175: data_o = 32'h0AB00B13;
+                10'd176: data_o = 32'h0CD00B93;
+                10'd177: data_o = 32'h0EF00C13;
+                10'd178: data_o = 32'h80848433;
+                10'd179: data_o = 32'h80890433;
+                10'd180: data_o = 32'h80898433;
+                10'd181: data_o = 32'h808A0433;
+                10'd182: data_o = 32'h808A8433;
+                10'd183: data_o = 32'h808B0433;
+                10'd184: data_o = 32'h808B8433;
+                10'd185: data_o = 32'h808C0433;
+                10'd186: data_o = 32'h11141463;
+                10'd187: data_o = 32'h000102B7;
+                10'd188: data_o = 32'hFFF28293;
+                10'd189: data_o = 32'h00001337;
+                10'd190: data_o = 32'h23430313;
+                10'd191: data_o = 32'h000053B7;
+                10'd192: data_o = 32'h67838393;
+                10'd193: data_o = 32'h00009E37;
+                10'd194: data_o = 32'h0ABE0E13;
+                10'd195: data_o = 32'h0000DEB7;
+                10'd196: data_o = 32'hDEFE8E93;
+                10'd197: data_o = 32'h805312B3;
+                10'd198: data_o = 32'h805392B3;
+                10'd199: data_o = 32'h805E12B3;
+                10'd200: data_o = 32'h805E92B3;
+                10'd201: data_o = 32'h0D129663;
+                10'd202: data_o = 32'h00010537;
+                10'd203: data_o = 32'hFFF50513;
+                10'd204: data_o = 32'h123455B7;
+                10'd205: data_o = 32'h67858593;
+                10'd206: data_o = 32'h90ABD637;
+                10'd207: data_o = 32'hDEF60613;
+                10'd208: data_o = 32'h80A5A533;
+                10'd209: data_o = 32'h80A62533;
+                10'd210: data_o = 32'h0B151463;
+                10'd211: data_o = 32'h00000297;
+                10'd212: data_o = 32'h0AC28293;
+                10'd213: data_o = 32'h0002A303;
+                10'd214: data_o = 32'h0042A383;
+                10'd215: data_o = 32'h00010537;
+                10'd216: data_o = 32'hFFF50513;
+                10'd217: data_o = 32'h80A32533;
+                10'd218: data_o = 32'h80A3A533;
+                10'd219: data_o = 32'h000028B7;
+                10'd220: data_o = 32'hE8288893;
+                10'd221: data_o = 32'h07151E63;
+                10'd222: data_o = 32'h01400293;
+                10'd223: data_o = 32'h00A00313;
+                10'd224: data_o = 32'h006283B3;
+                10'd225: data_o = 32'h40628E33;
+                10'd226: data_o = 32'h03C38EB3;
+                10'd227: data_o = 32'h12C00F13;
+                10'd228: data_o = 32'h07EE9063;
+                10'd229: data_o = 32'h00000297;
+                10'd230: data_o = 32'h06C28293;
+                10'd231: data_o = 32'h0FC10317;
+                10'd232: data_o = 32'hC7430313;
+                10'd233: data_o = 32'h00300393;
+                10'd234: data_o = 32'h0002AE03;
+                10'd235: data_o = 32'h01C32023;
+                10'd236: data_o = 32'h00428293;
+                10'd237: data_o = 32'h00430313;
+                10'd238: data_o = 32'hFFF38393;
+                10'd239: data_o = 32'hFE0396E3;
+                10'd240: data_o = 32'h0FC10317;
+                10'd241: data_o = 32'hC5030313;
+                10'd242: data_o = 32'h00032E03;
+                10'd243: data_o = 32'h11111EB7;
+                10'd244: data_o = 32'h111E8E93;
+                10'd245: data_o = 32'h01DE1E63;
+                10'd246: data_o = 32'h00832E03;
+                10'd247: data_o = 32'h33333EB7;
+                10'd248: data_o = 32'h333E8E93;
+                10'd249: data_o = 32'h01DE1663;
+                10'd250: data_o = 32'h00000213;
+                10'd251: data_o = 32'h0000006F;
+                10'd252: data_o = 32'hFFF00213;
+                10'd253: data_o = 32'h0000006F;
+                10'd254: data_o = 32'h12345678;
+                10'd255: data_o = 32'h90ABCDEF;
+                10'd256: data_o = 32'h11111111;
+                10'd257: data_o = 32'h22222222;
+                10'd258: data_o = 32'h33333333;
                 default: data_o = 32'h00000013; // NOP (addi x0, x0, 0)
             endcase
         end
@@ -478,57 +722,8 @@ endmodule
 
 
 //  ---------- INLCUDED BLOCK: dmem_eq26  ---------- 
-// dmem.v
-// Guide §4.3. 8 kB data SRAM at `DMEM_BASE (0x10010000).
-//
-// TIMING-CRITICAL: guide §4.3 states writes/reads via SRAM "will only be
-// completed after a clock cycle" — registered-output, NOT combinational.
-// The control unit's FSM has separate MEM_ACCESS_ADDR (present address,
-// oe_o=1) and MEM_ACCESS_DATA (result_src_o=RESULT_SRC_MEM) states
-// specifically because data isn't ready until the cycle after the
-// address is presented. A combinational `assign data_o = mem[index]`
-// would pass simulation (data arrives early, FSM reads a cycle late,
-// looks fine) but fail in real SRAM. Built registered from the start.
-//
-// Byte-write: bw_i is a MASK (one bit per byte), not a binary selector
-// (guide §4.3/§3.3.2, control unit computes it — decision #11, this
-// module only applies it).
-//
-// Sizing: guide Table 13 maps DMEM as 8 kB (2048 words), but there is no
-// SRAM macro behind this array -- it synthesises to DEPTH_WORDS*32
-// flip-flops plus a DEPTH_WORDS-way read mux. At 2048 that is 65,536 DFFs,
-// which dominates area and made OpenLane place-and-route run 11 h+ before
-// failing in detailed routing. Deliberate area tradeoff, to be stated in
-// the report: the address map stays 8 kB (address_decoder's DMEM_HIGH is
-// unchanged), only the physical backing store is shrunk.
-//
-// DEPTH_WORDS = 8 (32 B) is sized from the validation firmware's .bss,
-// which is the whole of its DMEM usage:
-//     test_ram:  .space 16  -> DMEM_BASE+0x00..0x0F = words 0..3
-//     dest_data: .space 12  -> DMEM_BASE+0x10..0x1B = words 4..6
-// Highest word index touched is 6, so 7 words are required; rounded up to
-// the next power of two because `index` is a bit-slice, not a compare --
-// a non-power-of-2 depth leaves indices above the array bound (see below).
-// DEPTH_WORDS must stay a power of two for that reason.
-//
-// DEPTH_WORDS = 4 (16 B) also passes the validation firmware, but only by
-// accident: it aliases dest_data (words 4..6) onto test_ram (words 0..2),
-// which is harmless ONLY because the LSU test completes and self-checks
-// before the memcpy test starts, so nothing reads test_ram after the
-// clobber, and the copy loop's readback happens to hit the same aliased
-// words it wrote. Verified: depth 4 and 8 both reach ALL TESTS PASSED;
-// depth 2 fails (x4=0xFFFFFFFF, stuck at _error) because dest_data[0] and
-// dest_data[2] then collide with each other. 8 is chosen over 4 for margin
-// -- it holds the full .bss with no aliasing, so a firmware change that
-// interleaves the two regions cannot break it silently, and the extra 128
-// flip-flops are negligible against the 65,536 being removed.
-//
-// DMEM_BASE (0x10010000) has its low bits clear, so the base always maps
-// to index 0 regardless of depth; depth only limits how far above the base
-// the firmware may reach.
-
 module dmem_eq26 #(
-    parameter DEPTH_WORDS = 8
+    parameter DEPTH_WORDS = 4
 ) (
     input  wire        clk_i,
     input  wire         rst_i,
@@ -1649,8 +1844,8 @@ module top (
   input wire clk_i,
   input wire rst_i,
   output wire halt_o,
-  output wire [31:0] x4_dbg_o,
-  output wire [31:0] pc_dbg_o
+  output wire [31:0] pc_dbg_o,
+  output wire [31:0] x4_dbg_o
 
 );
 
@@ -1680,41 +1875,41 @@ module top (
  wire w_26;
  wire [31:0] w_27;
  wire [1:0] w_30;
- wire [31:0] w_31;
- wire [31:0] w_32;
- wire [2:0] w_33;
- wire w_34;
- wire [6:0] w_35;
- wire [6:0] w_37;
- wire [11:0] w_38;
+ wire [6:0] w_31;
+ wire [2:0] w_32;
+ wire [6:0] w_33;
+ wire [11:0] w_34;
+ wire w_35;
+ wire w_36;
+ wire [1:0] w_37;
+ wire w_38;
  wire w_39;
- wire [1:0] w_40;
+ wire [2:0] w_40;
  wire w_41;
- wire w_42;
+ wire [1:0] w_42;
  wire [2:0] w_43;
- wire w_44;
- wire [1:0] w_45;
- wire [2:0] w_46;
- wire [3:0] w_47;
- wire [3:0] w_48;
- wire w_49;
- wire [2:0] w_50;
- wire w_51;
- wire [31:0] w_54;
- wire [31:0] w_55;
- wire [31:0] w_56;
+ wire [3:0] w_44;
+ wire [3:0] w_45;
+ wire w_46;
+ wire [2:0] w_47;
+ wire w_48;
+ wire [31:0] w_49;
+ wire [31:0] w_50;
+ wire [31:0] w_51;
+ wire [31:0] w_52;
+ wire [31:0] w_53;
  wire [31:0] w_57;
+ wire [31:0] w_59;
  wire [31:0] w_61;
- wire [31:0] w_63;
- wire [31:0] w_65;
- wire [4:0] w_66;
- wire [4:0] w_67;
- wire [4:0] w_68;
- wire [31:0] w_74;
- wire [31:0] w_75;
+ wire [4:0] w_62;
+ wire [4:0] w_64;
+ wire [4:0] w_65;
+ wire [31:0] w_67;
+ wire [31:0] w_72;
+ wire [31:0] w_73;
 
 //Interface Assigns
-assign pc_dbg_o[31:0] = w_57;
+assign pc_dbg_o[31:0] = w_53;
 
 //Instances of Modules
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_24 (
@@ -1764,13 +1959,6 @@ alu_out_reg #(.RESET_VALUE(32'h00000000)) blk3811_51 (
          .addr_lsb_o (w_30)
      );
 
-branch_comparator_eq26 blk3552_52 (
-         .rs1_i (w_31),
-         .rs2_i (w_32),
-         .funct3_i (w_33),
-         .branch_taken_o (w_34)
-     );
-
 control_unit_eq26 blk3567_53 (
          .clk_i (clk_i),
          .rst_i (rst_i),
@@ -1783,44 +1971,125 @@ control_unit_eq26 blk3567_53 (
          .alu_op_o (w_23),
          .not_adr_src_o (w_26),
          .addr_lsb_i (w_30),
-         .branch_taken_i (w_34),
-         .opcode_i (w_35),
-         .funct3_i (w_33),
-         .funct7_i (w_37),
-         .funct12_i (w_38),
-         .pc_write_o (w_39),
-         .pc_src_o (w_40),
-         .ir_write_o (w_41),
-         .reg_write_o (w_42),
-         .result_src_o (w_43),
-         .alu_src_a_o (w_44),
-         .alu_src_b_o (w_45),
-         .imm_sel_o (w_46),
-         .mult_op_o (w_47),
-         .crc_op_o (w_48),
-         .crc_en_o (w_49),
-         .op_size_o (w_50),
-         .adr_src_o (w_51)
+         .opcode_i (w_31),
+         .funct3_i (w_32),
+         .funct7_i (w_33),
+         .funct12_i (w_34),
+         .branch_taken_i (w_35),
+         .pc_write_o (w_36),
+         .pc_src_o (w_37),
+         .ir_write_o (w_38),
+         .reg_write_o (w_39),
+         .result_src_o (w_40),
+         .alu_src_a_o (w_41),
+         .alu_src_b_o (w_42),
+         .imm_sel_o (w_43),
+         .mult_op_o (w_44),
+         .crc_op_o (w_45),
+         .crc_en_o (w_46),
+         .op_size_o (w_47),
+         .adr_src_o (w_48)
      );
 
 crc_eq26 #(.POLY(16'h1021), .XOR_OUT(16'h0000)) blk3553_54 (
-         .crc_op_i (w_48),
-         .a_i (w_31),
-         .b_i (w_32),
-         .result_o (w_54)
+         .crc_op_i (w_45),
+         .a_i (w_49),
+         .b_i (w_50),
+         .result_o (w_51)
      );
 
-// DEPTH_WORDS(4): OpenLane synth-flow test only (organiser feedback,
-// 2026-09-10) -- shrinks DFF count for placement/routing runtime vs the
-// functional default of 8. Power-of-two, so no index-out-of-bounds risk
-// (unlike a depth-3 attempt). rtl/dmem_eq26.v header documents depth 4 as
-// verified: passes the full validation firmware to ALL TESTS PASSED, by
-// aliasing dest_data (words 4..6) onto test_ram (words 0..2) -- safe only
-// because the LSU test's self-check completes before the memcpy test
-// touches the aliased words. This mock imem issues no loads/stores at all,
-// so the aliasing is moot here; noted in case this override is later reused
-// for a run that does exercise memory.
-dmem_eq26 #(.DEPTH_WORDS(4)) blk3565_55 (
+fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_56 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .pc_o (w_53),
+         .mem_data_i (w_19),
+         .pc_write_i (w_36),
+         .ir_write_i (w_38),
+         .pc_next_i (w_52),
+         .old_pc_o (w_57),
+         .ir_o (w_59)
+     );
+
+imm_extend_eq26 blk3556_58 (
+         .imm_sel_i (w_43),
+         .instr_i (w_59),
+         .imm_o (w_61)
+     );
+
+ir_splitter_eq26 blk3781_59 (
+         .opcode_o (w_31),
+         .funct3_o (w_32),
+         .funct7_o (w_33),
+         .funct12_o (w_34),
+         .instr_i (w_59),
+         .rd_o (w_62),
+         .rs1_o (w_64),
+         .rs2_o (w_65)
+     );
+
+lsu_eq26 blk3562_60 (
+         .core_data_i (w_5),
+         .mem_data_o (w_19),
+         .core_address_o (w_27),
+         .op_size_o (w_47),
+         .core_data_o (w_50),
+         .mem_data_i (w_67)
+     );
+
+mult_eq26 blk3557_61 (
+         .result_o (w_2),
+         .mult_op_i (w_44),
+         .a_i (w_49),
+         .b_i (w_50)
+     );
+
+mux_alu_a blk3795_62 (
+         .a_o (w_21),
+         .alu_src_a_i (w_41),
+         .old_pc_i (w_57),
+         .rs1_data_i (w_49)
+     );
+
+mux_alu_b blk3796_63 (
+         .b_o (w_22),
+         .alu_src_b_i (w_42),
+         .imm_i (w_61),
+         .rs2_data_i (w_50)
+     );
+
+mux_mem_addr blk3808_64 (
+         .address_o (w_7),
+         .alu_out_i (w_27),
+         .adr_src_i (w_48),
+         .pc_i (w_53)
+     );
+
+mux_pc_next blk3807_65 (
+         .alu_result_i (w_24),
+         .pc_src_i (w_37),
+         .pc_next_o (w_52),
+         .pc_i (w_53)
+     );
+
+mux_result blk3724_66 (
+         .mult_result_i (w_3),
+         .mem_result_i (w_6),
+         .alu_out_i (w_27),
+         .result_src_i (w_40),
+         .old_pc_i (w_57),
+         .crc_result_i (w_72),
+         .result_o (w_73)
+     );
+
+reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_67 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .en_i (w_46),
+         .d_i (w_51),
+         .q_o (w_72)
+     );
+
+dmem_eq26 #(.DEPTH_WORDS(4)) blk3565_69 (
          .clk_i (clk_i),
          .rst_i (rst_i),
          .data_o (w_11),
@@ -1828,118 +2097,34 @@ dmem_eq26 #(.DEPTH_WORDS(4)) blk3565_55 (
          .we_i (w_15),
          .oe_i (w_16),
          .bw_i (w_18),
-         .data_i (w_55)
+         .data_i (w_67)
      );
 
-fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_56 (
+branch_comparator_eq26 blk3552_77 (
+         .branch_taken_o (w_35),
+         .funct3_i (w_32),
+         .rs1_i (w_49),
+         .rs2_i (w_50)
+     );
+
+regfile_eq blk3560_78 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .pc_o (w_57),
-         .mem_data_i (w_19),
-         .pc_write_i (w_39),
-         .ir_write_i (w_41),
-         .pc_next_i (w_56),
-         .old_pc_o (w_61),
-         .ir_o (w_63)
+         .x4_dbg_o (x4_dbg_o[31:0]),
+         .reg_write_i (w_39),
+         .rs1_data_o (w_49),
+         .rs2_data_o (w_50),
+         .rd_addr_i (w_62),
+         .rs1_addr_i (w_64),
+         .rs2_addr_i (w_65),
+         .write_data_i (w_73)
      );
 
-imem blk3564_57 (
+imem blk3564_79 (
          .clk_i (clk_i),
          .data_o (w_12),
          .addr_i (w_13),
          .oe_i (w_17)
-     );
-
-imm_extend_eq26 blk3556_58 (
-         .imm_sel_i (w_46),
-         .instr_i (w_63),
-         .imm_o (w_65)
-     );
-
-ir_splitter_eq26 blk3781_59 (
-         .funct3_o (w_33),
-         .opcode_o (w_35),
-         .funct7_o (w_37),
-         .funct12_o (w_38),
-         .instr_i (w_63),
-         .rd_o (w_66),
-         .rs1_o (w_67),
-         .rs2_o (w_68)
-     );
-
-lsu_eq26 blk3562_60 (
-         .core_data_i (w_5),
-         .mem_data_o (w_19),
-         .core_address_o (w_27),
-         .op_size_o (w_50),
-         .mem_data_i (w_55),
-         .core_data_o (w_32)
-     );
-
-mult_eq26 blk3557_61 (
-         .result_o (w_2),
-         .mult_op_i (w_47),
-         .a_i (w_31),
-         .b_i (w_32)
-     );
-
-mux_alu_a blk3795_62 (
-         .a_o (w_21),
-         .alu_src_a_i (w_44),
-         .old_pc_i (w_61),
-         .rs1_data_i (w_31)
-     );
-
-mux_alu_b blk3796_63 (
-         .b_o (w_22),
-         .alu_src_b_i (w_45),
-         .imm_i (w_65),
-         .rs2_data_i (w_32)
-     );
-
-mux_mem_addr blk3808_64 (
-         .address_o (w_7),
-         .alu_out_i (w_27),
-         .adr_src_i (w_51),
-         .pc_i (w_57)
-     );
-
-mux_pc_next blk3807_65 (
-         .alu_result_i (w_24),
-         .pc_src_i (w_40),
-         .pc_next_o (w_56),
-         .pc_i (w_57)
-     );
-
-mux_result blk3724_66 (
-         .mult_result_i (w_3),
-         .mem_result_i (w_6),
-         .alu_out_i (w_27),
-         .result_src_i (w_43),
-         .old_pc_i (w_61),
-         .crc_result_i (w_74),
-         .result_o (w_75)
-     );
-
-reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_67 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .en_i (w_49),
-         .d_i (w_54),
-         .q_o (w_74)
-     );
-
-regfile_eq blk3560_68 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .x4_dbg_o (x4_dbg_o[31:0]),
-         .rs1_data_o (w_31),
-         .rs2_data_o (w_32),
-         .reg_write_i (w_42),
-         .rd_addr_i (w_66),
-         .rs1_addr_i (w_67),
-         .rs2_addr_i (w_68),
-         .write_data_i (w_75)
      );
 
 
