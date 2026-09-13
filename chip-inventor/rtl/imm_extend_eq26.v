@@ -1,5 +1,4 @@
-// imm_extend.v
-// Guide §3.1.5. Extracts immediate per format, sign-extends to 32 bits.
+// Immediate extender.
 module imm_extend_eq26(
     input  wire [31:0] instr_i,
     input  wire [2:0]  imm_sel_i,
@@ -14,19 +13,16 @@ module imm_extend_eq26(
     always @(*) begin
         imm_o = 32'b0; // default
         case (imm_sel_i)
-            // I-type: instr[31:20], sign-extended
+            // I-type
             IMM_SEL_I: imm_o = {{20{instr_i[31]}}, instr_i[31:20]};
-            // S-type: {instr[31:25], instr[11:7]}, sign-extended
+            // S-type
             IMM_SEL_S: imm_o = {{20{instr_i[31]}}, instr_i[31:25], instr_i[11:7]};
-            // B-type: {instr[31], instr[7], instr[30:25], instr[11:8], 0},
-            // sign-extended. Implicit trailing zero (2-byte aligned).
+            // B-type
             IMM_SEL_B: imm_o = {{19{instr_i[31]}}, instr_i[31], instr_i[7],
                                   instr_i[30:25], instr_i[11:8], 1'b0};
-            // U-type: {instr[31:12], 12'b0} — no sign extension needed,
-            // immediate occupies the upper bits directly.
+            // U-type
             IMM_SEL_U: imm_o = {instr_i[31:12], 12'b0};
-            // J-type: {instr[31], instr[19:12], instr[20], instr[30:21], 0},
-            // sign-extended. Implicit trailing zero.
+            // J-type
             IMM_SEL_J: imm_o = {{11{instr_i[31]}}, instr_i[31], instr_i[19:12],
                                   instr_i[20], instr_i[30:21], 1'b0};
             default: imm_o = 32'b0;

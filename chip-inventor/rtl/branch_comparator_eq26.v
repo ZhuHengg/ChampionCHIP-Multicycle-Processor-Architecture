@@ -1,9 +1,4 @@
-// branch_comparator.v
-// Guide §3.1.6. Compares rs1/rs2 per funct3, drives branch_taken_o which
-// arrives at the control unit as branch_taken_i.
-//
-// Combinational only: values in, value out, no clock, no state.
-
+// Branch condition comparator.
 module branch_comparator_eq26(
     input  wire [31:0] rs1_i,
     input  wire [31:0] rs2_i,
@@ -11,9 +6,7 @@ module branch_comparator_eq26(
     output reg  branch_taken_o
 );
 
-    // funct3 encodings are RV32I standard branch funct3 values (RISC-V
-    // spec, not guide-defined — no macro exists for these in
-    // rvbl2_defines.vh, so literals here are the spec encoding itself).
+    // RV32I branch funct3 codes.
     localparam FUNCT3_BEQ  = 3'b000;
     localparam FUNCT3_BNE  = 3'b001;
     localparam FUNCT3_BLT  = 3'b100;

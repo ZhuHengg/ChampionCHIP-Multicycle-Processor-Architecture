@@ -10,11 +10,7 @@ module regfile_eq(
 
     output wire [31:0] rs1_data_o,
     output wire [31:0] rs2_data_o,
-    // Debug tap for testbench observability (ChipInventor's canvas
-    // compiler rejects hierarchical dot-refs into instance internals, so
-    // x4 -- the organiser firmware's PASS/FAIL result register -- needs a
-    // real port to be checkable from testbench.v). Not part of the guide
-    // or team-fixed interface; simulation-only observability signal.
+    // Debug tap for testbench.
     output wire [31:0] x4_dbg_o
 );
 
@@ -22,14 +18,12 @@ module regfile_eq(
 
     integer i;
 
-    // Async reads — x0 forced to zero even if somehow never reset-cleared.
+    // Async read, x0 hardwired zero.
     assign rs1_data_o = (rs1_addr_i == 5'd0) ? 32'b0 : regs[rs1_addr_i];
     assign rs2_data_o = (rs2_addr_i == 5'd0) ? 32'b0 : regs[rs2_addr_i];
     assign x4_dbg_o   = regs[4];
 
-    // Sync write, x0 write-protected (guide §3.1.4: "hardwired (fixed) at
-    // zero and cannot be modified"). Control unit asserts reg_write_o
-    // regardless of rd — this guard is the only place that catches it.
+    // Sync write, x0 write-protected.
     always @(posedge clk_i) begin
         if (rst_i) begin
             for (i = 0; i < 32; i = i + 1)

@@ -17,11 +17,4 @@ module reg32_dff_eq26 #(
     end
 
 endmodule
-/* With a D Flip-Flop:
- Cycle 4: LSU outputs 0x00000042.
-          At the clock edge, the Flip-Flop SNAPS A PHOTO 📸 and freezes 0x00000042.
- Cycle 5: Even though the LSU input changes, the Flip-Flop holds the frozen photo!
-          RegFile safely writes 0x00000042 into rd! 🎉
-Summary:
-A Wire changes instantaneously (0 delay).
-A D Flip-Flop acts as a 1-cycle memory buffer (takes a snapshot at the clock edge and holds it stable for the next cycle). */
+// Generic D flip-flop register.

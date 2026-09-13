@@ -1,31 +1,4 @@
-// address_decoder.v
-// Guide §4.4, Figure 3. Routes core memory requests to IMEM or DMEM
-// based on address, and muxes the read data back to the core.
-//
-// - address_o: bottom 2 bits dropped (guide: "ignoring the bottom two
-//   bits, alignment at 4 bytes") — both memories are word-addressed.
-// - we_o -> DMEM only. IMEM has no write path at all (guide §4.4:
-//   "EXCEPT IMEM memory, which cannot be written").
-// - oe_o -> both devices.
-// - bw_o -> DMEM only (guide: "sends the Byte Write signal ... ONLY to
-//   the DMEM memory").
-//
-// Address ranges (guide Table 13):
-//   IMEM: `IMEM_BASE (0x00400000) + 4 MB
-//   DMEM: `DMEM_BASE (0x10010000) + 8 kB
-//
-// Unmapped addresses: guide is silent on behavior. Returns zero, asserts
-// nothing — no bus-error mechanism invented. Flagged per CLAUDE.md step
-// 8/MEMORY_BUILD_PLAN.md.
-//
-// FLAG: MEMORY_BUILD_PLAN.md's port table lists a core_data_i input
-// (store data heading out) but no corresponding output toward DMEM/IMEM,
-// and guide Figure 3 draws the decoder with only address/we/oe/bw
-// arrows — no data path through it at all. Read literally, store data
-// (LSU's mem_data_i) must wire directly from LSU to DMEM at top.v,
-// bypassing the decoder entirely. Omitted that port here rather than
-// wiring a dead input with no destination; flagging rather than
-// silently guessing a route the guide never draws.
+// Memory address decoder.
 
 module address_decoder (
     input  wire [31:0] address_i,
