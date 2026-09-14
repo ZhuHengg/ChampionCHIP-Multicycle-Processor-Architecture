@@ -1,0 +1,13 @@
+--- Starting ALU Verification ---
+Set a_i = 2; b_i = 1;
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+Time 10: SUCCESS | ALU_OP = PASS_B (0) | a = 2, b = 1 | result = 1
+Time 20: SUCCESS | ALU_OP = ADD (1) | a = 2, b = 1 | result = 3
+Time 30: SUCCESS | ALU_OP = SUB (2) | a = 2, b = 1 | result = 1
+Time 40: SUCCESS | ALU_OP = AND (3) | a = 2, b = 1 | result = 0
+Time 50: SUCCESS | ALU_OP = OR (4) | a = 2, b = 1 | result = 3
+Time 60: SUCCESS | ALU_OP = XOR (5) | a = 2, b = 1 | result = 3
+Time 70: SUCCESS | ALU_OP = SLL (6) | a = 2, b = 1 | result = 4
+Time 80: SUCCESS | ALU_OP = SRL (7) | a = 2, b = 1 | result = 1
+--- Verification Complete ---
+testbench/testbench.v:55: $finish called at 100 (1s)

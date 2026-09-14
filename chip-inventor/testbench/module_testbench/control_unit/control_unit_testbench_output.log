@@ -1,0 +1,44 @@
+Time=0 | Opcode=0000000 | RegWe=x | MemWe=x
+Time=5 | Opcode=0000000 | RegWe=0 | MemWe=0
+Time=25 | Opcode=0110011 | RegWe=0 | MemWe=0
+Time=55 | Opcode=0110011 | RegWe=1 | MemWe=0
+SUCCESS: R-Type ADD
+Time=65 | Opcode=0010011 | RegWe=0 | MemWe=0
+Time=95 | Opcode=0010011 | RegWe=1 | MemWe=0
+SUCCESS: I-Type ADDI
+Time=105 | Opcode=0100011 | RegWe=0 | MemWe=0
+Time=135 | Opcode=0100011 | RegWe=0 | MemWe=1
+SUCCESS: Store SW
+Time=145 | Opcode=0000011 | RegWe=0 | MemWe=0
+Time=195 | Opcode=0000011 | RegWe=1 | MemWe=0
+SUCCESS: Load LW
+Time=205 | Opcode=1100011 | RegWe=0 | MemWe=0
+SUCCESS: Branch Taken
+Time=235 | Opcode=0110011 | RegWe=0 | MemWe=0
+Time=265 | Opcode=0110011 | RegWe=1 | MemWe=0
+SUCCESS: Multiplier Op
+Time=275 | Opcode=1101111 | RegWe=0 | MemWe=0
+Time=305 | Opcode=1101111 | RegWe=1 | MemWe=0
+SUCCESS: JAL
+Time=315 | Opcode=1100111 | RegWe=0 | MemWe=0
+Time=345 | Opcode=1100111 | RegWe=1 | MemWe=0
+SUCCESS: JALR
+Time=355 | Opcode=0110111 | RegWe=0 | MemWe=0
+Time=385 | Opcode=0110111 | RegWe=1 | MemWe=0
+SUCCESS: LUI
+Time=395 | Opcode=0010111 | RegWe=0 | MemWe=0
+Time=425 | Opcode=0010111 | RegWe=1 | MemWe=0
+SUCCESS: AUIPC
+Time=435 | Opcode=0110011 | RegWe=0 | MemWe=0
+Time=465 | Opcode=0110011 | RegWe=1 | MemWe=0
+SUCCESS: CRC Op
+Time=475 | Opcode=0001011 | RegWe=0 | MemWe=0
+SUCCESS: Illegal Opcode
+Time=506 | Opcode=1110011 | RegWe=0 | MemWe=0
+SUCCESS: EBREAK
+Time=536 | Opcode=0001111 | RegWe=0 | MemWe=0
+SUCCESS: FENCE
+Time=566 | Opcode=1110011 | RegWe=0 | MemWe=0
+SUCCESS: ECALL / halt
+All multi-cycle test cases completed.
+testbench/testbench.v:368: $finish called at 656 (1s)

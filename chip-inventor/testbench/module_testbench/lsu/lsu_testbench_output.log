@@ -1,0 +1,19 @@
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+[Time 21] TEST SW (Store Word): Addr = 00000000, Data = 11223344
+  -> READ : mem_data_i = 11223344
+  -> SUCCESS
+[Time 31] TEST SB (Store Byte Offset 1): Addr = 00000001, Data = 000000aa
+  -> READ : mem_data_i = 0000aa00
+  -> SUCCESS
+[Time 41] TEST LW (Load Word): Addr = 00000000, Mem = deadbeef
+  -> READ : core_data_i = deadbeef
+  -> SUCCESS
+[Time 51] TEST LB (Load Byte Signed): Addr = 00000001, Mem = 0000fa00
+  -> READ : core_data_i = fffffffa
+  -> SUCCESS
+[Time 61] TEST LBU (Load Byte Unsigned): Addr = 00000001, Mem = 0000fa00
+  -> READ : core_data_i = 000000fa
+  -> SUCCESS
+--- TEST RESULT: COMPLETE ---
+--- SIMULATION END ---
+testbench/testbench.v:86: $finish called at 81 (1s)
