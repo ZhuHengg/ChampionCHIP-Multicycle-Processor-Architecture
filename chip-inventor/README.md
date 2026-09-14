@@ -13,7 +13,8 @@ hdl.v              flattened canvas netlist (all modules, incl. imem with
 rtl/                same modules split one-per-file, mirrors hdl.v
 testbench.v         full Stage 2 firmware validation testbench
 testbench/          simulation evidence (see below)
-build/              OpenLane synthesis-to-GDSII output (see below)
+results/final/      GDSII + GL netlist, OpenLane's default output path
+build/              same OpenLane synthesis-to-GDSII output (see below)
 logs/               OpenLane run logs, incl. earlier failed attempts
 convertion/         ChipInventor JSON->Verilog converter logs
 config.json         OpenLane synthesis config
@@ -87,5 +88,9 @@ Typical corner (see `build/openlane.log` for the referenced STA report).
 
 ### Outputs
 
-- `build/gds/top.gds` — final GDSII layout
-- `build/verilog/gl/top.v`, `build/verilog/gl/top.nl.v` — gate-level netlists
+- `results/final/gds/top.gds` — final GDSII layout
+- `results/final/verilog/gl/top.v`, `results/final/verilog/gl/top.nl.v` — gate-level netlists
+
+(same files also kept under `build/` from the original run capture;
+`results/final/...` mirrors OpenLane's own default output path for
+submission purposes.)
