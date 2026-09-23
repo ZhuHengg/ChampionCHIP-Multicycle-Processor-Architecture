@@ -656,15 +656,19 @@ module address_decoder (
 
     input  wire [31:0] dmem_data_i,
     input  wire [31:0] imem_data_i,
+    input  wire [31:0] gpio_data_i,
 
     output wire [31:0] address_o,     // word address (zero-extended)
     output wire        dmem_we_o,
     output wire        dmem_oe_o,
     output wire        imem_oe_o,
+    output wire        gpio_we_o,
+    output wire        gpio_oe_o,
     output wire [3:0]  bw_o,
     output reg  [31:0] data_o
 );
 
+    // Memory Map Base Addresses (Guide Table 13)
     localparam [31:0] IMEM_BASE = 32'h0040_0000;
     localparam [31:0] DMEM_BASE = 32'h1001_0000;
 
@@ -673,10 +677,17 @@ module address_decoder (
     localparam [31:0] DMEM_LOW  = DMEM_BASE;
     localparam [31:0] DMEM_HIGH = DMEM_BASE + 32'h0000_2000 - 1; // +8kB
 
+    // Stage 3 GPIO registers; low two byte-address bits are ignored.
+    wire is_gpio = (address_i[31:4] == 28'hF000000) &&
+                   (address_i[3:2] != 2'b11);
+
     wire is_imem = (address_i >= IMEM_LOW) && (address_i <= IMEM_HIGH);
     wire is_dmem = (address_i >= DMEM_LOW) && (address_i <= DMEM_HIGH);
 
   	assign address_o = {2'b00, address_i[31:2]};// zeroextending
+
+    assign gpio_we_o = we_i && is_gpio;
+    assign gpio_oe_o = oe_i && is_gpio;
 
     assign dmem_we_o = we_i && is_dmem;
     assign dmem_oe_o = oe_i && is_dmem;
@@ -685,7 +696,9 @@ module address_decoder (
 
     always @(*) begin
         data_o = 32'b0; // default: unmapped address, guide silent (see header note)
-        if (is_dmem)
+        if (is_gpio)
+            data_o = gpio_data_i;
+        else if (is_dmem)
             data_o = dmem_data_i;
         else if (is_imem)
             data_o = imem_data_i;
@@ -1343,7 +1356,75 @@ endmodule
 // when you ask tool to generate top Verilog code by clicking
 // at BLOCKS button.
 
+// Stage 3 Part 1, sections 1.1-1.3: eight independent GPIO pins.
+// Bus: clk/rst (1), word offset addr_i (2), we/oe (1), byte mask (4),
+// write/read data (32), bidirectional pins_io (8).
+// Offsets: 0 DATAOUT (RW), 1 DATAIN (R), 2 DATADIR (RW).
+// Direction 0 releases the pin; direction 1 drives DATAOUT.
+// Implementation choices where the guide is silent: synchronous active-high
+// reset, all registers reset to zero, DATAIN holds its last sample in output
+// mode. Reserved bits/offsets read zero. Writes only affect byte lane zero.
+// Read data registers on oe_i and holds otherwise, matching the core's
+// MEM_ACCESS_ADDR -> MEM_ACCESS_DATA load sequence and DMEM interface.
+// Board integration must map the tri-state drivers to bidirectional I/O pads.
+module gpio (
+    input wire clk_i,
+    input wire rst_i,
+    input wire [1:0] addr_i,
+    input wire we_i,
+    input wire oe_i,
+    input wire [3:0] bw_i,
+    input wire [31:0] data_i,
+    output reg [31:0] data_o,
+    inout wire [7:0] pins_io
+);
+    reg [7:0] dataout;
+    reg [7:0] datadir;
+    reg [7:0] datain;
+
+    genvar i;
+    generate
+        for (i = 0; i < 8; i = i + 1) begin : pin_control
+            assign pins_io[i] = datadir[i] ? dataout[i] : 1'bz;
+            always @(posedge clk_i) begin
+                if (rst_i)
+                    datain[i] <= 1'b0;
+                else if (!datadir[i])
+                    datain[i] <= pins_io[i];
+            end
+        end
+    endgenerate
+
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            dataout <= 8'b0;
+            datadir <= 8'b0;
+        end else if (we_i && bw_i[0]) begin
+            case (addr_i)
+                2'd0: dataout <= data_i[7:0];
+                2'd2: datadir <= data_i[7:0];
+                default: begin end // DATAIN is read-only.
+            endcase
+        end
+    end
+
+    always @(posedge clk_i) begin
+        if (rst_i)
+            data_o <= 32'b0;
+        else if (oe_i) begin
+            case (addr_i)
+                2'd0: data_o <= {24'b0, dataout};
+                2'd1: data_o <= {24'b0, datain};
+                2'd2: data_o <= {24'b0, datadir};
+                default: data_o <= 32'b0;
+            endcase
+        end
+    end
+endmodule
+
+
 module top (
+    inout wire [7:0] pins_io,
 
   input wire clk_i,
   input wire rst_i,
@@ -1432,7 +1513,19 @@ reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_32 (
          .q_o (w_6)
      );
 
+wire [31:0] gpio_data;
+wire gpio_we, gpio_oe;
+gpio gpio_inst (
+    .clk_i(clk_i), .rst_i(rst_i),
+    .addr_i(w_7[3:2]), .we_i(gpio_we), .oe_i(gpio_oe),
+    .bw_i(w_10), .data_i(w_67), .data_o(gpio_data),
+    .pins_io(pins_io)
+);
+
 address_decoder blk3566_49 (
+         .gpio_data_i (gpio_data),
+         .gpio_we_o (gpio_we),
+         .gpio_oe_o (gpio_oe),
          .address_i (w_7),
          .we_i (w_8),
          .oe_i (w_9),

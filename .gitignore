@@ -1,6 +1,7 @@
 # simulation scratch output
 **/sim/*.vvp
 **/sim/*.vcd
+chip-inventor/sim/gpio/
 
 # simulation run logs (keep the folder, ignore contents)
 **/logs/*
