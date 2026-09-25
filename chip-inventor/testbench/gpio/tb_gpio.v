@@ -19,7 +19,7 @@ module tb_gpio;
     address_decoder decoder (
         .address_i(addr), .we_i(we), .oe_i(oe), .bw_i(bw),
         .dmem_data_i(32'h12345678), .imem_data_i(32'h87654321),
-        .gpio_data_i(gpio_rd), .address_o(word_addr),
+        .uart_data_i(32'h13579bdf), .gpio_data_i(gpio_rd), .address_o(word_addr),
         .dmem_we_o(dwe), .dmem_oe_o(doe), .imem_oe_o(ioe),
         .gpio_we_o(gwe), .gpio_oe_o(goe), .bw_o(dbw), .data_o(rd)
     );
@@ -101,7 +101,7 @@ module tb_gpio;
         addr=32'hf0000010; #1;
         if (gwe || goe || rd !== 0) $fatal(1,"GPIO alias");
         addr=32'hf1000000; #1;
-        if (gwe || goe || rd !== 0) $fatal(1,"UART address must remain unmapped");
+        if (gwe || goe || rd !== 32'h13579bdf) $fatal(1,"UART must not select GPIO");
         addr=32'h10010000; #1;
         if (!dwe || !doe || gwe || goe || rd !== 32'h12345678) $fatal(1,"DMEM regression");
         addr=32'h00400000; #1;

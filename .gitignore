@@ -2,6 +2,7 @@
 **/sim/*.vvp
 **/sim/*.vcd
 chip-inventor/sim/gpio/
+chip-inventor/sim/uart/
 
 # simulation run logs (keep the folder, ignore contents)
 **/logs/*

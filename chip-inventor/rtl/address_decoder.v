@@ -9,11 +9,14 @@ module address_decoder (
     input  wire [31:0] dmem_data_i,
     input  wire [31:0] imem_data_i,
     input  wire [31:0] gpio_data_i,
+    input  wire [31:0] uart_data_i,
 
     output wire [31:0] address_o,     // word address (zero-extended)
     output wire        dmem_we_o,
     output wire        dmem_oe_o,
     output wire        imem_oe_o,
+    output wire        uart_we_o,
+    output wire        uart_oe_o,
     output wire        gpio_we_o,
     output wire        gpio_oe_o,
     output wire [3:0]  bw_o,
@@ -33,10 +36,16 @@ module address_decoder (
     wire is_gpio = (address_i[31:4] == 28'hF000000) &&
                    (address_i[3:2] != 2'b11);
 
+    wire is_uart = (address_i[31:4] == 28'hF100000) &&
+                   (address_i[3:2] != 2'b11);
+
     wire is_imem = (address_i >= IMEM_LOW) && (address_i <= IMEM_HIGH);
     wire is_dmem = (address_i >= DMEM_LOW) && (address_i <= DMEM_HIGH);
 
   	assign address_o = {2'b00, address_i[31:2]};// zeroextending
+
+    assign uart_we_o = we_i && is_uart;
+    assign uart_oe_o = oe_i && is_uart;
 
     assign gpio_we_o = we_i && is_gpio;
     assign gpio_oe_o = oe_i && is_gpio;
@@ -50,6 +59,8 @@ module address_decoder (
         data_o = 32'b0; // default: unmapped address, guide silent (see header note)
         if (is_gpio)
             data_o = gpio_data_i;
+        else if (is_uart)
+            data_o = uart_data_i;
         else if (is_dmem)
             data_o = dmem_data_i;
         else if (is_imem)
