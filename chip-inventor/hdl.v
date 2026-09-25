@@ -648,6 +648,8 @@ endmodule
 
 //  ---------- INLCUDED BLOCK: address_decoder  ----------
 // Memory address decoder.
+// Memory address decoder.
+
 module address_decoder (
     input  wire [31:0] address_i,
     input  wire        we_i,
@@ -656,15 +658,22 @@ module address_decoder (
 
     input  wire [31:0] dmem_data_i,
     input  wire [31:0] imem_data_i,
+    input  wire [31:0] gpio_data_i,
+    input  wire [31:0] uart_data_i,
 
     output wire [31:0] address_o,     // word address (zero-extended)
     output wire        dmem_we_o,
     output wire        dmem_oe_o,
     output wire        imem_oe_o,
+    output wire        uart_we_o,
+    output wire        uart_oe_o,
+    output wire        gpio_we_o,
+    output wire        gpio_oe_o,
     output wire [3:0]  bw_o,
     output reg  [31:0] data_o
 );
 
+    // Memory Map Base Addresses (Guide Table 13)
     localparam [31:0] IMEM_BASE = 32'h0040_0000;
     localparam [31:0] DMEM_BASE = 32'h1001_0000;
 
@@ -673,10 +682,23 @@ module address_decoder (
     localparam [31:0] DMEM_LOW  = DMEM_BASE;
     localparam [31:0] DMEM_HIGH = DMEM_BASE + 32'h0000_2000 - 1; // +8kB
 
+    // Stage 3 GPIO registers; low two byte-address bits are ignored.
+    wire is_gpio = (address_i[31:4] == 28'hF000000) &&
+                   (address_i[3:2] != 2'b11);
+
+    wire is_uart = (address_i[31:4] == 28'hF100000) &&
+                   (address_i[3:2] != 2'b11);
+
     wire is_imem = (address_i >= IMEM_LOW) && (address_i <= IMEM_HIGH);
     wire is_dmem = (address_i >= DMEM_LOW) && (address_i <= DMEM_HIGH);
 
   	assign address_o = {2'b00, address_i[31:2]};// zeroextending
+
+    assign uart_we_o = we_i && is_uart;
+    assign uart_oe_o = oe_i && is_uart;
+
+    assign gpio_we_o = we_i && is_gpio;
+    assign gpio_oe_o = oe_i && is_gpio;
 
     assign dmem_we_o = we_i && is_dmem;
     assign dmem_oe_o = oe_i && is_dmem;
@@ -685,7 +707,11 @@ module address_decoder (
 
     always @(*) begin
         data_o = 32'b0; // default: unmapped address, guide silent (see header note)
-        if (is_dmem)
+        if (is_gpio)
+            data_o = gpio_data_i;
+        else if (is_uart)
+            data_o = uart_data_i;
+        else if (is_dmem)
             data_o = dmem_data_i;
         else if (is_imem)
             data_o = imem_data_i;
@@ -1343,7 +1369,219 @@ endmodule
 // when you ask tool to generate top Verilog code by clicking
 // at BLOCKS button.
 
-module top (
+// Stage 3 Part 1, sections 1.1-1.3: eight independent GPIO pins.
+// Bus: clk/rst (1), word offset addr_i (2), we/oe (1), byte mask (4),
+// write/read data (32), bidirectional pins_io (8).
+// Offsets: 0 DATAOUT (RW), 1 DATAIN (R), 2 DATADIR (RW).
+// Direction 0 releases the pin; direction 1 drives DATAOUT.
+// Implementation choices where the guide is silent: synchronous active-high
+// reset, all registers reset to zero, DATAIN holds its last sample in output
+// mode. Reserved bits/offsets read zero. Writes only affect byte lane zero.
+// Read data registers on oe_i and holds otherwise, matching the core's
+// MEM_ACCESS_ADDR -> MEM_ACCESS_DATA load sequence and DMEM interface.
+// Board integration must map the tri-state drivers to bidirectional I/O pads.
+module gpio (
+    input wire clk_i,
+    input wire rst_i,
+    input wire [1:0] addr_i,
+    input wire we_i,
+    input wire oe_i,
+    input wire [3:0] bw_i,
+    input wire [31:0] data_i,
+    output reg [31:0] data_o,
+    inout wire [7:0] pins_io
+);
+    reg [7:0] dataout;
+    reg [7:0] datadir;
+    reg [7:0] datain;
+
+    genvar i;
+    generate
+        for (i = 0; i < 8; i = i + 1) begin : pin_control
+            assign pins_io[i] = datadir[i] ? dataout[i] : 1'bz;
+            always @(posedge clk_i) begin
+                if (rst_i)
+                    datain[i] <= 1'b0;
+                else if (!datadir[i])
+                    datain[i] <= pins_io[i];
+            end
+        end
+    endgenerate
+
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            dataout <= 8'b0;
+            datadir <= 8'b0;
+        end else if (we_i && bw_i[0]) begin
+            case (addr_i)
+                2'd0: dataout <= data_i[7:0];
+                2'd2: datadir <= data_i[7:0];
+                default: begin end // DATAIN is read-only.
+            endcase
+        end
+    end
+
+    always @(posedge clk_i) begin
+        if (rst_i)
+            data_o <= 32'b0;
+        else if (oe_i) begin
+            case (addr_i)
+                2'd0: data_o <= {24'b0, dataout};
+                2'd1: data_o <= {24'b0, datain};
+                2'd2: data_o <= {24'b0, datadir};
+                default: data_o <= 32'b0;
+            endcase
+        end
+    end
+endmodule
+
+
+// 8-N-1 transmitter. start_i while busy is ignored; done_o stays high when idle.
+module uart_tx #(parameter integer CLKS_PER_BIT = 174) (
+    input wire clk_i, rst_i, start_i,
+    input wire [7:0] data_i,
+    output reg tx_o, busy_o, done_o
+);
+    localparam integer CW = (CLKS_PER_BIT > 1) ? $clog2(CLKS_PER_BIT) : 1;
+    reg [CW-1:0] count;
+    reg [3:0] bit_index;
+    reg [7:0] shift;
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            tx_o <= 1; busy_o <= 0; done_o <= 1;
+            count <= 0; bit_index <= 0; shift <= 0;
+        end else if (!busy_o) begin
+            if (start_i) begin
+                shift <= data_i;
+                tx_o <= 0; busy_o <= 1; done_o <= 0;
+                count <= 0; bit_index <= 0;
+            end
+        end else if (count == CLKS_PER_BIT-1) begin
+            count <= 0;
+            if (bit_index < 8) begin
+                tx_o <= shift[0]; shift <= {1'b0, shift[7:1]};
+                bit_index <= bit_index + 1'b1;
+            end else if (bit_index == 8) begin
+                tx_o <= 1; bit_index <= 9;
+            end else begin
+                busy_o <= 0; done_o <= 1;
+            end
+        end else count <= count + 1'b1;
+    end
+endmodule
+
+// Single midpoint sample per bit (no oversampling), with a two-flop synchronizer.
+// Invalid start/stop bits are discarded; there is no error status in the guide.
+module uart_rx #(parameter integer CLKS_PER_BIT = 174) (
+    input wire clk_i, rst_i, rx_i,
+    output reg [7:0] data_o,
+    output reg valid_o
+);
+    localparam integer CW = (CLKS_PER_BIT > 1) ? $clog2(CLKS_PER_BIT) : 1;
+    localparam [1:0] IDLE=0, START=1, DATA=2, STOP=3;
+    (* ASYNC_REG = "TRUE" *) reg rx_meta, rx_sync;
+    reg [1:0] state;
+    reg [CW-1:0] count;
+    reg [2:0] bit_index;
+    reg [7:0] shift;
+    always @(posedge clk_i) begin
+        if (rst_i) begin rx_meta <= 1; rx_sync <= 1; end
+        else begin rx_meta <= rx_i; rx_sync <= rx_meta; end
+    end
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            state <= IDLE; count <= 0; bit_index <= 0;
+            shift <= 0; data_o <= 0; valid_o <= 0;
+        end else begin
+            valid_o <= 0;
+            case (state)
+                IDLE: if (!rx_sync) begin count <= 0; state <= START; end
+                START: if (count == (CLKS_PER_BIT/2)-1) begin
+                    count <= 0;
+                    if (!rx_sync) begin bit_index <= 0; state <= DATA; end
+                    else state <= IDLE;
+                end else count <= count + 1'b1;
+                DATA: if (count == CLKS_PER_BIT-1) begin
+                    count <= 0; shift[bit_index] <= rx_sync;
+                    if (bit_index == 7) state <= STOP;
+                    else bit_index <= bit_index + 1'b1;
+                end else count <= count + 1'b1;
+                STOP: if (count == CLKS_PER_BIT-1) begin
+                    count <= 0; state <= IDLE;
+                    if (rx_sync) begin data_o <= shift; valid_o <= 1; end
+                end else count <= count + 1'b1;
+                default: state <= IDLE;
+            endcase
+        end
+    end
+endmodule
+
+// Stage 3 Part 1 section 2: word offsets 0 TXDATA, 1 RXDATA, 2 CONTROL.
+// Registered reads match GPIO/DMEM. Only byte lane zero is writable.
+// Choices where guide is silent: TXDONE resets high; busy starts are ignored;
+// newest received byte wins on overrun; reception wins over software flag clear.
+module uart #(
+    parameter integer CLK_HZ = 20000000,
+    parameter integer BAUD = 115200
+) (
+    input wire clk_i, rst_i,
+    input wire [1:0] addr_i,
+    input wire we_i, oe_i,
+    input wire [3:0] bw_i,
+    input wire [31:0] data_i,
+    output reg [31:0] data_o,
+    input wire rx_i,
+    output wire tx_o
+);
+    // Round to nearest whole clock. Supported configurations need >= 4 clocks/bit.
+    localparam integer CLKS_PER_BIT = (CLK_HZ + BAUD/2) / BAUD;
+    reg [7:0] txdata, rxdata;
+    reg transmit, rxdone;
+    wire txbusy, txdone, rxvalid;
+    wire [7:0] received;
+    uart_tx #(.CLKS_PER_BIT(CLKS_PER_BIT)) transmitter (
+        .clk_i(clk_i), .rst_i(rst_i), .start_i(transmit), .data_i(txdata),
+        .tx_o(tx_o), .busy_o(txbusy), .done_o(txdone)
+    );
+    uart_rx #(.CLKS_PER_BIT(CLKS_PER_BIT)) receiver (
+        .clk_i(clk_i), .rst_i(rst_i), .rx_i(rx_i),
+        .data_o(received), .valid_o(rxvalid)
+    );
+    always @(posedge clk_i) begin
+        if (rst_i) begin
+            txdata <= 0; rxdata <= 0; transmit <= 0; rxdone <= 0;
+        end else begin
+            transmit <= 0;
+            if (we_i && bw_i[0]) begin
+                case (addr_i)
+                    0: txdata <= data_i[7:0];
+                    2: begin
+                        transmit <= data_i[0] && !txbusy && !transmit;
+                        rxdone <= data_i[1];
+                    end
+                    default: begin end
+                endcase
+            end
+            if (rxvalid) begin rxdata <= received; rxdone <= 1; end
+        end
+    end
+    always @(posedge clk_i) begin
+        if (rst_i) data_o <= 0;
+        else if (oe_i) begin
+            case (addr_i)
+                0: data_o <= {24'b0, txdata};
+                1: data_o <= {24'b0, rxdata};
+                2: data_o <= {29'b0, (txdone && !transmit), rxdone, 1'b0};
+                default: data_o <= 0;
+            endcase
+        end
+    end
+endmodule
+
+module top #(parameter integer CLK_HZ = 20000000) (
+    input wire rx_i,
+    output wire tx_o,
+    inout wire [7:0] pins_io,
 
   input wire clk_i,
   input wire rst_i,
@@ -1432,7 +1670,29 @@ reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_32 (
          .q_o (w_6)
      );
 
+wire [31:0] uart_data;
+wire uart_we, uart_oe;
+uart #(.CLK_HZ(CLK_HZ)) uart_inst (
+    .clk_i(clk_i), .rst_i(rst_i), .addr_i(w_7[3:2]),
+    .we_i(uart_we), .oe_i(uart_oe), .bw_i(w_10),
+    .data_i(w_67), .data_o(uart_data), .rx_i(rx_i), .tx_o(tx_o)
+);
+wire [31:0] gpio_data;
+wire gpio_we, gpio_oe;
+gpio gpio_inst (
+    .clk_i(clk_i), .rst_i(rst_i),
+    .addr_i(w_7[3:2]), .we_i(gpio_we), .oe_i(gpio_oe),
+    .bw_i(w_10), .data_i(w_67), .data_o(gpio_data),
+    .pins_io(pins_io)
+);
+
 address_decoder blk3566_49 (
+         .uart_data_i (uart_data),
+         .uart_we_o (uart_we),
+         .uart_oe_o (uart_oe),
+         .gpio_data_i (gpio_data),
+         .gpio_we_o (gpio_we),
+         .gpio_oe_o (gpio_oe),
          .address_i (w_7),
          .we_i (w_8),
          .oe_i (w_9),
