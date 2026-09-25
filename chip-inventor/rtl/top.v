@@ -1588,8 +1588,8 @@ module top #(parameter integer CLK_HZ = 20000000) (
   input wire clk_i,
   input wire rst_i,
   output wire halt_o,
-  output wire [31:0] x4_dbg_o,
-  output wire [31:0] pc_dbg_o
+  output wire [31:0] pc_dbg_o,
+  output wire [31:0] x4_dbg_o
 
 );
 
@@ -1597,61 +1597,63 @@ module top #(parameter integer CLK_HZ = 20000000) (
  wire w_1;
  wire [31:0] w_2;
  wire [31:0] w_3;
- wire [31:0] w_4;
+ wire w_4;
  wire [31:0] w_5;
  wire [31:0] w_6;
- wire w_7;
+ wire [31:0] w_7;
  wire w_8;
- wire [3:0] w_9;
- wire [31:0] w_10;
+ wire w_9;
+ wire [3:0] w_10;
  wire [31:0] w_11;
  wire [31:0] w_12;
- wire w_14;
+ wire [31:0] w_13;
  wire w_15;
  wire w_16;
- wire [3:0] w_17;
- wire [31:0] w_18;
- wire [31:0] w_20;
+ wire w_17;
+ wire [3:0] w_18;
+ wire [31:0] w_19;
  wire [31:0] w_21;
- wire [3:0] w_22;
- wire [31:0] w_23;
- wire [31:0] w_25;
- wire [1:0] w_28;
- wire [31:0] w_29;
- wire [31:0] w_30;
- wire [2:0] w_31;
- wire w_32;
+ wire [31:0] w_22;
+ wire [3:0] w_23;
+ wire [31:0] w_24;
+ wire w_26;
+ wire [31:0] w_27;
+ wire [1:0] w_30;
+ wire [6:0] w_31;
+ wire [2:0] w_32;
  wire [6:0] w_33;
- wire [6:0] w_35;
- wire [11:0] w_36;
- wire w_37;
- wire [1:0] w_38;
+ wire [11:0] w_34;
+ wire w_35;
+ wire w_36;
+ wire [1:0] w_37;
+ wire w_38;
  wire w_39;
- wire w_40;
- wire [2:0] w_41;
- wire w_42;
- wire [1:0] w_43;
- wire [2:0] w_44;
+ wire [2:0] w_40;
+ wire w_41;
+ wire [1:0] w_42;
+ wire [2:0] w_43;
+ wire [3:0] w_44;
  wire [3:0] w_45;
- wire [3:0] w_46;
- wire w_47;
- wire [2:0] w_48;
- wire w_49;
+ wire w_46;
+ wire [2:0] w_47;
+ wire w_48;
+ wire [31:0] w_49;
+ wire [31:0] w_50;
+ wire [31:0] w_51;
  wire [31:0] w_52;
  wire [31:0] w_53;
- wire [31:0] w_54;
- wire [31:0] w_55;
+ wire [31:0] w_57;
  wire [31:0] w_59;
  wire [31:0] w_61;
- wire [31:0] w_63;
+ wire [4:0] w_62;
  wire [4:0] w_64;
  wire [4:0] w_65;
- wire [4:0] w_66;
+ wire [31:0] w_67;
  wire [31:0] w_72;
  wire [31:0] w_73;
 
 //Interface Assigns
-assign pc_dbg_o[31:0] = w_55;
+assign pc_dbg_o[31:0] = w_53;
 
 //Instances of Modules
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_24 (
@@ -1665,24 +1667,24 @@ reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_24 (
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_32 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .en_i (load_result_en),
-         .d_i (w_4),
-         .q_o (w_5)
+         .en_i (w_4),
+         .d_i (w_5),
+         .q_o (w_6)
      );
 
 wire [31:0] uart_data;
 wire uart_we, uart_oe;
 uart #(.CLK_HZ(CLK_HZ)) uart_inst (
-    .clk_i(clk_i), .rst_i(rst_i), .addr_i(w_6[3:2]),
-    .we_i(uart_we), .oe_i(uart_oe), .bw_i(w_9),
-    .data_i(w_53), .data_o(uart_data), .rx_i(rx_i), .tx_o(tx_o)
+    .clk_i(clk_i), .rst_i(rst_i), .addr_i(w_7[3:2]),
+    .we_i(uart_we), .oe_i(uart_oe), .bw_i(w_10),
+    .data_i(w_67), .data_o(uart_data), .rx_i(rx_i), .tx_o(tx_o)
 );
 wire [31:0] gpio_data;
 wire gpio_we, gpio_oe;
 gpio gpio_inst (
     .clk_i(clk_i), .rst_i(rst_i),
-    .addr_i(w_6[3:2]), .we_i(gpio_we), .oe_i(gpio_oe),
-    .bw_i(w_9), .data_i(w_53), .data_o(gpio_data),
+    .addr_i(w_7[3:2]), .we_i(gpio_we), .oe_i(gpio_oe),
+    .bw_i(w_10), .data_i(w_67), .data_o(gpio_data),
     .pins_io(pins_io)
 );
 
@@ -1693,181 +1695,154 @@ address_decoder blk3566_49 (
          .gpio_data_i (gpio_data),
          .gpio_we_o (gpio_we),
          .gpio_oe_o (gpio_oe),
-         .address_i (w_6),
-         .we_i (w_7),
-         .oe_i (w_8),
-         .bw_i (w_9),
-         .dmem_data_i (w_10),
-         .imem_data_i (w_11),
-         .address_o (w_12),
-         .dmem_we_o (w_14),
-         .dmem_oe_o (w_15),
-         .imem_oe_o (w_16),
-         .bw_o (w_17),
-         .data_o (w_18)
+         .address_i (w_7),
+         .we_i (w_8),
+         .oe_i (w_9),
+         .bw_i (w_10),
+         .dmem_data_i (w_11),
+         .imem_data_i (w_12),
+         .address_o (w_13),
+         .dmem_we_o (w_15),
+         .dmem_oe_o (w_16),
+         .imem_oe_o (w_17),
+         .bw_o (w_18),
+         .data_o (w_19)
      );
 
 alu_eq26 blk3550_50 (
-         .a_i (w_20),
-         .b_i (w_21),
-         .alu_op_i (w_22),
-         .result_o (w_23)
+         .a_i (w_21),
+         .b_i (w_22),
+         .alu_op_i (w_23),
+         .result_o (w_24)
      );
 
 alu_out_reg #(.RESET_VALUE(32'h00000000)) blk3811_51 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .en_i (alu_address_en),
-         .alu_result_i (w_23),
-         .alu_out_o (w_25),
-         .addr_lsb_o (w_28)
+         .alu_result_i (w_24),
+         .en_i (w_26),
+         .alu_out_o (w_27),
+         .addr_lsb_o (w_30)
      );
 
-branch_comparator_eq26 blk3552_52 (
-         .rs1_i (w_29),
-         .rs2_i (w_30),
-         .funct3_i (w_31),
-         .branch_taken_o (w_32)
-     );
-
-// Retain the address during memory access and the load result for writeback.
-wire load_result_en, alu_address_en;
 control_unit_eq26 blk3567_53 (
-         .result_src_is_mem_o (load_result_en),
-         .not_adr_src_o (alu_address_en),
          .clk_i (clk_i),
          .rst_i (rst_i),
          .halt_o (halt_o),
          .mult_en_o (w_1),
-         .we_o (w_7),
-         .oe_o (w_8),
-         .bw_o (w_9),
-         .alu_op_o (w_22),
-         .addr_lsb_i (w_28),
-         .branch_taken_i (w_32),
-         .opcode_i (w_33),
-         .funct3_i (w_31),
-         .funct7_i (w_35),
-         .funct12_i (w_36),
-         .pc_write_o (w_37),
-         .pc_src_o (w_38),
-         .ir_write_o (w_39),
-         .reg_write_o (w_40),
-         .result_src_o (w_41),
-         .alu_src_a_o (w_42),
-         .alu_src_b_o (w_43),
-         .imm_sel_o (w_44),
-         .mult_op_o (w_45),
-         .crc_op_o (w_46),
-         .crc_en_o (w_47),
-         .op_size_o (w_48),
-         .adr_src_o (w_49)
+         .result_src_is_mem_o (w_4),
+         .we_o (w_8),
+         .oe_o (w_9),
+         .bw_o (w_10),
+         .alu_op_o (w_23),
+         .not_adr_src_o (w_26),
+         .addr_lsb_i (w_30),
+         .opcode_i (w_31),
+         .funct3_i (w_32),
+         .funct7_i (w_33),
+         .funct12_i (w_34),
+         .branch_taken_i (w_35),
+         .pc_write_o (w_36),
+         .pc_src_o (w_37),
+         .ir_write_o (w_38),
+         .reg_write_o (w_39),
+         .result_src_o (w_40),
+         .alu_src_a_o (w_41),
+         .alu_src_b_o (w_42),
+         .imm_sel_o (w_43),
+         .mult_op_o (w_44),
+         .crc_op_o (w_45),
+         .crc_en_o (w_46),
+         .op_size_o (w_47),
+         .adr_src_o (w_48)
      );
 
 crc_eq26 #(.POLY(16'h1021), .XOR_OUT(16'h0000)) blk3553_54 (
-         .crc_op_i (w_46),
-         .a_i (w_29),
-         .b_i (w_30),
-         .result_o (w_52)
-     );
-
-dmem_eq26 #(.DEPTH_WORDS(8)) blk3565_55 (
-         .clk_i (clk_i),
-         .rst_i (rst_i),
-         .data_o (w_10),
-         .addr_i (w_12),
-         .we_i (w_14),
-         .oe_i (w_15),
-         .bw_i (w_17),
-         .data_i (w_53)
+         .crc_op_i (w_45),
+         .a_i (w_49),
+         .b_i (w_50),
+         .result_o (w_51)
      );
 
 fetch_registers #(.PC_RESET_ADDR(32'h00400000)) blk3804_56 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .pc_o (w_55),
-         .mem_data_i (w_18),
-         .pc_write_i (w_37),
-         .ir_write_i (w_39),
-         .pc_next_i (w_54),
-         .old_pc_o (w_59),
-         .ir_o (w_61)
-     );
-
-imem blk3564_57 (
-         .clk_i (clk_i),
-         .data_o (w_11),
-         .addr_i (w_12),
-         .oe_i (w_16)
+         .pc_o (w_53),
+         .mem_data_i (w_19),
+         .pc_write_i (w_36),
+         .ir_write_i (w_38),
+         .pc_next_i (w_52),
+         .old_pc_o (w_57),
+         .ir_o (w_59)
      );
 
 imm_extend_eq26 blk3556_58 (
-         .imm_sel_i (w_44),
-         .instr_i (w_61),
-         .imm_o (w_63)
+         .imm_sel_i (w_43),
+         .instr_i (w_59),
+         .imm_o (w_61)
      );
 
 ir_splitter_eq26 blk3781_59 (
-         .funct3_o (w_31),
-         .opcode_o (w_33),
-         .funct7_o (w_35),
-         .funct12_o (w_36),
-         .instr_i (w_61),
-         .rd_o (w_64),
-         .rs1_o (w_65),
-         .rs2_o (w_66)
+         .opcode_o (w_31),
+         .funct3_o (w_32),
+         .funct7_o (w_33),
+         .funct12_o (w_34),
+         .instr_i (w_59),
+         .rd_o (w_62),
+         .rs1_o (w_64),
+         .rs2_o (w_65)
      );
 
 lsu_eq26 blk3562_60 (
-         .core_data_i (w_4),
-         .mem_data_o (w_18),
-         .core_address_o (w_25),
-         .op_size_o (w_48),
-         .mem_data_i (w_53),
-         .core_data_o (w_30)
+         .core_data_i (w_5),
+         .mem_data_o (w_19),
+         .core_address_o (w_27),
+         .op_size_o (w_47),
+         .core_data_o (w_50),
+         .mem_data_i (w_67)
      );
 
 mult_eq26 blk3557_61 (
          .result_o (w_2),
-         .mult_op_i (w_45),
-         .a_i (w_29),
-         .b_i (w_30)
+         .mult_op_i (w_44),
+         .a_i (w_49),
+         .b_i (w_50)
      );
 
 mux_alu_a blk3795_62 (
-         .a_o (w_20),
-         .alu_src_a_i (w_42),
-         .old_pc_i (w_59),
-         .rs1_data_i (w_29)
+         .a_o (w_21),
+         .alu_src_a_i (w_41),
+         .old_pc_i (w_57),
+         .rs1_data_i (w_49)
      );
 
 mux_alu_b blk3796_63 (
-         .b_o (w_21),
-         .alu_src_b_i (w_43),
-         .imm_i (w_63),
-         .rs2_data_i (w_30)
+         .b_o (w_22),
+         .alu_src_b_i (w_42),
+         .imm_i (w_61),
+         .rs2_data_i (w_50)
      );
 
 mux_mem_addr blk3808_64 (
-         .address_o (w_6),
-         .alu_out_i (w_25),
-         .adr_src_i (w_49),
-         .pc_i (w_55)
+         .address_o (w_7),
+         .alu_out_i (w_27),
+         .adr_src_i (w_48),
+         .pc_i (w_53)
      );
 
 mux_pc_next blk3807_65 (
-         .alu_result_i (w_23),
-         .pc_src_i (w_38),
-         .pc_next_o (w_54),
-         .pc_i (w_55)
+         .alu_result_i (w_24),
+         .pc_src_i (w_37),
+         .pc_next_o (w_52),
+         .pc_i (w_53)
      );
 
 mux_result blk3724_66 (
          .mult_result_i (w_3),
-         .mem_result_i (w_5),
-         .alu_out_i (w_25),
-         .result_src_i (w_41),
-         .old_pc_i (w_59),
+         .mem_result_i (w_6),
+         .alu_out_i (w_27),
+         .result_src_i (w_40),
+         .old_pc_i (w_57),
          .crc_result_i (w_72),
          .result_o (w_73)
      );
@@ -1875,22 +1850,47 @@ mux_result blk3724_66 (
 reg32_dff_eq26 #(.RESET_VALUE(32'h00000000)) blk3722_67 (
          .clk_i (clk_i),
          .rst_i (rst_i),
-         .en_i (w_47),
-         .d_i (w_52),
+         .en_i (w_46),
+         .d_i (w_51),
          .q_o (w_72)
      );
 
-regfile_eq blk3560_68 (
+dmem_eq26 #(.DEPTH_WORDS(4)) blk3565_69 (
+         .clk_i (clk_i),
+         .rst_i (rst_i),
+         .data_o (w_11),
+         .addr_i (w_13),
+         .we_i (w_15),
+         .oe_i (w_16),
+         .bw_i (w_18),
+         .data_i (w_67)
+     );
+
+branch_comparator_eq26 blk3552_77 (
+         .branch_taken_o (w_35),
+         .funct3_i (w_32),
+         .rs1_i (w_49),
+         .rs2_i (w_50)
+     );
+
+regfile_eq blk3560_78 (
          .clk_i (clk_i),
          .rst_i (rst_i),
          .x4_dbg_o (x4_dbg_o[31:0]),
-         .rs1_data_o (w_29),
-         .rs2_data_o (w_30),
-         .reg_write_i (w_40),
-         .rd_addr_i (w_64),
-         .rs1_addr_i (w_65),
-         .rs2_addr_i (w_66),
+         .reg_write_i (w_39),
+         .rs1_data_o (w_49),
+         .rs2_data_o (w_50),
+         .rd_addr_i (w_62),
+         .rs1_addr_i (w_64),
+         .rs2_addr_i (w_65),
          .write_data_i (w_73)
+     );
+
+imem blk3564_79 (
+         .clk_i (clk_i),
+         .data_o (w_12),
+         .addr_i (w_13),
+         .oe_i (w_17)
      );
 
 
