@@ -1,0 +1,14 @@
+--- SIMULATION START for regfile---
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+[Time 30] WRITE: Reg[1] <- deadbeef
+[Time 40] WRITE: Reg[2] <- cafebabe
+[Time 51] READ : Reg[1]=deadbeef, Reg[2]=cafebabe
+  -> SUCCESS: Read data matches written data.
+
+[Time 60] WRITE: Reg[0] <- ffffffff (Attempting to overwrite)
+[Time 71] READ : Reg[0]=00000000
+  -> SUCCESS: Reg 0 remains 0.
+
+--- TEST RESULT: PASS ---
+--- SIMULATION END ---
+testbench/testbench.v:75: $finish called at 101 (1s)

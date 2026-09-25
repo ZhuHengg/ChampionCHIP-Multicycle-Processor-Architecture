@@ -1,0 +1,30 @@
+--- SIMULATION START for mult_eq26 ---
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+
+[Time 21] TEST MUL (Basic): a =         10, b =          5, op =  0
+  -> READ : result_o =         50
+  -> SUCCESS (Reason: 10 * 5 = 50)
+
+[Time 31] TEST MUL (Negative): a =          -2 (signed), b =          6, op =  0
+  -> READ : result_o =         -12 (signed)
+  -> SUCCESS (Reason: -2 * 6 = -12, which is FFFFFFF4 in 32-bit two's complement)
+
+[Time 41] TEST MUL (Overflow): a = 00010000, b = 00010000, op =  0
+  -> READ : result_o = 00000000
+  -> SUCCESS (Reason: 0x10000 * 0x10000 = 0x100000000. Lower 32 bits are 00000000)
+
+[Time 51] TEST MULH (op=1): a = 40000000, b = 40000000, op =  1
+  -> READ : result_o = 10000000
+  -> SUCCESS (Reason: 2^30 * 2^30 = 2^60 (0x10000000_00000000). Upper 32 bits are 10000000)
+
+[Time 61] TEST MULHSU (op=2): a = ffffffff, b = ffffffff, op =  2
+  -> READ : result_o = ffffffff
+  -> SUCCESS (Reason: -1 * 4294967295 = -4294967295 (0xFFFFFFFF_00000001). Upper 32 bits are FFFFFFFF)
+
+[Time 71] TEST MULHU (op=3): a = ffffffff, b = ffffffff, op =  3
+  -> READ : result_o = fffffffe
+  -> SUCCESS (Reason: 4294967295 * 4294967295 = 0xFFFFFFFE_00000001. Upper 32 bits are FFFFFFFE)
+
+--- TEST RESULT: COMPLETE ---
+--- SIMULATION END ---
+testbench/testbench.v:89: $finish called at 91 (1s)

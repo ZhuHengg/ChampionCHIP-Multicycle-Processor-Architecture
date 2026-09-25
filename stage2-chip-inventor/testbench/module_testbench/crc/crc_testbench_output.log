@@ -1,0 +1,21 @@
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+========================================
+STARTING CRC SELF-CHECKING TESTS
+========================================
+
+[TEST 1] Testing Byte CRC (CRCB)...
+   -> ACTION: Data = 0x00000031, Seed = 0x0000ffff, Op = 0x0
+   -> [PASS] Expected 0x0000c782 and got 0x0000c782
+
+[TEST 2] Testing Half-Word CRC (CRCH)...
+   -> ACTION: Data = 0x00003132, Seed = 0x0000ffff, Op = 0x1
+   -> [PASS] Expected 0x00003dba and got 0x00003dba
+
+[TEST 3] Testing Word CRC (CRCW)...
+   -> ACTION: Data = 0x31323334, Seed = 0x0000ffff, Op = 0x2
+   -> [PASS] Expected 0x00005349 and got 0x00005349
+
+========================================
+ALL TESTS COMPLETED.
+========================================
+testbench/testbench.v:81: $finish called at 40 (1s)

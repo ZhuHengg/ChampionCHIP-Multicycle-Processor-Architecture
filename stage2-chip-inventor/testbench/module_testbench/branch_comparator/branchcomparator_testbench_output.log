@@ -1,0 +1,23 @@
+--- SIMULATION START for branch_comparator ---
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+[Time 21] TEST BEQ: rs1 =        150, rs2 =        150, funct3 = 0
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+[Time 31] TEST BNE: rs1 =        150, rs2 =        200, funct3 = 1
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+[Time 41] TEST BLT: rs1 = fffffff6, rs2 = 0000000a, funct3 = 4
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+[Time 51] TEST BGE: rs1 = 0000000a, rs2 = fffffff6, funct3 = 5
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+[Time 61] TEST BLTU: rs1 = 0000000a, rs2 = fffffff6, funct3 = 6
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+[Time 71] TEST BGEU: rs1 = fffffff6, rs2 = 0000000a, funct3 = 7
+  -> READ : branch_taken_o = 1
+  -> SUCCESS
+--- TEST RESULT: COMPLETE ---
+--- SIMULATION END ---
+testbench/testbench.v:103: $finish called at 91 (1s)

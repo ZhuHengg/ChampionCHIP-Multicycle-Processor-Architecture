@@ -1,0 +1,18 @@
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+========================================
+STARTING MEMORY MAPPING TESTS
+========================================
+
+[TEST 1] Writing to Data Memory...
+   -> ACTION: Wrote 0xdeadbeef to Address 0x10010004
+
+[TEST 2] Reading back from Data Memory...
+   -> SUCCESS: Expected 0xDEADBEEF, and actually read 0xdeadbeef
+
+[TEST 3] Reading from Instruction Memory...
+   -> SUCCESS: IMEM Output at Address 0x00400000 is 0x123452b7
+
+========================================
+ALL TESTS COMPLETED.
+========================================
+testbench/testbench.v:84: $finish called at 70 (1s)

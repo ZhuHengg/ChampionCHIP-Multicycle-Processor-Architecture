@@ -1,0 +1,17 @@
+--- SIMULATION START for imm_extend ---
+VCD info: dumpfile testbench/testbench.vcd opened for output.
+[Time 21] TEST I-Type: instr = 80000000, sel = 0
+  -> READ : imm_o = fffff800
+  -> SUCCESS
+[Time 31] TEST S-Type: instr = 7e000f80, sel = 1
+  -> READ : imm_o = 000007ff
+  -> SUCCESS
+[Time 41] TEST B-Type: instr = 00000663, sel = 2
+  -> READ : imm_o = 0000000c
+  -> SUCCESS
+[Time 51] TEST U-Type: instr = 12345000, sel = 3
+  -> READ : imm_o = 12345000
+  -> SUCCESS
+--- TEST RESULT: COMPLETE ---
+--- SIMULATION END ---
+testbench/testbench.v:71: $finish called at 71 (1s)
