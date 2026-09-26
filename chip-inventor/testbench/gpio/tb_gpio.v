@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module tb_gpio;
+module testbench;
     reg clk = 0;
     always #5 clk = ~clk;
     reg rst = 1, we = 0, oe = 0;
@@ -9,12 +9,15 @@ module tb_gpio;
     wire gwe, goe, dwe, doe, ioe;
     wire [3:0] dbw;
     tri [7:0] pins;
+    wire [7:0] pins_o, pins_oe;
     reg [7:0] ext_en = 0, ext_data = 0;
     integer i;
     reg [7:0] mask;
     genvar p;
     generate for (p=0; p<8; p=p+1) begin : external_pins
         assign pins[p] = ext_en[p] ? ext_data[p] : 1'bz;
+        // Pad model: tri-state lives outside the GPIO block.
+        assign pins[p] = pins_oe[p] ? pins_o[p] : 1'bz;
     end endgenerate
     address_decoder decoder (
         .address_i(addr), .we_i(we), .oe_i(oe), .bw_i(bw),
@@ -23,9 +26,9 @@ module tb_gpio;
         .dmem_we_o(dwe), .dmem_oe_o(doe), .imem_oe_o(ioe),
         .gpio_we_o(gwe), .gpio_oe_o(goe), .bw_o(dbw), .data_o(rd)
     );
-    gpio dut (.clk_i(clk), .rst_i(rst), .addr_i(addr[3:2]),
+    gpio dut (.clk_i(clk), .rst_i(rst), .addr_i(addr),
         .we_i(gwe), .oe_i(goe), .bw_i(bw), .data_i(wr),
-        .data_o(gpio_rd), .pins_io(pins));
+        .data_o(gpio_rd), .pins_i(pins), .pins_o(pins_o), .pins_oe_o(pins_oe));
 
     task write_reg;
         input [31:0] a, value;
@@ -49,7 +52,7 @@ module tb_gpio;
         end
     endtask
     initial begin
-        $dumpfile("gpio.vcd"); $dumpvars(0,tb_gpio);
+        $dumpfile("gpio.vcd"); $dumpvars(0,testbench);
         repeat(2) @(negedge clk);
         if (pins !== 8'hzz || gpio_rd !== 0) $fatal(1,"reset");
         rst=0;

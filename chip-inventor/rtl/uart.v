@@ -1,5 +1,7 @@
 // Stage 3 Part 1 section 2: word offsets 0 TXDATA, 1 RXDATA, 2 CONTROL.
 // Registered reads match GPIO/DMEM. Only byte lane zero is writable.
+// addr_i takes the whole address bus so the ChipInventor canvas can wire it
+// bus-to-bus; the register select is taken from addr_i[3:2] here.
 // Choices where guide is silent: TXDONE resets high; busy starts are ignored;
 // newest received byte wins on overrun; reception wins over software flag clear.
 module uart #(
@@ -7,7 +9,7 @@ module uart #(
     parameter integer BAUD = 115200
 ) (
     input wire clk_i, rst_i,
-    input wire [1:0] addr_i,
+    input wire [31:0] addr_i,
     input wire we_i, oe_i,
     input wire [3:0] bw_i,
     input wire [31:0] data_i,
@@ -21,6 +23,7 @@ module uart #(
     reg transmit, rxdone;
     wire txbusy, txdone, rxvalid;
     wire [7:0] received;
+    wire [1:0] reg_sel = addr_i[3:2]; // word offset; bits [1:0] ignored per guide 2.1
     uart_tx #(.CLKS_PER_BIT(CLKS_PER_BIT)) transmitter (
         .clk_i(clk_i), .rst_i(rst_i), .start_i(transmit), .data_i(txdata),
         .tx_o(tx_o), .busy_o(txbusy), .done_o(txdone)
@@ -35,7 +38,7 @@ module uart #(
         end else begin
             transmit <= 0;
             if (we_i && bw_i[0]) begin
-                case (addr_i)
+                case (reg_sel)
                     0: txdata <= data_i[7:0];
                     2: begin
                         transmit <= data_i[0] && !txbusy && !transmit;
@@ -50,7 +53,7 @@ module uart #(
     always @(posedge clk_i) begin
         if (rst_i) data_o <= 0;
         else if (oe_i) begin
-            case (addr_i)
+            case (reg_sel)
                 0: data_o <= {24'b0, txdata};
                 1: data_o <= {24'b0, rxdata};
                 2: data_o <= {29'b0, (txdone && !transmit), rxdone, 1'b0};

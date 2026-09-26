@@ -5,8 +5,9 @@ entry points, `chip-inventor/hdl.v` and `chip-inventor/rtl/top.v`.
 Compile one entry point at a time: each already contains all its modules.
 The older `legacy/` and separate `v2-chip-inventor-synth/` tracks are unchanged.
 
-Stage 3 Part 1 sections 1.1-1.3 specify eight bidirectional `pins_io[7:0]`
-connections. Each DATADIR bit independently selects input (0) or output (1).
+Stage 3 Part 1 sections 1.1-1.3 specify eight bidirectional pins. The tri-state
+pad sits outside the block: GPIO exposes `pins_i`, `pins_o` (DATAOUT) and
+`pins_oe_o` (DATADIR), because ChipInventor's Inout Pin drops its C/D inputs. Each DATADIR bit independently selects input (0) or output (1).
 Input mode releases the output driver and samples the pin into DATAIN.
 Output mode drives DATAOUT and stops updating that pin's DATAIN bit.
 
@@ -33,9 +34,9 @@ lw   x3, 4(x1)       # DATAIN; mask with 0xF0 to inspect inputs
 
 ## Integration and timing
 
-The GPIO interface uses `clk_i`/`rst_i`, two-bit word offset `addr_i`,
+The GPIO interface uses `clk_i`/`rst_i`, 32-bit byte address `addr_i` (bits [3:2] select the register),
 `we_i`/`oe_i`, four-bit byte mask `bw_i`, 32-bit `data_i`/`data_o`, and
-eight-bit bidirectional `pins_io`. Writes commit on the rising clock edge.
+eight-bit `pins_i`/`pins_o`/`pins_oe_o`. Writes commit on the rising clock edge.
 Reads register the selected value on the rising edge when `oe_i` is high;
 the result holds otherwise, matching DMEM's registered read interface.
 DATAIN samples separately, so reads return the previously sampled pin value.

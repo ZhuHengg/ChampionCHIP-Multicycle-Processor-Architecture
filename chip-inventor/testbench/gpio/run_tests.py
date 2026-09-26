@@ -1,57 +1,24 @@
 """Run from any directory: python run_tests.py [--iverilog PATH] [--vvp PATH].
 
-Builds into ignored chip-inventor/sim/gpio. System tests replace only the
-instruction ROM in a scratch copy, preserving the checked-in Stage 2 firmware.
-Tests both independently generated flattened source variants.
+Builds into ignored chip-inventor/sim/gpio. Runs the GPIO + address decoder unit test. Then, for every top
+(hdl.v, rtl/top.v and, if present, the ChipInventor canvas export
+convertion/new_export/top.v): the Stage 2 firmware check, and the CPU GPIO lw/sw program.
+The system test selects FIRMWARE 1 in imem via defparam, so the design
+files are used exactly as checked in - no ROM swapping.
 """
 import argparse
 from pathlib import Path
 import re
 import subprocess
-import sys
 
 HERE = Path(__file__).resolve().parent
 CHIP = HERE.parents[1]
-sys.path.insert(0, str(CHIP.parent / 'legacy/scripts'))
-from rvbl2_asm import Asm
 
 
-def firmware_rom():
-    a = Asm()
-    a.lui(1, 0xf0000)             # GPIO base address
-    a.li(2, 15)
-    a.store('sw', 2, 8, 1)        # Four inputs, four outputs
-    a.load('lw', 3, 8, 1)
-    a.branch('bne', 3, 2, 'fail')
-    a.li(2, 5)
-    a.store('sw', 2, 0, 1)        # Drive output pins 0 and 2 high
-    a.load('lw', 3, 0, 1)
-    a.branch('bne', 3, 2, 'fail')
-    a.load('lw', 3, 4, 1)         # Read externally driven high nibble
-    a.i('andi', 3, 3, 0xf0)
-    a.li(2, 0xa0)
-    a.branch('bne', 3, 2, 'fail')
-    a.li(4, 0x55)
-    a.label('pass')
-    a.jal(0, 'pass')
-    a.label('fail')
-    a.li(4, 0xff)
-    a.label('failed')
-    a.jal(0, 'failed')
-    cases = '\n'.join(f"10'd{(addr-0x00400000)//4}: data_o=32'h{word:08x}; // {text}"
-                      for addr, word, text, comment in a.assemble())
-    return '''module imem(input wire clk_i, input wire [31:0] addr_i,
-input wire oe_i, output reg [31:0] data_o);
-always @(*) begin
-    data_o=0;
-    if (oe_i) begin
-        case(addr_i[9:0])
-''' + cases + '''
-        default: data_o=32'h0000006f;
-        endcase
-    end
-end
-endmodule'''
+def imem_instance(top_file):
+    """Instance name of imem in the top module (differs per canvas export)."""
+    text = top_file.read_text(encoding='utf-8')
+    return re.search(r'^\s*imem\b\s*(?:#\(.*?\)\s*)?(\w+)\s*\(', text, re.M | re.S).group(1)
 
 
 def main():
@@ -62,27 +29,25 @@ def main():
     scratch = CHIP / 'sim/gpio'
     scratch.mkdir(parents=True, exist_ok=True)
 
-    def run(name, top, sources):
+    def run(name, sources, defines=()):
         out = scratch / (name + '.vvp')
-        subprocess.run([args.iverilog, '-g2012', '-s', top, '-o', str(out),
+        subprocess.run([args.iverilog, '-g2012', '-s', 'testbench', *defines, '-o', str(out),
                         *map(str, sources)], check=True, cwd=scratch)
         result = subprocess.run([args.vvp, str(out)], check=True, cwd=scratch,
                                 capture_output=True, text=True)
         print(name + ':\n' + result.stdout)
-        if 'ALL TESTS PASSED' not in result.stdout or 'FAIL ' in result.stdout:
+        if 'ALL TESTS PASSED' not in result.stdout or 'FAIL' in result.stdout:
             raise RuntimeError(name + ' failed')
 
-    run('gpio', 'tb_gpio', [CHIP/'rtl/gpio.v', CHIP/'rtl/address_decoder.v', HERE/'tb_gpio.v'])
-    for variant in ['hdl.v', 'rtl/top.v']:
-        tag = variant.replace('/', '_').replace('.v', '')
-        source = CHIP / variant
-        run(tag + '_stage2', 'testbench', [source, CHIP/'testbench/testbench.v'])
-        text, count = re.subn(r'module imem\b.*?endmodule',
-                              lambda _: firmware_rom(), source.read_text(), flags=re.S)
-        assert count == 1, 'Expected one instruction ROM'
-        test_source = scratch / (tag + '_gpio_rom.v')
-        test_source.write_text(text)
-        run(tag + '_gpio_system', 'tb_gpio_system', [test_source, HERE/'tb_gpio_system.v'])
+    run('gpio', [CHIP/'rtl/gpio.v', CHIP/'rtl/address_decoder.v', HERE/'tb_gpio.v'])
+
+    tops = ['hdl.v', 'rtl/top.v', 'convertion/new_export/top.v']
+    for rel in [t for t in tops if (CHIP / t).exists()]:
+        top = CHIP / rel
+        tag = rel.replace('/', '_').replace('.v', '')
+        run(tag + '_stage2', [top, CHIP/'testbench/testbench.v'])
+        run(tag + '_gpio_system', [top, HERE/'tb_gpio_system.v'],
+            ['-DIMEM_INST=' + imem_instance(top)])
 
 
 if __name__ == '__main__':
