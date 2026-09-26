@@ -1,8 +1,7 @@
 """Run from any directory: python run_tests.py [--iverilog PATH] [--vvp PATH].
 
 Builds into ignored chip-inventor/sim/uart. Runs the UART + address decoder unit test. Then, for every top
-(hdl.v, rtl/top.v and, if present, the ChipInventor canvas export
-convertion/new_export/top.v): the Stage 2 firmware check, and the CPU UART echo.
+(hdl.v = the ChipInventor canvas top, hdl_ref.v, rtl/top.v): the Stage 2 firmware check, and the CPU UART echo.
 The system test selects FIRMWARE 2 in imem via defparam, so the design
 files are used exactly as checked in - no ROM swapping.
 """
@@ -42,7 +41,7 @@ def main():
     run('uart', [CHIP/'rtl/uart.v', CHIP/'rtl/uart_tx.v', CHIP/'rtl/uart_rx.v',
                  CHIP/'rtl/address_decoder.v', HERE/'tb_uart.v'])
 
-    tops = ['hdl.v', 'rtl/top.v', 'convertion/new_export/top.v']
+    tops = ['hdl.v', 'hdl_ref.v', 'rtl/top.v']
     for rel in [t for t in tops if (CHIP / t).exists()]:
         top = CHIP / rel
         tag = rel.replace('/', '_').replace('.v', '')

@@ -1,341 +1,301 @@
 # Stage 3 — Brief, Constraints, and Stand-Out Strategy
 
-**Date:** 2026-09-26
-**Sources:** `docs/BlockGuide_Stage3_Part1.pdf` (v1.0, Part 2 not yet released),
-`docs/meeting_min.md`, organiser slides from the 2026-09-22 briefing (Roadmap,
-Video Guideline ×2, Report Guideline, Pedro's repo walkthrough), our own RTL in
-`chip-inventor/rtl/`, and public competitor repos.
+**Last updated:** 2026-09-26 (rev 2 — after the official Submission Guide)
+**Sources:** `docs/Submission Guide_Stage__Block_Guide_Stage_3.pdf` (**authoritative**),
+`docs/BlockGuide_Stage3_Part1.pdf`, `docs/meeting_min.md`, organiser slides
+from the 2026-09-22 briefing, the organiser repo
+[CCX_Malaysia_Edition_Stage_3](https://github.com/championchip-experience-community/CCX_Malaysia_Edition_Stage_3),
+our RTL in `chip-inventor/rtl/`, and public competitor repos.
 
-**Status of this document:** research + recommendation. The application choice
-in §6 is a *recommendation pending team decision*, not a decided design.
+**Status:** research + recommendation. The application choice in §7 is a
+*recommendation pending team decision*.
 
----
-
-## 1. Our scope for Stage 3
-
-The organiser roadmap (slide "Roadmap") has 10 boxes in four colour groups.
-Our working assumption: Stage 3 ends at **Sky130/OpenLane synthesis** of the
-core + GPIO + UART with our application firmware in IMEM. Everything on AWS F2
-is Stage 4 (top-10 teams only). This matches the ASEM page: Stage 3 = "Design
-Challenge… SkyWater 130nm PDK", Stage 4 = "AWS Cloud FPGA Prototype".
-
-| # | Roadmap box | Colour group | Stage | Our status |
-|---|---|---|---|---|
-| 1 | GPIO & UART integration | green | 3 | RTL + unit testbenches exist (`gpio.v`, `uart.v`, `uart_tx.v`, `uart_rx.v`, `testbench/gpio`, `testbench/uart`). Chip Inventor integration still open per `chip-inventor/HANDOFF_ZHU_HENG.md`. Tests not re-run for this review. |
-| 2 | Communication firmware test (testbench) | green | 3 | Not started. Echo test is the organiser-recommended first step. |
-| 3 | Application definition | green | 3 | **This document — pending decision (§6).** |
-| 4 | Application firmware development | yellow | 3 | Not started |
-| 5 | Application firmware testbench | yellow | 3 | Not started |
-| 6 | Emulator adaptation (C) | yellow | **disputed** — see §8 | Not started |
-| 7 | Top adaptation Verilog | purple | 4 | — |
-| 8 | Synthesis on AWS (FPGA) | purple | 4 | — |
-| 9 | Load FPGA image on F2 | purple | 4 | — |
-| 10 | Run the emulator | purple | 4 | — |
-| — | Record 1-min video demonstration | pink | 4 per roadmap; guidelines already given | — |
-
-For Stage 3 we additionally owe an **OpenLane (Sky130) synthesis** of the
-updated design (core + peripherals + app firmware ROM).
+> ## ⚠ Deadline: **30 September 2026, 23:59 MYT** — 4 days from this revision. Late submissions are not accepted.
 
 ---
 
-## 2. What the organisers asked for
+## 0. What changed in rev 2 (vs. rev 1 of this doc)
 
-### 2.1 Application definition (meeting minutes)
-
-- Define a concrete **system context** and the **processor's responsibility**:
-  what inputs it receives, what it computes, what it outputs.
-- The organisers' examples — **do not use these, other teams will**:
-  - Drone: velocity/pitch → acceleration → deceleration value / over-limit flag / motor command.
-  - Stock market: price ticks → mid-price / decision metric → buy/sell.
-  - Game.
-- Balance creativity and feasibility. Present the application on competition day.
-- The organiser's own sample repo (slide 5, `RVBL-2-AWS-FPGA`) contains
-  `ecu_firmware/` (engine control unit) and `uii_firmware/`, `simple_firmware/`.
-  **Automotive-ECU-style apps will look derivative of the organiser sample.**
-
-### 2.2 Firmware and testbench (minutes)
-
-- Firmware runs on the core, reads inputs via UART/GPIO, processes, writes outputs via UART/GPIO.
-- Testbench must **simulate inputs and validate outputs against expected results**.
-  Echo test is the recommended starting point. The organiser-provided
-  firmware/testbench (≈10 samples promised on GitHub) is only a starting point —
-  robustness is on us.
-- Organiser tooling: C firmware compiled with `riscv32-unknown-elf-*` via
-  `make` (slide 5 terminal: `make` → `objdump -D build/firmware.elf`), plus an
-  assembler/Makefile like Stage 2.
-
-### 2.3 Video requirements (slides "Video Guideline")
-
-| Must show | Detail |
-|---|---|
-| GPIO setup | Detailed port configuration process |
-| UART setup | Serial communication protocol initialisation |
-| Execution | Clear step-by-step implementation logic |
-| Validation firmware | Explain validation logic step by step |
-| **No AI narration** | Authentic human voices only |
-| **Mandatory subtitles** | Text captions for accessibility |
-
-Delivery = **pitch presentation**: design rationale (explain GPIO/UART
-choices), showcase validation logic, professional tone ("sell the technical
-concept"). Roadmap final box: 1-minute demonstration video.
-
-### 2.4 Report requirements (slide "Report Guideline")
-
-Standard cover (members, team, project name) · mandatory table of contents ·
-legible high-resolution screenshots · a single font family throughout.
-
-### 2.5 Emulator / AWS F2 interface facts (for Stage 4 readiness)
-
-From Pedro's walkthrough — design Stage 3 choices so Stage 4 is cheap:
-
-- SoC on FPGA: core + GPIO + UART + memories + AXI→core wrapper.
-- **GPIO via emulator:** one 16-bit register, upper 8 bits = direction
-  (1 = output), lower 8 bits = value. Inputs set from the emulator must be
-  de-asserted after use or they interfere with the next test.
-- **UART via emulator:** separate TX-write and RX-read registers. RX is a
-  **64-entry circular FIFO; Pedro recommends reading at most 8 entries at a time.**
-- Reset: write 0 then 1 to the reset bit.
-- Two tools: low-level AXI read/write (precise, you encode dir+value bits
-  yourself) and a higher-level GUI for batch testing.
-
----
-
-## 3. Hardware facts that constrain the application
-
-These come from the Stage 3 guide and our own RTL. Any application idea that
-ignores them will not fit.
-
-| Resource | Fact | Source | Consequence for the app |
+| Topic | Rev 1 assumption | Submission Guide says | Impact |
 |---|---|---|---|
-| GPIO | 8 bidirectional pins, `0xF0000000`: DATAOUT `+0x0`, DATAIN `+0x4`, DATADIR `+0x8` (1 = output). No pull-ups, no drive strength. | Guide §1 | 8 pins total — the pin map is a design decision worth explaining in the pitch. |
-| UART | 115200 baud, 8-N-1, `0xF1000000`: TXDATA `+0x0`, RXDATA `+0x4`, CONTROL `+0x8` (bit0 TRANSMIT, bit1 RXDONE, bit2 TXDONE). **Single-byte buffer, no FIFO, no flow control, no interrupts.** | Guide §2 | Polling only. If firmware is busy when a second byte arrives, a byte is lost (our `uart.v`: newest byte wins on overrun). |
-| Clock | 20 MHz (`CLOCK_PERIOD 50.0` ns in `chip-inventor/config.json`) | config | ≈5 MIPS peak. |
-| CPI | ALU/MUL/CRC 4, branch 3, store 4, **load 6** | Handoff §2 | ~4 cycles/instruction average. |
-| Byte time | 10 bits × 174 clk/bit = **1740 cycles/byte** | `uart.v` CLKS_PER_BIT | **~400 instructions of budget per received byte** if processing inline. |
-| DMEM | Flip-flop array, **8 words = 32 bytes** (`chip-inventor`), 4 words in synth track — organiser instruction, applies to all teams | `dmem_eq26.v` header | **No sample buffers, no lookup tables.** State must live in the 31 GPRs. Streaming algorithms only. |
-| IMEM | Combinational `case` ROM, ≤1024 words | `imem.v` | **Code size = silicon area** in OpenLane. Compact firmware is a measurable win. |
-| Timer | None. No CSRs (no `rdcycle`), no interrupts | ISA = RV32I+Zmmul+Xicrc | **Time must come from the data** (sample index = time base), not a wall clock. |
-| Arithmetic | `mul/mulh/mulhsu/mulhu` (1 instr, 4 cycles). **No divide, no floating point.** | Handoff §8 | Fixed-point (Q15/Q14) with `mulh`. Avoid division: compare `a² ≥ k²·b` instead of `a/b ≥ k`. |
-| CRC | `crcb/crch/crcw`: CRC-16, poly `0x1021`, non-reflected, xorout 0, **seed in via second operand** | `crc.eq26.v` | With seed `0xFFFF` this is **CRC-16/IBM-3740 (a.k.a. CCITT-FALSE)** — catalogue check value for `"123456789"` is **`0x29B1`**. With seed `0x0000` it is CRC-16/XMODEM. |
-
-**CRC byte-order gotcha (worth a line in the report):** `crcw` consumes bit 31
-first. Memory is little-endian, so a `lw` of four stream bytes puts the *first*
-stream byte in bits [7:0] — `crcw` on that word processes the stream bytes in
-**reverse** order. For stream-order CRC over UART bytes, use `crcb` per byte (or
-byte-swap first). Confirm the rs1/rs2 → `a_i`/`b_i` mapping in `top.v` before
-writing firmware.
+| Deadline | unknown | **30 Sep 2026 23:59 MYT** | Scope must fit 4 days. §8 plan. |
+| Synthesis | Stage 3 ends at Sky130/OpenLane synthesis | **Not a deliverable.** Workflow ends at "Emulator Preview"; AWS FPGA not covered | Drop OpenLane from the critical path. |
+| Emulator | Stage 4 / disputed | **In scope as a concept:** app definition must explain `./emu` values; video must show emulator ↔ processor logic. Running on AWS is **not** required | Design the app's I/O around `./emu` options (§3). |
+| Official test | "echo test recommended" | **Mandatory:** run the organiser's GPIO/UART test firmware on our integrated design; logs/waveforms go in the report | Top priority, day 1. |
+| Block diagram | ChipInventor for figures | **Mandatory:** block diagram generated in ChipInventor (coloured wires, project as a block) | Day 1 alongside integration. |
+| Video | 1 min | **Max 8 min**, three parts: technical, application logic with `./emu`, pitch | Script in §2.4. |
+| Report | cover, TOC, screenshots, one font | **Topics 1–5 of the guide, PDF, max 7 pages, max 10 MB** | Tight — outline in §2.3. |
+| Firmware format | C or asm (open) | Organiser builder is **assembly** (`src/main.s`); firmware must be delivered in **binary and assembly** | Write the app in assembly. |
+| App candidates | Vibration monitor with Goertzel + CWRU dataset replay | Each `./emu` run **resets the processor** and moves UART data in 1/2/4-byte chunks | Streaming thousands of samples through the emulator is impractical. Re-scored in §7. |
+| Integrity | — | Code must be the team's own; copying from other teams → penalties/disqualification | Competitor repos below are for landscape only. **Do not reuse their code.** |
 
 ---
 
-## 4. Competitive landscape
+## 1. Scope and workflow for Stage 3
 
-- **Every team builds the same RVBL-2 spec** (RV32I + Zmmul + Xicrc) — see
-  public repos [Niccc8/rvbl2-riscv-cpu-core](https://github.com/Niccc8/rvbl2-riscv-cpu-core)
-  and [Lourencohg/championchip-rv32-riscv](https://github.com/Lourencohg/championchip-rv32-riscv).
-  **Having** CRC/MUL hardware is not a differentiator. **Using it where it
-  matters, and measuring the win,** is.
-- The strongest visible competitor (Niccc8) already has: clean Sky130
-  sign-off (0 DRC, LVS match), lockstep equivalence over 410,400 cycles,
-  7,384 checks across 15 testbenches, a 20-page report. **Verification rigor
-  is table stakes at the top.** We must match it and add something they don't
-  show.
-- Neither public repo shows a Stage 3 application yet.
-- Likely crowd choices: the three organiser examples (drone, stock, game),
-  traffic lights, smart home, temperature monitor, and ECU copies of the
-  organiser sample. Anything in this set competes on execution alone.
+Official workflow (Submission Guide §1 figure):
 
----
+`GPIO & UART integration → Official Firmware Testbench → [Application Definition → Application Firmware Development → Application Firmware Testbench] → Emulator Preview`
 
-## 5. Stand-out strategy — seven levers
+The bracketed part is the "Application guide scope". The guide says: *"Your
+team's focus must be strictly on developing the application logic and the
+firmware (AWS FPGA direct implementation will not be covered in this part)."*
 
-Ordered by expected marks per hour of effort.
-
-### L1. Pick an application outside the crowd, anchored to a real problem and a real standard
-Judges hear many drones and stock bots. An app that names a real industry
-pain point, cites a real standard for its thresholds, and has local relevance
-(ASEM is Malaysian; the organisers are Brazilian) reads as engineering, not a
-toy.
-
-### L2. Hardware–software co-design story with measured numbers
-Put `crcb` and `mul/mulh` in the application's **hot path**, then prove the
-benefit in simulation:
-- **GPIO probe-pin technique:** firmware toggles a spare GPIO pin at the start
-  and end of a routine; the testbench counts clock cycles between the edges.
-  The same trick works later on the FPGA with a logic analyser.
-- Report a table: software CRC vs `crcb`, shift-add multiply vs `mul`.
-  *Rough estimates to be replaced by measurement:* bitwise software CRC-16
-  ≈ 200 cycles/byte vs 4 cycles for `crcb` (~50×); software 32×32 multiply
-  ≈ 600 cycles vs 4 for `mul`.
-- Memory argument: a table-driven software CRC-16 needs a **512-byte table —
-  16× our entire 32-byte DMEM.** Xicrc is not a nice-to-have here; it is the
-  only way to get fast CRC at all.
-
-### L3. A robust, validated UART protocol (feeds the "Validation Firmware" video segment directly)
-- Framed packets: `[SOF][TYPE][SEQ][payload…][CRC16_hi][CRC16_lo]`, CRC via `crcb`.
-- **Stop-and-wait:** host sends one frame, waits for the reply. This gives flow
-  control for free on a UART that has none (guide §2), and keeps per-byte work
-  inside the 1740-cycle budget.
-- Error handling: bad CRC → NACK, SOF hunting for resync, bounded frame length.
-- **Fault-injection tests:** bit flips, truncated frames, garbage between
-  frames, back-to-back frames. Show the firmware rejecting them on video.
-- **Replies ≤ 8 bytes**, matching Pedro's "read up to 8 FIFO entries" advice,
-  so Stage 4 needs no protocol change.
-
-### L4. Quantified validation, not "it works"
-- Python golden model, **bit-exact** with the firmware's fixed-point math,
-  generates stimulus and expected outputs.
-- Self-checking Verilog testbench with a UART bus-functional model (drive
-  `rx_i`, decode `tx_o`) and GPIO drive/monitor.
-- Requirement → test traceability table (every requirement has a test ID and
-  a pass/fail).
-- Where possible, validate against a **public labelled dataset** and report an
-  accuracy figure (confusion matrix / detection rate). A number like "correctly
-  classified 97 of 100 windows" is something toy apps cannot claim.
-- First golden vector for the comm test: CRC-16/IBM-3740 of `"123456789"` = `0x29B1`.
-
-### L5. Resource-aware design as a talking point
-Fits 32 B DMEM by design (register-resident state, streaming algorithms).
-Report firmware size in words and the OpenLane area/timing delta for adding
-GPIO + UART + app ROM. Frame it as a deliberate trade-off, same style as the
-Stage 2 DMEM rationale in `v2-chip-inventor-synth/rtl/dmem_eq26.v`.
-
-### L6. Stage-4-ready choices made now (cheap, and a good pitch line)
-- Replies ≤ 8 bytes; pin map expressed in the emulator's 16-bit dir/value format.
-- `CLK_HZ` / `BAUD` stay parameters (F2 clock will differ from 20 MHz).
-- Keep GPIO's out/oe/in logic separable from the `inout` pad so the FPGA top
-  adaptation needs no internal tri-states (FPGA fabric does not support them).
-- Keep the Python frame encoder simple enough to port to the C emulator adapter.
-
-### L7. Presentation polish
-Human narration + subtitles (mandatory), a scripted 1-minute demo with a
-visible before/after (e.g. LEDs change from green to red when a fault is
-injected), consistent report typography, legible screenshots. Cheap marks that
-careless teams lose.
+| # | Step | Guide § | Our status |
+|---|---|---|---|
+| 1 | GPIO & UART integration (+ ChipInventor block diagram) | §2 | RTL + unit testbenches exist (`gpio.v`, `uart.v`, `uart_tx.v`, `uart_rx.v`, `testbench/gpio`, `testbench/uart`). ChipInventor integration still open per `chip-inventor/HANDOFF_ZHU_HENG.md`. Tests not re-run for this review. |
+| 2 | Official Firmware Testbench | §3 | Not started |
+| 3 | Application Definition | §4 | **Pending decision (§7)** |
+| 4 | Application Firmware Development | §5 | Not started |
+| 5 | Application Firmware Testbench (team's own) | §6 | Not started |
+| 6 | Emulator Preview (`./emu` command set for our app) | §4, §7 | Not started. Organiser says full emulator instructions come "later in Stage 3". |
 
 ---
 
-## 6. Application candidates
+## 2. Deliverables checklist
 
-Filter used: not an organiser example or ECU; uses **both** UART and GPIO;
-uses MUL **and** CRC for real reasons; streaming so it fits 32 B DMEM; data
-supplies its own time base; testable through UART/GPIO only; demonstrable in
-one minute.
+### 2.1 Files to submit (guide §9)
 
-### Scoring (3 = best)
+1. Technical report — PDF, **≤ 7 pages, ≤ 10 MB**, covering guide topics 1–5.
+2. GitHub link.
+3. Video demo — YouTube link, **≤ 8 minutes**.
+4. Project files: **all** source code (C, Verilog, …) and the complete firmware
+   in **both binary and assembly** (`firmware.bin` + `main.s`; the builder also
+   emits `firmware.txt` and `firmware.dmp`).
 
-| Criterion | A. Machine-health vibration monitor | B. EV battery-pack monitor | C. Solar PV protection relay | D. Flood early-warning station |
+Evaluators may reproduce the simulation and execution flow on AWS from the
+submitted files — **the repo must build and simulate from a clean checkout.**
+
+### 2.2 Official Firmware Testbench (guide §3) — mandatory
+
+Organiser firmware (`RVBL-GPIO-UART-Test-Firmware`) loops:
+read P3–P0 → write them to P7–P4 (`DATADIR = 0xF0`) → wait for a UART byte → echo it.
+
+Our testbench must:
+- Load `firmware.txt` into IMEM.
+- Apply `0xA` on P3–P0 and expect `0xA0` on DATAOUT (P7–P4 = `0xA`).
+  GPIO stimulus must be stable **before** the firmware's GPIO read.
+- Then send `0x30` on `rx_i` and expect `0x30` back on `tx_o`.
+- Timeout detection, and clear log lines:
+  ```
+  [PASS] GPIO: P3-P0 = 0xA, P7-P4 = 0xA
+  [PASS] UART: RX = 0x30, TX = 0x30
+  [PASS] GPIO and UART firmware test completed successfully
+  ```
+- A waveform showing clock, reset, GPIO transitions, and UART byte timing — screenshot for the report.
+
+### 2.3 Report outline (7 pages, topics 1–5 only)
+
+| Page budget | Guide topic | Content |
+|---|---|---|
+| ~1 | 1. Project Overview | Goal, architecture, how the firmware uses UART + GPIO in a real-world scenario |
+| ~1.5 | 2. GPIO & UART Integration | Integration design, address decoding, **ChipInventor block diagram** (mandatory) |
+| ~1 | 3. Official Firmware Testbench | PASS log + waveform screenshot |
+| ~1.5 | 4. Application Definition | Context / Input / Processing / Output, pin map, `./emu` values for our tests |
+| ~2 | 5. Firmware Development and Processing | UART frame handling, **how CRC and Zmmul are used**, how GPIO control is driven. The guide names CRC/Zmmul explicitly — this is where the co-design numbers (L2) go |
+
+Plus, from the earlier slide: cover (members, team, project name), table of
+contents, legible screenshots, one font family. Check whether the cover/TOC
+count towards the 7 pages — assume yes to be safe (§9, Q1).
+
+### 2.4 Video (guide §7, ≤ 8 min) — suggested split
+
+| Part | Time | Content |
+|---|---|---|
+| 1. Technical | ~3 min | Architecture, GPIO/UART integration, ChipInventor diagram, official testbench PASS, firmware structure, CRC/MUL usage with measured cycle numbers |
+| 2. Application logic | ~3 min | Walk through `./emu` command lines → what the processor receives → what it computes → GPIO/UART results. Show the team testbench running the same vectors, including a rejected corrupted frame |
+| 3. Pitch | ~1.5 min | Problem, value, who would use it, why this design |
+
+From the earlier slides (still assumed valid): **human narration only (no AI
+voice), mandatory subtitles**, professional tone.
+
+---
+
+## 3. Emulator (`./emu`) facts — these shape the application
+
+From the organiser's `RVBL-Emulator/README.md`:
+
+| Option | Meaning |
+|---|---|
+| `-d DIR` | GPIO direction, per bit: 0 = input driven by the emulator, 1 = output observed by the emulator |
+| `-i DATA` | Drive an 8-bit value onto the processor's GPIO inputs |
+| `-o DATA` | Read the processor's GPIO outputs and **verify** they equal `DATA` |
+| `-t1 / -t2 / -t4 V` | Send 1, 2 or 4 bytes to the processor over UART, **least-significant byte first** |
+| `-r1 / -r2 / -r4 V` | Read 1, 2 or 4 bytes from the processor and **verify** they equal `V` |
+
+Rules:
+- **All operations of one test go in one command, in the order the firmware expects.**
+- **Each run resets the processor.** No state survives between commands.
+- Numbers accept decimal or hex.
+
+Consequences for the application:
+1. **Transaction-based, not long-running.** One command = one scenario: set
+   inputs, send a short packet, check outputs. Anything that needs history
+   (trends, averages) must receive that history inside the same command.
+2. **Keep packets short**, built from 4-byte and 2-byte chunks. A 10-byte
+   packet is `-t4 -t4 -t2`; a 4-byte reply is `-r4`.
+3. **LSB-first on the wire** — a 32-bit value sent with `-t4` arrives low byte first.
+4. **An `./emu` command is itself a self-checking test vector** (`-o` and `-r`
+   verify). So every vector in our Verilog testbench can be exported 1:1 as an
+   `./emu` command line. This is our Emulator Preview deliverable, and a strong
+   point for the video.
+
+---
+
+## 4. Hardware facts that constrain the application
+
+| Resource | Fact | Source | Consequence |
+|---|---|---|---|
+| GPIO | 8 pins, `0xF0000000`: DATAOUT `+0x0`, DATAIN `+0x4`, DATADIR `+0x8` (1 = output) | Block Guide §1 | Pin map is a design decision to explain. |
+| UART | 115200 8-N-1, `0xF1000000`: TXDATA `+0x0`, RXDATA `+0x4`, CONTROL `+0x8` (bit0 TRANSMIT, bit1 RXDONE, bit2 TXDONE). **Single-byte buffer, no flow control, no interrupts** | Block Guide §2 | Polling; firmware must read each byte before the next one lands. |
+| Clock | 20 MHz (`CLOCK_PERIOD 50.0`) | `chip-inventor/config.json` | ≈5 MIPS peak. |
+| CPI | ALU/MUL/CRC 4, branch 3, store 4, **load 6** | Handoff §2 | ~4 cycles/instruction. |
+| Byte time | 10 × 174 = **1740 cycles/byte** | `uart.v` | ~400 instructions of budget per received byte. |
+| DMEM | **8 words = 32 bytes** (organiser instruction, all teams) | `dmem_eq26.v` header | No buffers or lookup tables; state lives in registers. |
+| IMEM | `case` ROM, ≤ 1024 words | `imem.v` | Plenty for an assembly app. |
+| Timer / interrupts | None (no CSRs, no `rdcycle`) | ISA | Time comes from the data (sample index), not a clock. |
+| Arithmetic | `mul/mulh/mulhsu/mulhu`, **no divide, no FP** | Handoff §8 | Fixed point; compare `a² ≥ k²·b` instead of dividing. |
+| CRC | `crcb/crch/crcw`, CRC-16 poly `0x1021`, non-reflected, xorout 0, seed via second operand | `crc.eq26.v` | Seed `0xFFFF` = **CRC-16/IBM-3740 (CCITT-FALSE)**, check value `"123456789"` → **`0x29B1`**. |
+
+**CRC byte-order gotcha:** `crcw` consumes bit 31 first; `lw` on
+little-endian memory puts the first stream byte in bits [7:0]. So `crcw` on a
+loaded word processes stream bytes in **reverse** order. And `./emu -t4` also
+sends LSB first. Decide the byte order once, write it into the protocol spec,
+and use `crcb` per byte if in doubt. Confirm the rs1/rs2 → `a_i`/`b_i`
+operand mapping in `top.v` before writing firmware.
+
+**Custom instructions in assembly:** the organiser builder assembles
+`src/main.s` with the stock GNU toolchain, which does not know `crcb` & co.
+Encode them with `.insn r` (or `.word`) using opcode/funct3/funct7 from the
+handoff opcode table — never from memory. Check the builder's `-march` accepts
+`mul` (Zmmul/M) or encode MUL the same way.
+
+---
+
+## 5. Competitive landscape
+
+- **Every team builds the same RVBL-2 spec** (RV32I + Zmmul + Xicrc) — e.g.
+  [Niccc8/rvbl2-riscv-cpu-core](https://github.com/Niccc8/rvbl2-riscv-cpu-core),
+  [Lourencohg/championchip-rv32-riscv](https://github.com/Lourencohg/championchip-rv32-riscv).
+  Having CRC/MUL is not a differentiator; **using them in the app and measuring
+  the benefit is** — and guide §5 explicitly asks how CRC/Zmmul are used.
+- The strongest visible competitor already has clean Sky130 sign-off and
+  7,384+ checks over 15 testbenches. Verification rigour is table stakes.
+- Likely crowd choices: drone, stock market, game (organiser examples),
+  traffic lights, smart home, temperature monitor, ECU copies of the organiser
+  sample. **Do not look at or reuse other teams' code** (guide Note 1).
+
+---
+
+## 6. Stand-out strategy — levers, re-ranked for 4 days
+
+| # | Lever | Effort | Why it scores |
+|---|---|---|---|
+| L1 | Application outside the crowd, tied to a real problem and a cited standard | low | Pitch and "Application Definition" marks |
+| L2 | **CRC + MUL in the hot path, with measured cycle counts.** GPIO probe-pin: firmware toggles a spare pin around a routine, testbench counts cycles. Compare `crcb` vs a bitwise software CRC (and note a table CRC needs 512 B = 16× our DMEM) | low–med | Guide §5 asks for exactly this |
+| L3 | **CRC-protected packets** with a defined error response (bad CRC → error code on UART + fault pin), shown in the video | low | "Validation logic" and robustness |
+| L4 | **Testbench vectors exported 1:1 as `./emu` commands** — one source of truth for simulation and emulator | low | Directly satisfies "Emulator Values (./emu)" and video part 2 |
+| L5 | Self-checking team testbench: Python golden model → vectors → Verilog testbench with UART driver/monitor, PASS/FAIL log, requirement → test table | med | Guide §6 |
+| L6 | Clean, reproducible repo: one `make`/script builds firmware and runs every testbench from a clean checkout | low | Evaluators may reproduce the flow |
+| L7 | Presentation polish: human narration + subtitles, tight 8-min structure, 7-page report that reads well | med | Cheap marks careless teams lose |
+
+Dropped for Stage 3 (no longer in scope or not feasible in 4 days): OpenLane
+area/timing reporting, public-dataset replay through the emulator, Stage 4
+FPGA top-adaptation prep.
+
+---
+
+## 7. Application candidates — re-scored
+
+New filters: fits the `./emu` model (one command = one short transaction,
+reset every run) and is buildable in assembly in ~1.5 days.
+
+| Criterion (3 = best) | A′. Vibration severity monitor (lite) | B. EV battery-pack monitor | C. Solar PV protection relay | D. Flood early-warning |
 |---|---|---|---|---|
-| Distance from examples / ECU | 3 | 1 (automotive, near ECU) | 3 | 3 |
-| Real MUL use | 3 (RMS, Goertzel) | 2 (coulomb count) | 3 (RMS, power) | 1 |
+| Distance from examples / ECU | 3 | 1 | 3 | 3 |
+| Real MUL use | 3 (sum of squares, crest factor) | 2 (power, scaling) | 3 (P = V·I, V²/I² limits) | 1 |
 | Natural CRC use | 3 | 3 | 3 | 3 |
-| Fits 32 B DMEM | 3 | 2 | 3 | 3 |
-| Public labelled data for accuracy claim | 3 (CWRU bearing data) | 1 | 1 (synthetic) | 2 |
-| 1-minute demo clarity | 3 | 3 | 2 | 3 |
-| Local / industry relevance | 3 (E&E, fabs, mills) | 3 (EV roadmap) | 3 (rooftop solar) | 3 (monsoon floods) |
-| Risk of looking "too simple" | 3 | 2 | 3 | 1 |
-| Implementation risk (3 = low) | 2 (DSP tuning) | 3 | 2 | 3 |
-| **Total** | **26** | 20 | 23 | 22 |
+| Fits `./emu` transaction model | 2 (short window per command) | 3 | 3 | 2 (history in one command) |
+| Uses GPIO in and out meaningfully | 2 | 3 | 3 | 2 |
+| 4-day feasibility | 2 | 3 | 3 | 3 |
+| Demo clarity | 3 | 3 | 2 | 3 |
+| Risk of looking "too simple" | 3 | 2 | 2 | 1 |
+| **Total** | **21** | **20** | **22** | **18** |
 
-### A. Machine-health vibration monitor (predictive maintenance) — **recommended**
+### C. Solar PV grid-tie protection relay — **now recommended**
 
-- **Context:** rotating machines (pumps, fans, motors) in Malaysian E&E plants,
-  semiconductor fabs, and palm-oil mills. Unplanned bearing failure means
-  downtime. The node flags developing faults early. Severity zones follow
-  ISO 20816 (successor to ISO 10816) vibration-severity bands.
-- **Inputs:**
-  - UART data frames: batches of int16 acceleration samples (sample index is the time base).
-  - UART config frames: alarm thresholds and Goertzel coefficients for this
-    machine's fault frequencies, computed on the host. This doubles as the
-    "configure parameters" behaviour the emulator adapter needs in Stage 4.
-  - GPIO in: P0 machine-running interlock, P1 operator acknowledge/reset.
-- **Processing (all streaming, register-resident):**
-  1. DC removal — 1-pole IIR high-pass.
-  2. RMS over an N-sample block — sum of squares with `mul`/`mulh` (64-bit accumulate).
-  3. Peak and crest factor, compared without division: `peak² ≥ k²·mean_sq`.
-  4. Envelope (|x| → IIR low-pass), then **Goertzel** at 1–3 configured fault
-     frequencies (outer race / inner race) — Q14 coefficients with `mulh`.
-     Two state words per frequency, no buffer.
-  5. Health state machine Normal → Watch → Alarm → Trip, with hysteresis and debounce.
-- **Outputs:**
-  - GPIO out: P4/P5/P6 zone LEDs (green/amber/red), P7 trip relay. P2/P3 spare —
-    one of them is the cycle-measurement probe pin (L2).
-  - UART reply (exactly 8 bytes): `[SOF][TYPE][STATE][RMS_hi][RMS_lo][FLAGS][CRC_hi][CRC_lo]`.
-- **Validation:** bit-exact Python golden model; synthetic sine/impulse tests
-  for Goertzel correctness; replay of the **Case Western Reserve University
-  bearing dataset** (public, labelled normal / inner-race / outer-race / ball
-  faults) → confusion matrix. The dataset's bearing fault frequencies are
-  published multiples of shaft speed — take them from the CWRU site, do not
-  derive from memory.
-- **Graceful scope:** RMS + ISO zones + protocol alone is already a complete,
-  demonstrable app. Goertzel fault classification is the upgrade on top — if
-  DSP tuning runs late we still ship.
-- **Main risk:** simulation time. Thousands of samples at 1740 cycles/byte are
-  slow in iverilog. Mitigation: a simulation-only `BAUD` override (fewer clocks
-  per bit) for long dataset runs, full 115200 for the protocol/timing tests.
+- **Context:** a rooftop-solar inverter's protection relay (Malaysia's NEM
+  rooftop-solar programme). It decides whether the inverter may stay connected
+  to the grid, per grid-code voltage/frequency/power limits.
+- **Input** (one `./emu` command):
+  - UART packet (10 bytes = `-t4 -t4 -t2`): voltage (int16), current (int16),
+    frequency (uint16, 0.01 Hz), sequence/flags (uint16), CRC-16 (2 bytes).
+  - GPIO in: P0 grid-breaker-closed feedback, P1 manual isolate/E-stop.
+- **Processing:**
+  1. Validate the CRC with `crcb` — bad CRC → error reply + fault pin, no action.
+  2. P = V·I with `mul`; S² vs P² comparison for power-factor limit (no sqrt, no divide).
+  3. Over/under-voltage, over/under-frequency, over-power checks against limits.
+  4. Decision: CONNECT / DERATE / TRIP, with E-stop override.
+- **Output:**
+  - GPIO out: P4 connect relay, P5 derate flag, P6 trip/fault LED, P7 probe pin (cycle measurement).
+  - UART reply (4 bytes = `-r4`): status code, fault bits, CRC-16 of the reply.
+- **Why it moved to first:** every input fits in one short `./emu` command,
+  GPIO is used both ways, the MUL use is genuine, and it is fully buildable in
+  assembly within the deadline.
+- **Weakness:** single-snapshot decisions (no RMS over a cycle), synthetic data only.
 
-### B. EV battery-pack monitor (BMS slave)
+### A′. Vibration severity monitor (lite) — distinctive alternative
 
-- Inputs: frames with 4 cell voltages (mV), pack current, temperature; config
-  frames; GPIO in P0 charger-connected, P1 E-stop.
-- Processing: OV/UV/OT with debounce counters; coulomb-counting state of
-  charge (`mul`/`mulh`); passive balancing decision; contactor state machine
-  with pre-charge; fail-safe on N consecutive bad-CRC frames.
-- Outputs: GPIO balance switches, contactor, fault LED; UART status frame.
-- Strong CRC story (real battery front-ends CRC-protect their daisy-chain
-  frames). Weaknesses: automotive, close to the organiser's ECU sample; no
-  public dataset for an accuracy number.
+- Rev 1's recommendation, cut to fit the emulator: each command sends one
+  short window (e.g. 8 int16 samples = 16 bytes + 2 CRC bytes = `-t4 ×4 -t2`).
+  Firmware computes the sum of squares (`mul`/`mulh`), peak, and a crest-factor
+  test without division, then maps RMS to ISO 20816 severity zones A/B/C/D.
+  Output: zone LEDs + trip pin; reply with zone + RMS.
+- Goertzel fault detection and CWRU dataset replay are **dropped** — not
+  meaningful on 8 samples, not feasible in 4 days.
+- Most novel of the four, but the "window per command" framing is a little
+  artificial, and GPIO input use is thin.
 
-### C. Solar PV grid-tie protection relay
+### B. EV battery-pack monitor — lowest risk
 
-- Inputs: voltage/current sample pairs; config frames with grid-code limits.
-- Processing: Vrms, Irms, real power P = mean(v·i), power-factor check by
-  comparing squares (no sqrt/divide), frequency from zero-crossing count
-  (sample index as time base), over/under voltage and frequency trips with
-  time delays.
-- Outputs: GPIO trip relay, reconnect-permit, fault LEDs; UART event log.
-- Strong maths. Weaknesses: synthetic data only; UART throughput limits
-  samples per mains cycle (not an issue in simulation or the emulator, but
-  worth stating).
+- Packet: 4 cell voltages + pack current + CRC. Processing: min/max/imbalance,
+  OV/UV/OC, pack power (`mul`), balancing decision. GPIO out: balance switches,
+  contactor, fault; GPIO in: charger connected, E-stop.
+- Very natural fit, but automotive — reads close to the organiser's ECU sample.
 
-### D. Flood early-warning river station
+### D. Flood early-warning — weakest
 
-- Inputs: river level + rain-gauge tip counts per interval; config frames with
-  alert thresholds.
-- Processing: EWMA smoothing, rate of rise, rainfall accumulation, tiered
-  alerts (Normal/Alert/Warning/Danger), optional time-to-danger estimate.
-- Outputs: GPIO siren/LED tiers; UART telemetry.
-- Excellent social-impact story for Malaysia. Weakness: computation is thin,
-  MUL use is marginal — risks looking simple next to DSP-based entries.
+- Needs history (rate of rise), so every command must carry several readings;
+  computation is thin and MUL use is marginal.
 
 ### Recommendation
 
-**A (vibration monitor)**: furthest from the crowd, heaviest legitimate use of
-both custom extensions, fits the 32 B DMEM by construction, and is the only
-candidate with a public labelled dataset — which turns "it works" into "97 of
-100 windows correct". **Fallback: C**, which reuses the same RMS/protocol
-building blocks.
+**C (solar protection relay)** for the deadline: best fit to `./emu`, strong
+GPIO in/out story, genuine CRC + MUL use, low build risk. **A′** if the team
+values novelty over fit. Either way, the protocol, CRC handling, testbench,
+and `./emu` export (L2–L6) are identical, so the choice does not change the
+day-1 and day-3 work.
 
 ---
 
-## 7. Work that is app-independent — can start now
+## 8. Four-day plan (26 → 30 Sep, submit by the evening of 30 Sep with margin)
 
-1. **Comm firmware test (roadmap box 2):** UART echo, then CRC echo — firmware
-   returns the `crcb` CRC of received bytes. Golden: `"123456789"` → `0x29B1`
-   with seed `0xFFFF`.
-2. **Testbench infrastructure:** UART BFM (drive `rx_i`, decode `tx_o`), GPIO
-   driver/monitor, cycle counter on a probe pin, self-checking summary.
-3. **Frame protocol** (L3) with fault-injection tests.
-4. Finish Chip Inventor GPIO/UART integration (`chip-inventor/HANDOFF_ZHU_HENG.md`).
+| Day | Date | Work |
+|---|---|---|
+| 1 | Sat 26 – Sun 27 | Finish ChipInventor GPIO/UART integration; export the block diagram. Build the organiser test firmware, run the **official testbench**, capture PASS log + waveform. Team picks the app (§7) and freezes the packet format. |
+| 2 | Mon 28 | App firmware in assembly (`RVBL-Firmware-Builder`). Python golden model + vector generator (also emits `./emu` command lines). Check the CRC byte-order golden `0x29B1` first. |
+| 3 | Tue 29 | Team testbench: all directed vectors + bad-CRC/E-stop cases, probe-pin cycle counts. Report draft (7 pages). Video script. |
+| 4 | Wed 30 | Record video (human narration, subtitles, ≤ 8 min). Final report PDF (≤ 10 MB). Repo cleanup: firmware `.bin` + `.s`, all sources, README with build/run steps from a clean checkout. **Submit before 23:59 MYT.** |
 
 ---
 
-## 8. Risks and open questions — confirm with organisers
+## 9. Open questions — confirm with organisers
 
 | # | Question | Why it matters |
 |---|---|---|
-| 1 | Is the **emulator adaptation (C)** due in Stage 3 or Stage 4? The minutes say "a required intermediate submission for all teams now"; our reading of the roadmap/ASEM page says Stage 4. | If Stage 3, it is a missing deliverable. Hedge: keep the Python frame encoder C-portable (L6). |
-| 2 | Is the **1-minute video** due at the end of Stage 3 or Stage 4? | Video guidelines were presented now; roadmap puts the video after "Run the Emulator". |
-| 3 | Does **DMEM stay at 8 words** for Stage 3, or may we enlarge it for the application? | Decides whether any buffer is possible. Our plan assumes it stays at 8. |
-| 4 | What will **Block Guide Part 2** add? | Might add a timer or interrupts, which would change the polling design. Keep the design adaptable. |
-| 5 | May application firmware be **C** (organiser sample uses `riscv32-unknown-elf-gcc`) or must it be assembly? Which `-march`? | C needs `.insn` for Xicrc and `-march=rv32i_zmmul` for MUL. Opcode/funct fields must come from the handoff opcode table, not memory. |
-| 6 | Format and count of the promised organiser test samples (~10). | Our testbench should ingest them unchanged. |
+| 1 | Do the cover and TOC count towards the 7-page limit? | Page budget in §2.3 |
+| 2 | Is the "no AI narration / mandatory subtitles" slide rule still in force for the 8-minute video? | Recording plan |
+| 3 | Does DMEM stay at 8 words for Stage 3? | Our design assumes yes |
+| 4 | Full `./emu` instructions are promised "later in Stage 3" — any constraint on number of options per command or allowed chunk sizes beyond 1/2/4 bytes? | Packet format |
+| 5 | Which `-march` does the Firmware Builder use (does it accept `mul`)? How do they expect custom Xicrc instructions to be written? | Firmware encoding |
+| 6 | Where do the team testbench results (guide §6) go, given the report covers only topics 1–5? Video and repo only? | Report page budget |

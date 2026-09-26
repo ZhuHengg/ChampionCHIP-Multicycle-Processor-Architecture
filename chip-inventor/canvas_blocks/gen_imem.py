@@ -2,8 +2,8 @@
 
   python chip-inventor/canvas_blocks/gen_imem.py
 
-Writes rtl/imem.v, then replaces module imem in hdl.v, rtl/top.v and (if
-present) convertion/new_export/top.v. The Stage 2 ROM (FIRMWARE 0) is carried
+Writes rtl/imem.v, then replaces module imem in hdl.v (the canvas top,
+pasted into ChipInventor), hdl_ref.v and rtl/top.v. The Stage 2 ROM (FIRMWARE 0) is carried
 over verbatim from the current rtl/imem.v; test ROMs come from
 testbench/firmware.py. Upload rtl/imem.v as the canvas imem block code.
 """
@@ -86,7 +86,7 @@ def main():
     (CHIP / 'rtl/imem.v').write_text(module, encoding='utf-8')
     print('wrote rtl/imem.v')
     body = re.search(r'module imem\b.*?endmodule', module, re.S).group(0)
-    for rel in ['hdl.v', 'rtl/top.v', 'convertion/new_export/top.v']:
+    for rel in ['hdl.v', 'hdl_ref.v', 'rtl/top.v']:
         path = CHIP / rel
         if not path.exists():
             continue

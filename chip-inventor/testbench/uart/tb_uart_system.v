@@ -17,7 +17,7 @@ module testbench;
 
     // Select this test's program in imem (0 = Stage 2, the default).
     // IMEM_INST is imem's instance name in the top: blk3564_70 on the
-    // ChipInventor canvas; run_tests.py overrides it for hdl.v/rtl/top.v.
+    // ChipInventor canvas; run_tests.py overrides it for hdl_ref.v/rtl/top.v.
 `ifndef IMEM_INST
 `define IMEM_INST blk3564_70
 `endif

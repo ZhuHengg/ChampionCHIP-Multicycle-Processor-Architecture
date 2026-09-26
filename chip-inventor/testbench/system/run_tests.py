@@ -1,8 +1,7 @@
 """Run from any directory: python run_tests.py [--iverilog PATH] [--vvp PATH].
 
 Builds into ignored chip-inventor/sim/system. Then, for every top
-(hdl.v, rtl/top.v and, if present, the ChipInventor canvas export
-convertion/new_export/top.v): the Stage 2 firmware check, and the full system test (UART + GPIO + MUL + CRC).
+(hdl.v = the ChipInventor canvas top, hdl_ref.v, rtl/top.v): the Stage 2 firmware check, and the full system test (UART + GPIO + MUL + CRC).
 The system test selects FIRMWARE 3 in imem via defparam, so the design
 files are used exactly as checked in - no ROM swapping.
 """
@@ -40,7 +39,7 @@ def main():
             raise RuntimeError(name + ' failed')
 
 
-    tops = ['hdl.v', 'rtl/top.v', 'convertion/new_export/top.v']
+    tops = ['hdl.v', 'hdl_ref.v', 'rtl/top.v']
     for rel in [t for t in tops if (CHIP / t).exists()]:
         top = CHIP / rel
         tag = rel.replace('/', '_').replace('.v', '')

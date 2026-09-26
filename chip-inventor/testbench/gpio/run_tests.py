@@ -1,8 +1,7 @@
 """Run from any directory: python run_tests.py [--iverilog PATH] [--vvp PATH].
 
 Builds into ignored chip-inventor/sim/gpio. Runs the GPIO + address decoder unit test. Then, for every top
-(hdl.v, rtl/top.v and, if present, the ChipInventor canvas export
-convertion/new_export/top.v): the Stage 2 firmware check, and the CPU GPIO lw/sw program.
+(hdl.v = the ChipInventor canvas top, hdl_ref.v, rtl/top.v): the Stage 2 firmware check, and the CPU GPIO lw/sw program.
 The system test selects FIRMWARE 1 in imem via defparam, so the design
 files are used exactly as checked in - no ROM swapping.
 """
@@ -41,7 +40,7 @@ def main():
 
     run('gpio', [CHIP/'rtl/gpio.v', CHIP/'rtl/address_decoder.v', HERE/'tb_gpio.v'])
 
-    tops = ['hdl.v', 'rtl/top.v', 'convertion/new_export/top.v']
+    tops = ['hdl.v', 'hdl_ref.v', 'rtl/top.v']
     for rel in [t for t in tops if (CHIP / t).exists()]:
         top = CHIP / rel
         tag = rel.replace('/', '_').replace('.v', '')
