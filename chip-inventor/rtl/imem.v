@@ -111,6 +111,32 @@ module imem #(
                     10'd45: data_o = 32'h0000006f; // jal x0,pass
                     default: data_o = 32'h0000006f; // j . (park)
                 endcase
+            end else if (FIRMWARE == 4) begin
+                // FIRMWARE 4: organiser official GPIO/UART firmware
+                case (addr_i[9:0])
+                    10'd0: data_o = 32'hf0000437; // organiser GPIO/UART test firmware (verbatim)
+                    10'd1: data_o = 32'hf10004b7; // organiser GPIO/UART test firmware (verbatim)
+                    10'd2: data_o = 32'h00842283; // organiser GPIO/UART test firmware (verbatim)
+                    10'd3: data_o = 32'h0f02e293; // organiser GPIO/UART test firmware (verbatim)
+                    10'd4: data_o = 32'h00542423; // organiser GPIO/UART test firmware (verbatim)
+                    10'd5: data_o = 32'h00442283; // organiser GPIO/UART test firmware (verbatim)
+                    10'd6: data_o = 32'h00429293; // organiser GPIO/UART test firmware (verbatim)
+                    10'd7: data_o = 32'h00542023; // organiser GPIO/UART test firmware (verbatim)
+                    10'd8: data_o = 32'h0084a283; // organiser GPIO/UART test firmware (verbatim)
+                    10'd9: data_o = 32'h0022f293; // organiser GPIO/UART test firmware (verbatim)
+                    10'd10: data_o = 32'hfe028ce3; // organiser GPIO/UART test firmware (verbatim)
+                    10'd11: data_o = 32'h0004a423; // organiser GPIO/UART test firmware (verbatim)
+                    10'd12: data_o = 32'h0044a303; // organiser GPIO/UART test firmware (verbatim)
+                    10'd13: data_o = 32'h0084a283; // organiser GPIO/UART test firmware (verbatim)
+                    10'd14: data_o = 32'h0042f293; // organiser GPIO/UART test firmware (verbatim)
+                    10'd15: data_o = 32'hfe028ce3; // organiser GPIO/UART test firmware (verbatim)
+                    10'd16: data_o = 32'h0064a023; // organiser GPIO/UART test firmware (verbatim)
+                    10'd17: data_o = 32'h0084a303; // organiser GPIO/UART test firmware (verbatim)
+                    10'd18: data_o = 32'h00136313; // organiser GPIO/UART test firmware (verbatim)
+                    10'd19: data_o = 32'h0064a423; // organiser GPIO/UART test firmware (verbatim)
+                    10'd20: data_o = 32'hfc5ff06f; // organiser GPIO/UART test firmware (verbatim)
+                    default: data_o = 32'h0000006f; // j . (park)
+                endcase
             end else begin
                 // FIRMWARE 0: official Stage 2 validation firmware
                 case (addr_i[9:0])

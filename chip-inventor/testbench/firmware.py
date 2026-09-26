@@ -1,13 +1,20 @@
 """Test firmware for the FIRMWARE-selectable imem (see canvas_blocks/gen_imem.py).
 
-Each program returns an Asm; gen_imem.py assembles them into imem's ROMs:
-  FIRMWARE 1 = gpio_program   (tb_gpio_system.v)
-  FIRMWARE 2 = uart_program   (tb_uart_system.v)
-  FIRMWARE 3 = system_program (tb_system.v)
+Each program returns an Asm-like object with .assemble(); gen_imem.py
+assembles them into imem's ROMs:
+  FIRMWARE 1 = gpio_program       (tb_gpio_system.v)
+  FIRMWARE 2 = uart_program       (tb_uart_system.v)
+  FIRMWARE 3 = system_program     (tb_system.v)
+  FIRMWARE 4 = organiser_program  (tb_organiser.v) -- verbatim official
+               Stage 3 GPIO/UART test firmware, see
+               external/CCX_Malaysia_Edition_Stage_3/RVBL-GPIO-UART-Test-Firmware
 FIRMWARE 0 is the official Stage 2 firmware and is not generated here.
-Pass/fail convention for all three: x4 = 0x55 when the program completes.
+Pass/fail convention for FIRMWARE 1-3: x4 = 0x55 when the program completes.
+FIRMWARE 4 is the organiser's own program verbatim and has no such marker;
+its testbench checks GPIO/UART behavior directly per the organiser's README.
 """
 from pathlib import Path
+import re
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'legacy/scripts'))
@@ -122,6 +129,37 @@ def system_program():
     return a
 
 
+class LiteralRom:
+    """Wraps a fixed (addr, word) list with the .assemble() interface
+    gen_imem.py expects, so a verbatim ROM can sit alongside Asm programs
+    without going through the assembler."""
+    def __init__(self, words, comment):
+        self._words = words
+        self._comment = comment
+
+    def assemble(self):
+        return [(addr, word, self._comment, '') for addr, word in self._words]
+
+
+_ORGANISER_TXT = (Path(__file__).resolve().parents[2] / 'external' /
+    'CCX_Malaysia_Edition_Stage_3' / 'RVBL-GPIO-UART-Test-Firmware' / 'src' /
+    'firmware.txt')
+
+
+def organiser_program():
+    """Verbatim official Stage 3 GPIO/UART test firmware (21 words), loaded
+    byte-for-byte from the organiser's firmware.txt -- not reassembled, so
+    this is exactly what they shipped. See that folder's README for the
+    RV32I source (P7-4 output/P3-0 input; GPIO echo P3-0->P7-4; UART RX
+    byte echoed back on TX)."""
+    text = _ORGANISER_TXT.read_text(encoding='utf-8')
+    pairs = re.findall(r"32'h([0-9A-Fa-f]{8}):\s*r_Instruction\s*=\s*32'h([0-9A-Fa-f]{8})", text)
+    assert len(pairs) == 21, f'expected 21 words in organiser firmware.txt, got {len(pairs)}'
+    words = [(int(a, 16), int(w, 16)) for a, w in pairs]
+    return LiteralRom(words, 'organiser GPIO/UART test firmware (verbatim)')
+
+
 PROGRAMS = {1: ('GPIO system test', gpio_program),
             2: ('UART echo test', uart_program),
-            3: ('full system test', system_program)}
+            3: ('full system test', system_program),
+            4: ('organiser official GPIO/UART firmware', organiser_program)}

@@ -4,6 +4,14 @@
 chip-inventor/sim/gpio/
 chip-inventor/sim/uart/
 chip-inventor/sim/system/
+chip-inventor/sim/organiser/
+chip-inventor/sim/mut/
+
+# organiser's Stage 3 repo (RVBL-Emulator, RVBL-Firmware-Builder toolchain):
+# cloned for reference, not vendored. RVBL-GPIO-UART-Test-Firmware/ IS
+# committed because gen_imem.py reads firmware.txt from it.
+external/CCX_Malaysia_Edition_Stage_3/RVBL-Emulator/
+external/CCX_Malaysia_Edition_Stage_3/RVBL-Firmware-Builder/
 
 # simulation run logs (keep the folder, ignore contents)
 **/logs/*
