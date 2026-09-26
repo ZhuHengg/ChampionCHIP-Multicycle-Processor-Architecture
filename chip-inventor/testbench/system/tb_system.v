@@ -110,7 +110,7 @@ module testbench;
     reg [7:0] got;
 
     initial begin
-        $dumpfile("system.vcd");
+        $dumpfile("testbench.vcd");
         $dumpvars(0, testbench);
 
         repeat (3) @(negedge clk_i);

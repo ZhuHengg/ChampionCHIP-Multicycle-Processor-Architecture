@@ -28,7 +28,7 @@ module testbench;
 
     // Host drives one byte on rx while the chip echoes it on tx.
     initial begin
-        $dumpfile("uart_system.vcd");
+        $dumpfile("testbench.vcd");
         $dumpvars(0, testbench);
         repeat (3) @(negedge clk);
         rst = 0;

@@ -24,7 +24,7 @@ module testbench;
 `endif
     defparam dut.`IMEM_INST.FIRMWARE = 1;
     initial begin
-        $dumpfile("gpio_system.vcd"); $dumpvars(0,testbench);
+        $dumpfile("testbench.vcd"); $dumpvars(0,testbench);
         repeat(2) @(negedge clk); rst=0;
         repeat(300) @(negedge clk);
         if (x4 !== 32'h55) $fatal(1,"CPU GPIO program failed: x4=%h pc=%h",x4,pc);

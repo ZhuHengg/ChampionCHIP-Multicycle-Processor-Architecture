@@ -52,7 +52,7 @@ module testbench;
         end
     endtask
     initial begin
-        $dumpfile("gpio.vcd"); $dumpvars(0,testbench);
+        $dumpfile("testbench.vcd"); $dumpvars(0,testbench);
         repeat(2) @(negedge clk);
         if (pins !== 8'hzz || gpio_rd !== 0) $fatal(1,"reset");
         rst=0;
