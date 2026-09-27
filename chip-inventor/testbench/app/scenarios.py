@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from golden import Charger, Meter, corrupt, record_bytes, restart_delay  # noqa: F401
+from golden import Charger, Meter, corrupt, restart_delay  # noqa: F401
 
 HERE = Path(__file__).resolve().parent
 CHIP = HERE.parents[1]
@@ -161,8 +161,133 @@ def _harness():
     return out
 
 
+def _app():
+    """S1-S11 + S1X: the application scenario set of spec SS7.8.
+
+    Every scenario starts with -d 0xF0 (our DATADIR) and ends by reading the
+    one 8-byte session record.
+    """
+    out = {}
+
+    def new(name, title, **kw):
+        s = Scenario(name, title, **kw)
+        s.d(0xF0)
+        out[name] = s
+        return s
+
+    def N(m):
+        return m.frame(2300, 160, 5000)        # healthy nominal frame
+
+    # ---- S1: normal session ------------------------------------------------
+    s, m = new('S1', 'normal session: plug in, charge two frames, unplug'), Meter()
+    s.i(0).o().i(1).o().i(2).o()
+    s.frame(N(m)).o()
+    s.frame(N(m)).o()
+    s.i(1).o().i(0).o().record()
+
+    # ---- S1X: same, streamed ----------------------------------------------
+    # 16 bytes back to back with no gap: the first frame's end-of-frame
+    # processing must finish inside one byte time (1740 cycles).
+    s, m = new('S1X', 'stress: S1 with back-to-back UART bytes', stream=True), Meter()
+    s.i(0).o().i(1).o().i(2).o()
+    s.frame(N(m))
+    s.frame(N(m))
+    s.o()
+    s.i(1).o().i(0).o().record()
+
+    # ---- S2: grid under-frequency -> hold -> CRC-timed restart ------------
+    s, m = new('S2', 'grid under-frequency: hold, then CRC-timed restart'), Meter()
+    s.i(1).o().i(2).o()
+    s.frame(N(m)).o()
+    trigger = m.frame(2300, 160, 4920)         # F < F_LOW -> GRID_HOLD
+    delay = restart_delay(int.from_bytes(trigger[6:], 'little'))
+    s.frame(trigger).o()
+    s.frame(m.frame(2300, 160, 4940)).o()      # still unhealthy: count resets
+    for _ in range(delay):                     # healthy frames; the last one
+        s.frame(m.frame(2070, 160, 4950)).o()  # restarts charging
+    s.frame(N(m)).o()
+    s.i(1).o().i(0).o().record()
+
+    # ---- S3: corrupted frame and dropped frame ---------------------------
+    s, m = new('S3', 'corrupted frame and dropped frame each cost one frame'), Meter()
+    s.i(1).o().i(2).o()
+    s.frame(N(m)).o()
+    s.frame(corrupt(N(m))).o()                 # rejected
+    s.frame(N(m)).o()                          # chain resynchronises
+    N(m)                                       # generated but never delivered
+    s.frame(N(m)).o()                          # rejected: chain skipped a step
+    s.frame(N(m)).o()                          # accepted again
+    s.i(0).o().record()
+
+    # ---- S4: meter link lost ---------------------------------------------
+    s, m = new('S4', 'meter link lost: two bad frames in a row latch FAULT'), Meter()
+    s.i(1).o().i(2).o()
+    s.frame(N(m)).o()
+    s.frame(corrupt(N(m))).o()
+    s.frame(corrupt(N(m))).o()                 # -> 0x80, CRC-lost flag
+    s.i(0).o().record()
+
+    # ---- S5: emergency stop while charging, latched -----------------------
+    s, m = new('S5', 'E-stop while charging latches FAULT until released and unplugged'), Meter()
+    s.i(1).o().i(2).o()
+    s.frame(N(m)).o()
+    s.i(0x0A).o()                              # CP C + SAFETY_TRIP -> FAULT
+    s.i(0x02).o()                              # still faulted
+    s.i(0x08).o()                              # still faulted
+    s.i(0x00).o()                              # released and unplugged -> IDLE
+    s.record()
+
+    # ---- S6: straight to C, unplug under load ----------------------------
+    s, m = new('S6', 'plug straight into CP C, then unplug while charging'), Meter()
+    s.i(2).o()                                 # IDLE -> CONNECTED -> CHARGING
+    s.frame(N(m)).o()
+    s.i(0).o().record()
+
+    # ---- S7: boundaries and over-current ---------------------------------
+    s, m = new('S7', 'frame exactly on every limit is billed; I_MAX+1 faults'), Meter()
+    s.i(1).o().i(2).o()
+    s.frame(m.frame(2070, 320, 4950)).o()      # V_SAG, I_MAX, F_LOW exactly
+    s.frame(m.frame(2300, 321, 5000)).o()      # I > I_MAX -> FAULT
+    s.i(0).o().record()
+
+    # ---- S8: ventilation required, then CP error -------------------------
+    s = new('S8', 'ventilation (CP D) refused; CP E latches FAULT')
+    s.i(1).o().i(3).o()                        # D refused, stays CONNECTED
+    s.i(2).o()                                 # C -> CHARGING
+    s.i(3).o()                                 # D -> back to CONNECTED
+    s.i(4).o()                                 # E -> FAULT, CP-error flag
+    s.i(0).o().record()
+
+    # ---- S9: invalid pilot code ------------------------------------------
+    s = new('S9', 'invalid pilot code 7 latches FAULT with the CP-error flag')
+    s.i(1).o().i(7).o().i(0).o().record()
+
+    # ---- S10: replayed frame ---------------------------------------------
+    s, m = new('S10', 'replayed frame rejected, and the next one too -> FAULT'), Meter()
+    s.i(1).o().i(2).o()
+    f1 = N(m)
+    f2 = N(m)
+    s.frame(f1).o()
+    s.frame(f2).o()
+    s.frame(f1).o()                            # replay -> rejected
+    s.frame(N(m)).o()                          # chain broken -> FAULT
+    s.i(0).o().record()
+
+    # ---- S11: stale input pins at power-up -------------------------------
+    # emu.c keeps IN across its reset, so the firmware can boot with CP = C
+    # already asserted and must settle straight to CHARGING.
+    s, m = new('S11', 'stale pins at boot: CP C already asserted, settles to CHARGING',
+               preset_in=0x02), Meter()
+    s.o()                                      # 0x30 without any -i
+    s.frame(N(m)).o()
+    s.i(0).o().record()
+
+    return out
+
+
 SCENARIOS = {}
 SCENARIOS.update(_harness())
+SCENARIOS.update(_app())
 
 
 def write_emu_commands(path=None):
