@@ -5,9 +5,206 @@ build/firmware.elf:     file format elf32-littleriscv
 Disassembly of section .text:
 
 00400000 <_start>:
-  400000:	80848433          	.insn	4, 0x80848433
-  400004:	02c58533          	mul	a0,a1,a2
-  400008:	0000006f          	j	400008 <_start+0x8>
+  400000:	f0000437          	lui	s0,0xf0000
+  400004:	f10004b7          	lui	s1,0xf1000
+  400008:	0f000293          	li	t0,240
+  40000c:	00542423          	sw	t0,8(s0) # f0000008 <GPIO_BASE+0x8>
+  400010:	00042023          	sw	zero,0(s0)
+  400014:	00000213          	li	tp,0
+  400018:	00010937          	lui	s2,0x10
+  40001c:	fff90913          	addi	s2,s2,-1 # ffff <CRC_INIT>
+  400020:	00000993          	li	s3,0
+  400024:	00000a13          	li	s4,0
+  400028:	00000a93          	li	s5,0
+  40002c:	00000b13          	li	s6,0
+  400030:	00000b93          	li	s7,0
+  400034:	00000c13          	li	s8,0
+  400038:	00000c93          	li	s9,0
+
+0040003c <main_loop>:
+  40003c:	00c000ef          	jal	400048 <apply_pins>
+  400040:	1f8000ef          	jal	400238 <poll_uart>
+  400044:	ff9ff06f          	j	40003c <main_loop>
+
+00400048 <apply_pins>:
+  400048:	00008d93          	mv	s11,ra
+
+0040004c <ap_again>:
+  40004c:	00442283          	lw	t0,4(s0)
+  400050:	0072f593          	andi	a1,t0,7
+  400054:	0082f613          	andi	a2,t0,8
+  400058:	00020d13          	mv	s10,tp
+  40005c:	00400293          	li	t0,4
+  400060:	02520263          	beq	tp,t0,400084 <ap_fault>
+  400064:	02061a63          	bnez	a2,400098 <ap_estop>
+  400068:	00400293          	li	t0,4
+  40006c:	0255de63          	bge	a1,t0,4000a8 <ap_cp_error>
+  400070:	00000293          	li	t0,0
+  400074:	04520263          	beq	tp,t0,4000b8 <ap_idle>
+  400078:	00100293          	li	t0,1
+  40007c:	04520c63          	beq	tp,t0,4000d4 <ap_connected>
+  400080:	0700006f          	j	4000f0 <ap_session>
+
+00400084 <ap_fault>:
+  400084:	08061e63          	bnez	a2,400120 <ap_done>
+  400088:	08059c63          	bnez	a1,400120 <ap_done>
+  40008c:	00000513          	li	a0,0
+  400090:	0b4000ef          	jal	400144 <set_state>
+  400094:	0880006f          	j	40011c <ap_check>
+
+00400098 <ap_estop>:
+  400098:	00800293          	li	t0,8
+  40009c:	005aeab3          	or	s5,s5,t0
+  4000a0:	088000ef          	jal	400128 <enter_fault>
+  4000a4:	0780006f          	j	40011c <ap_check>
+
+004000a8 <ap_cp_error>:
+  4000a8:	01000293          	li	t0,16
+  4000ac:	005aeab3          	or	s5,s5,t0
+  4000b0:	078000ef          	jal	400128 <enter_fault>
+  4000b4:	0680006f          	j	40011c <ap_check>
+
+004000b8 <ap_idle>:
+  4000b8:	06058463          	beqz	a1,400120 <ap_done>
+  4000bc:	00000993          	li	s3,0
+  4000c0:	00000a13          	li	s4,0
+  4000c4:	00000a93          	li	s5,0
+  4000c8:	00100513          	li	a0,1
+  4000cc:	078000ef          	jal	400144 <set_state>
+  4000d0:	04c0006f          	j	40011c <ap_check>
+
+004000d4 <ap_connected>:
+  4000d4:	00200293          	li	t0,2
+  4000d8:	00558663          	beq	a1,t0,4000e4 <ap_conn_charge>
+  4000dc:	02058663          	beqz	a1,400108 <ap_unplug>
+  4000e0:	0400006f          	j	400120 <ap_done>
+
+004000e4 <ap_conn_charge>:
+  4000e4:	00200513          	li	a0,2
+  4000e8:	05c000ef          	jal	400144 <set_state>
+  4000ec:	0300006f          	j	40011c <ap_check>
+
+004000f0 <ap_session>:
+  4000f0:	00058c63          	beqz	a1,400108 <ap_unplug>
+  4000f4:	00200293          	li	t0,2
+  4000f8:	02558463          	beq	a1,t0,400120 <ap_done>
+  4000fc:	00100513          	li	a0,1
+  400100:	044000ef          	jal	400144 <set_state>
+  400104:	0180006f          	j	40011c <ap_check>
+
+00400108 <ap_unplug>:
+  400108:	00000513          	li	a0,0
+  40010c:	038000ef          	jal	400144 <set_state>
+  400110:	00000513          	li	a0,0
+  400114:	080000ef          	jal	400194 <send_record>
+  400118:	0040006f          	j	40011c <ap_check>
+
+0040011c <ap_check>:
+  40011c:	f3a218e3          	bne	tp,s10,40004c <ap_again>
+
+00400120 <ap_done>:
+  400120:	000d8093          	mv	ra,s11
+  400124:	00008067          	ret
+
+00400128 <enter_fault>:
+  400128:	00008e93          	mv	t4,ra
+  40012c:	00400513          	li	a0,4
+  400130:	014000ef          	jal	400144 <set_state>
+  400134:	00400513          	li	a0,4
+  400138:	05c000ef          	jal	400194 <send_record>
+  40013c:	000e8093          	mv	ra,t4
+  400140:	00008067          	ret
+
+00400144 <set_state>:
+  400144:	00050213          	mv	tp,a0
+  400148:	00000313          	li	t1,0
+  40014c:	02650263          	beq	a0,t1,400170 <ss_idle>
+  400150:	00100313          	li	t1,1
+  400154:	02650263          	beq	a0,t1,400178 <ss_connected>
+  400158:	00200313          	li	t1,2
+  40015c:	02650263          	beq	a0,t1,400180 <ss_charging>
+  400160:	00300313          	li	t1,3
+  400164:	02650263          	beq	a0,t1,400188 <ss_hold>
+  400168:	08000393          	li	t2,128
+  40016c:	0200006f          	j	40018c <ss_write>
+
+00400170 <ss_idle>:
+  400170:	00000393          	li	t2,0
+  400174:	0180006f          	j	40018c <ss_write>
+
+00400178 <ss_connected>:
+  400178:	02000393          	li	t2,32
+  40017c:	0100006f          	j	40018c <ss_write>
+
+00400180 <ss_charging>:
+  400180:	03000393          	li	t2,48
+  400184:	0080006f          	j	40018c <ss_write>
+
+00400188 <ss_hold>:
+  400188:	06000393          	li	t2,96
+
+0040018c <ss_write>:
+  40018c:	00742023          	sw	t2,0(s0)
+  400190:	00008067          	ret
+
+00400194 <send_record>:
+  400194:	00008e13          	mv	t3,ra
+  400198:	015565b3          	or	a1,a0,s5
+  40019c:	00010637          	lui	a2,0x10
+  4001a0:	fff60613          	addi	a2,a2,-1 # ffff <CRC_INIT>
+  4001a4:	0009d693          	srli	a3,s3,0x0
+  4001a8:	0ff6f513          	zext.b	a0,a3
+  4001ac:	80c50633          	.insn	4, 0x80c50633
+  4001b0:	068000ef          	jal	400218 <tx_wait>
+  4001b4:	0089d693          	srli	a3,s3,0x8
+  4001b8:	0ff6f513          	zext.b	a0,a3
+  4001bc:	80c50633          	.insn	4, 0x80c50633
+  4001c0:	058000ef          	jal	400218 <tx_wait>
+  4001c4:	0109d693          	srli	a3,s3,0x10
+  4001c8:	0ff6f513          	zext.b	a0,a3
+  4001cc:	80c50633          	.insn	4, 0x80c50633
+  4001d0:	048000ef          	jal	400218 <tx_wait>
+  4001d4:	0189d693          	srli	a3,s3,0x18
+  4001d8:	0ff6f513          	zext.b	a0,a3
+  4001dc:	80c50633          	.insn	4, 0x80c50633
+  4001e0:	038000ef          	jal	400218 <tx_wait>
+  4001e4:	0ff5f513          	zext.b	a0,a1
+  4001e8:	80c50633          	.insn	4, 0x80c50633
+  4001ec:	02c000ef          	jal	400218 <tx_wait>
+  4001f0:	0ffa7513          	zext.b	a0,s4
+  4001f4:	80c50633          	.insn	4, 0x80c50633
+  4001f8:	020000ef          	jal	400218 <tx_wait>
+  4001fc:	0ff67513          	zext.b	a0,a2
+  400200:	018000ef          	jal	400218 <tx_wait>
+  400204:	00865513          	srli	a0,a2,0x8
+  400208:	0ff57513          	zext.b	a0,a0
+  40020c:	00c000ef          	jal	400218 <tx_wait>
+  400210:	000e0093          	mv	ra,t3
+  400214:	00008067          	ret
+
+00400218 <tx_wait>:
+  400218:	0084a283          	lw	t0,8(s1) # f1000008 <UART_BASE+0x8>
+  40021c:	0042f293          	andi	t0,t0,4
+  400220:	fe028ce3          	beqz	t0,400218 <tx_wait>
+  400224:	00a4a023          	sw	a0,0(s1)
+  400228:	0084a283          	lw	t0,8(s1)
+  40022c:	0012e293          	ori	t0,t0,1
+  400230:	0054a423          	sw	t0,8(s1)
+  400234:	00008067          	ret
+
+00400238 <poll_uart>:
+  400238:	0084a283          	lw	t0,8(s1)
+  40023c:	0022f293          	andi	t0,t0,2
+  400240:	00028e63          	beqz	t0,40025c <pu_done>
+  400244:	0004a423          	sw	zero,8(s1)
+  400248:	0044a303          	lw	t1,4(s1)
+  40024c:	001c8c93          	addi	s9,s9,1
+  400250:	00800393          	li	t2,8
+  400254:	007cc463          	blt	s9,t2,40025c <pu_done>
+  400258:	00000c93          	li	s9,0
+
+0040025c <pu_done>:
+  40025c:	00008067          	ret
 
 Disassembly of section .riscv.attributes:
 
@@ -16,7 +213,7 @@ Disassembly of section .riscv.attributes:
    2:	0000                	.insn	2, 0x0000
    4:	7200                	.insn	2, 0x7200
    6:	7369                	.insn	2, 0x7369
-   8:	01007663          	bgeu	zero,a6,14 <GPIO_DATADIR+0xc>
+   8:	01007663          	bgeu	zero,a6,14 <F_CP_ERROR+0x4>
    c:	0018                	.insn	2, 0x0018
    e:	0000                	.insn	2, 0x0000
   10:	7205                	.insn	2, 0x7205

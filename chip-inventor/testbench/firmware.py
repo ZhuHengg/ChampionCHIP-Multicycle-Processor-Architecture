@@ -145,6 +145,19 @@ _ORGANISER_TXT = (Path(__file__).resolve().parents[2] / 'external' /
     'CCX_Malaysia_Edition_Stage_3' / 'RVBL-GPIO-UART-Test-Firmware' / 'src' /
     'firmware.txt')
 
+_APP_TXT = Path(__file__).resolve().parents[1] / 'firmware' / 'build' / 'firmware.txt'
+
+
+def _load_firmware_txt(path, comment, expected_words=None):
+    """Parse a Firmware-Builder firmware.txt into an (addr, word) LiteralRom."""
+    text = Path(path).read_text(encoding='utf-8')
+    pairs = re.findall(r"32'h([0-9A-Fa-f]{8}):\s*r_Instruction\s*=\s*32'h([0-9A-Fa-f]{8})", text)
+    if expected_words is not None:
+        assert len(pairs) == expected_words, \
+            f'expected {expected_words} words in {path}, got {len(pairs)}'
+    assert pairs, f'no instruction words found in {path}'
+    return LiteralRom([(int(a, 16), int(w, 16)) for a, w in pairs], comment)
+
 
 def organiser_program():
     """Verbatim official Stage 3 GPIO/UART test firmware (21 words), loaded
@@ -152,14 +165,20 @@ def organiser_program():
     this is exactly what they shipped. See that folder's README for the
     RV32I source (P7-4 output/P3-0 input; GPIO echo P3-0->P7-4; UART RX
     byte echoed back on TX)."""
-    text = _ORGANISER_TXT.read_text(encoding='utf-8')
-    pairs = re.findall(r"32'h([0-9A-Fa-f]{8}):\s*r_Instruction\s*=\s*32'h([0-9A-Fa-f]{8})", text)
-    assert len(pairs) == 21, f'expected 21 words in organiser firmware.txt, got {len(pairs)}'
-    words = [(int(a, 16), int(w, 16)) for a, w in pairs]
-    return LiteralRom(words, 'organiser GPIO/UART test firmware (verbatim)')
+    return _load_firmware_txt(_ORGANISER_TXT,
+                              'organiser GPIO/UART test firmware (verbatim)',
+                              expected_words=21)
+
+
+def app_program():
+    """Stage 3 application: grid-aware EV charging-station controller, built
+    from chip-inventor/firmware/src/main.s by the organiser's Firmware-Builder
+    (see that folder's README). Rebuild with `make`, then rerun gen_imem.py."""
+    return _load_firmware_txt(_APP_TXT, 'grid-aware EV charger application')
 
 
 PROGRAMS = {1: ('GPIO system test', gpio_program),
             2: ('UART echo test', uart_program),
             3: ('full system test', system_program),
-            4: ('organiser official GPIO/UART firmware', organiser_program)}
+            4: ('organiser official GPIO/UART firmware', organiser_program),
+            5: ('grid-aware EV charger application', app_program)}

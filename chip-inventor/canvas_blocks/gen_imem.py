@@ -6,6 +6,11 @@ Writes rtl/imem.v, then replaces module imem in hdl.v (the canvas top,
 pasted into ChipInventor), hdl_ref.v and rtl/top.v. The Stage 2 ROM (FIRMWARE 0) is carried
 over verbatim from the current rtl/imem.v; test ROMs come from
 testbench/firmware.py. Upload rtl/imem.v as the canvas imem block code.
+
+FIRMWARE 4 (the organiser's verbatim GPIO/UART test firmware) and FIRMWARE 5
+(our Stage 3 grid-aware EV charger application) are loaded from a
+Firmware-Builder firmware.txt, so rerun this script after rebuilding
+chip-inventor/firmware/ with `make`.
 """
 from pathlib import Path
 import re
@@ -59,6 +64,8 @@ def build():
     return f'''// Instruction ROM. FIRMWARE selects the program at elaboration time:
 //   0 = official Stage 2 validation firmware (default; what synthesis builds)
 //   1 = GPIO system test, 2 = UART echo test, 3 = full system test
+//   4 = organiser official GPIO/UART firmware (verbatim)
+//   5 = grid-aware EV charger application (Stage 3)
 // Test programs are simulation-only: a testbench selects one with
 //   defparam dut.<imem instance>.FIRMWARE = N;
 // FIRMWARE is a constant, so synthesis folds away the unselected ROMs.
