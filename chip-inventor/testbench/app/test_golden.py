@@ -175,6 +175,23 @@ def test_fault_sends_no_second_record():
     assert len(c.tx) == 8
 
 
+def test_valid_frame_in_fault_resets_bad_counter():
+    # Spec SS7.6 rule 3: a valid frame resets the counter in every state,
+    # FAULT included, so one later bad frame after recovery is not a fault.
+    c, m = Charger(), Meter()
+    c.set_inputs(1)
+    c.set_inputs(2)
+    c.rx_frame(corrupt(m.frame(2300, 160, 5000)))
+    c.rx_frame(corrupt(m.frame(2300, 160, 5000)))
+    assert c.state == FAULT
+    c.rx_frame(m.frame(2300, 160, 5000))
+    assert c.bad == 0
+    c.set_inputs(0)
+    c.rx_frame(corrupt(m.frame(2300, 160, 5000)))
+    assert c.state == IDLE
+    assert len(c.tx) == 8
+
+
 def test_overcurrent_boundary():
     c, m = Charger(), Meter()
     c.set_inputs(1)

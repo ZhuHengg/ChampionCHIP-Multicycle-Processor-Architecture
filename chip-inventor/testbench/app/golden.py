@@ -171,16 +171,13 @@ class Charger:
         valid = crc16(frame[:6], self.seed) == field
         self.seed = field                      # rule 1: always advance
 
-        if self.state == FAULT:
-            return
-
-        if not valid:                          # rule 2
+        if not valid:                          # rule 2: counted in FAULT too
             self.bad += 1
-            if self.bad >= 2:
+            if self.bad >= 2 and self.state != FAULT:
                 self._enter_fault(F_CRC_LOST)
             return
 
-        self.bad = 0                           # rule 3
+        self.bad = 0                           # rule 3: reset in every state
         v, i, f = struct.unpack('<HHH', frame[:6])
 
         if self.state == CHARGING:
