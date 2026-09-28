@@ -75,7 +75,7 @@ Official workflow (Submission Guide §1 figure):
 | 3 | Application Definition | §4 | **Done** — §7, frozen. Protocol answered against the emulator's own checklist in `chip-inventor/emulator/README.md`. |
 | 4 | Application Firmware Development | §5 | **Done.** `chip-inventor/firmware/src/main.s` (264 words, `FIRMWARE 5`), built with the organiser's vendored Firmware-Builder (`riscv64-unknown-elf`, MSYS2 UCRT64). Toolchain validated by rebuilding the organiser's own firmware byte-for-byte (21/21 lines identical). All five states, chained-CRC frame validation (`crcb`), `mul` metering, over-current and CRC-lost faults, and the CRC-hashed grid-hold restart. |
 | 5 | Application Firmware Testbench | §6 | **Done.** `testbench/app/` models `./emu` + the FPGA wrapper (one `emu_*` task per option). 15 scenarios × 3 tops = 45 runs, all as expected (H1 is an expected-fail harness self-check). 36 pytest cases cover the golden model and the scenario set. |
-| 6 | Emulator Preview (`./emu` command set) | §4, §7 | **Done.** `chip-inventor/emulator/emu_commands.txt` — 12 `./emu` command lines (S1–S11 + S1X), generated from the golden model, plus `run_scenarios.sh` to run them on the FPGA and `README.md` answering the organiser's protocol checklist. |
+| 6 | Emulator Preview (`./emu` command set) | §4, §7 | **Done.** `chip-inventor/emulator/emu_commands.txt` — 12 scenarios (S1–S11 + S1X) as 13 `./emu` command lines (S11 needs a setup line that leaves IN = 0x02 for its boot), generated from the golden model, plus `run_scenarios.sh` to run them on the FPGA and `README.md` answering the organiser's protocol checklist. |
 | — | `convertion/new_export/hdl.v` | — | Has FIRMWARE 1–3 only (no 4). Matters only if that export goes back into ChipInventor. |
 
 ---

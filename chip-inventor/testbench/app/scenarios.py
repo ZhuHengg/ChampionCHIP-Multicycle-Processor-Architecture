@@ -301,6 +301,16 @@ def write_emu_commands(path=None):
     for s in SCENARIOS.values():
         if s.firmware != APP_FIRMWARE:
             continue
+        if s.preset_in:
+            # emu.c keeps IN across its reset, so the only way to boot with
+            # pins asserted is to leave them there with a previous command.
+            # The run before this one may have ended on any IN value.
+            boot = Charger()
+            boot.set_inputs(s.preset_in)
+            lines.append(f'# {s.name} setup: leave IN = 0x{s.preset_in:02X} '
+                         f'for the reset at the start of {s.name}')
+            lines.append(f'./emu -d 0xF0 -i 0x{s.preset_in:02X} -o 0x{boot.out:02X}')
+            lines.append('')
         lines.append(f'# {s.name}: {s.title}')
         lines.append(s.to_emu())
         lines.append('')

@@ -155,6 +155,9 @@ Verified by reading `RVBL-Emulator/src/emu.c` in full:
    (the input value) keeps whatever the previous run left. The firmware can
    therefore boot with pins already asserted — scenario S11 pins this
    deliberately, and it is why the organiser's README example passes.
+   Because the input value is whatever the *previous* command left, S11 is
+   preceded by an "S11 setup" line that leaves IN = 0x02 for the reset that
+   starts S11 (so `run_scenarios.sh` runs 13 lines for 12 scenarios).
 3. **Options run strictly in order, and the first mismatch aborts the rest**
    (`goto main_end`).
 4. **At most 8 reply bytes per command**, through a running pointer (§5).
