@@ -338,16 +338,20 @@ Same scenarios exported as real `./emu` commands
 
 # How we stand out
 
-How chargers restart after a grid dip:
+How today's chargers handle a grid dip:
 
-| | Restart at once | Fixed delay | Random delay | Network scheduled | **Ours: CRC-timed** |
+| | Basic wallbox | Timer charger | Smart charger | Networked charger | **Ours** |
 |---|---|---|---|---|---|
+| *How it restarts* | *at once* | *after a fixed or scheduled delay* | *after a random delay* | *when the back-end server says* | ***at its own CRC-timed moment*** |
 | Spreads the restart surge | ✗ | ✗ | ✓ | ✓ | **✓** |
-| Works with no network | ✓ | ✓ | ✓ | ✗ | **✓** |
+| Senses grid trouble itself (frequency, voltage) | ✗ | ✗ | ◐ | ◐ | **✓** |
+| Still protects the grid when the network is down | — | — | ✓ | ✗ | **✓** |
 | No random-number source needed | ✓ | ✓ | ✗ | ✓ | **✓** |
 | Restart moment can be re-checked afterwards | ✓ | ✓ | ✗ | ◐ | **✓** |
+| Extra parts needed | none | real-time clock | random source | modem + cloud server | **none: one small chip** |
 
-✓ yes · ✗ no · ◐ only if the server's logs survive
+✓ yes · ✗ no · ◐ some models, or only via the operator · — no grid protection to lose
+Typical behaviour of each product type; individual models vary.
 
 Only ours ticks every box.
 

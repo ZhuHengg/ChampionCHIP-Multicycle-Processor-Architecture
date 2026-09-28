@@ -411,15 +411,23 @@ chapter.
 
 **On screen:**
 
-A comparison matrix: four ways chargers restart today, plus ours, against four
-criteria. Exact table in [SLIDES.md](SLIDES.md).
+A comparison matrix: four product types on the market today, plus ours.
+Exact table in [SLIDES.md](SLIDES.md).
 
-| | Restart at once | Fixed delay | Random delay | Network scheduled | **Ours: CRC-timed** |
+| | Basic wallbox | Timer charger | Smart charger | Networked charger | **Ours** |
 |---|---|---|---|---|---|
+| *How it restarts* | *at once* | *after a fixed or scheduled delay* | *after a random delay* | *when the back-end server says* | ***at its own CRC-timed moment*** |
 | Spreads the restart surge | ✗ | ✗ | ✓ | ✓ | **✓** |
-| Works with no network | ✓ | ✓ | ✓ | ✗ | **✓** |
+| Senses grid trouble itself (frequency, voltage) | ✗ | ✗ | ◐ | ◐ | **✓** |
+| Still protects the grid when the network is down | — | — | ✓ | ✗ | **✓** |
 | No random-number source needed | ✓ | ✓ | ✗ | ✓ | **✓** |
 | Restart moment can be re-checked afterwards | ✓ | ✓ | ✗ | ◐ | **✓** |
+| Extra parts needed | none | real-time clock | random source | modem + cloud server | **none: one small chip** |
+
+The columns are generic product types, not brands, and the marks describe
+typical behaviour (the slide says so). "Networked charger" means a
+cloud-managed public charger, e.g. one run over OCPP; when its link drops it
+falls back to its default behaviour.
 
 Below it: **Chip design:** every RVBL-2 chip has a CRC instruction. Most use
 it for *one* job (checking data). Ours does **three**.
@@ -431,12 +439,13 @@ markets already use cryptographically signed meter data, which is stronger than
 a CRC.
 
 **Say:**
-> Today a charger restarts at once or after a fixed delay, so the whole fleet
-> still comes back together. A random delay spreads them, but needs a random
-> source and can't be checked afterwards. Network scheduling works until the
-> network fails. Ours is the only one that ticks every box. And on the chip
-> side: every RVBL-2 chip has a CRC instruction. Most use it to check data.
-> Ours does three jobs.
+> A basic wallbox restarts at once, and a timer charger just restarts later,
+> all together. Smart chargers add a random delay, which spreads them but
+> can't be checked afterwards. Networked chargers spread the load until the
+> network drops. Ours senses the grid itself, spreads the restart, needs no
+> network and no extra parts, and anyone can re-check it. And on the chip
+> side: every RVBL-2 chip has a CRC instruction. Most use it to
+> check data. Ours does three jobs.
 
 ---
 
@@ -580,6 +589,7 @@ If a rehearsal runs long, cut the lines marked *(cut if long)* first.
 | Claim | Where | Action |
 |---|---|---|
 | The UK requires a randomised delay on smart chargers | Slide 14 (optional) | The script no longer names the UK. If you add it as a real-world example, confirm it against the UK *Electric Vehicles (Smart Charge Points) Regulations 2021* first |
+| Product-type columns on the comparison matrix | Slide 14 | Keep them generic (no brand names) and keep the "typical behaviour; individual models vary" footnote on the slide. If anyone wants to name a real product, check that model's documentation first |
 | "Human narration only, subtitles mandatory" | §7 Delivery | From earlier competition slides, not in the Stage 3 guide. Confirm with the organisers; human narration plus subtitles is safe either way |
 | Any Malaysian EV statistic added to slide 1 | Slide 1 | Only use a figure with a source you can cite |
 | YouTube visibility (public or unlisted) | Upload | Check the submission platform's instructions |
