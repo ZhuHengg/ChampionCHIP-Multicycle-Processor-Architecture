@@ -165,14 +165,14 @@ def fig_integration(t):
             s.line([(tx + tw + 5, y), (ex - 5, y)], key, 3)
         s.label((tx + tw + ex) / 2, y - 10, name, key, 17)
 
-    # Emulator
+    # Outside world (the emulator is introduced on the connection-logic slide)
     s.rect(ex, 470, 270, 460, t['emu'], sw=3, dash='10 7')
-    s.text(ex + 22, 512, 'Emulator  ./emu', 24, t['emu'], 700)
-    s.text(ex + 22, 560, 'GPIO  -d -i -o', 20, t['gpio'], 700, mono=True)
-    for i, ln in enumerate(('P2–P0 in: pilot', 'P3 in: E-stop', 'P4–P7 out: contactor,', '  lock, grid hold, fault')):
+    s.text(ex + 22, 512, 'Outside world', 24, t['emu'], 700)
+    s.text(ex + 22, 560, '8 GPIO pins', 20, t['gpio'], 700)
+    for i, ln in enumerate(('each pin: input or', 'output, set by DATADIR')):
         s.text(ex + 22, 594 + i * 28, ln, 18, t['muted'])
-    s.text(ex + 22, 760, 'UART  -t -r', 20, t['uart'], 700, mono=True)
-    for i, ln in enumerate(('-t in: meter frames', '-r out: session record')):
+    s.text(ex + 22, 760, 'Serial line', 20, t['uart'], 700)
+    for i, ln in enumerate(('rx_i: bytes in', 'tx_o: bytes out', '115200 baud, 8N1')):
         s.text(ex + 22, 794 + i * 28, ln, 18, t['muted'])
 
     s.text(70, 990, 'Registered peripheral reads match the core\'s MEM_ACCESS_ADDR → MEM_ACCESS_DATA load timing, '
@@ -187,7 +187,7 @@ def fig_integration(t):
 # ---------------------------------------------------------------------------
 def fig_process(t):
     s = Svg(t)
-    header(s, 'How GPIO & UART drive every decision',
+    header(s, 'Connection logic: ./emu ↔ RISC-V',
            'Everything the emulator sends enters through a peripheral; everything it checks leaves the same way')
     cols = ((60, 420, 'Emulator  (./emu)', 'emu'),
             (560, 1060, 'Peripheral hardware', 'text'),

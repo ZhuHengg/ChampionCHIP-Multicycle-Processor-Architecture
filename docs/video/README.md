@@ -37,12 +37,12 @@ way through without spending time on divider slides.
 | Guide requirement | Where it is answered |
 |---|---|
 | §7.1 Technical Part: architecture, hardware design, firmware implementation | Slides 3, 4, 6, 7 |
-| §7.2 Application Logic: working application, **connection logic between `./emu` and the RISC-V processor** | Slides 8–12 (slide 10 decodes one `./emu` line option by option) |
+| §7.2 Application Logic: working application, **connection logic between `./emu` and the RISC-V processor** | Slides 8–12 (slide 9 shows the connection logic; slide 10 walks one real `./emu` command through it, step by step) |
 | §7.3 Pitch: **professional posture**, sell the concept, **value** and **practical functionality** | Slides 14–17; slide 15 uses the rubric's own words as its title; presenter is full frame for this chapter |
 | §1 Project Overview: goal, architecture, general operation | Slides 1–2 (named "Project Overview", tagged 1 · Technical) |
-| §2 GPIO & UART Integration: integration design, ChipInventor block diagram | Slide 3 (block diagram), slide 4 (integration design), slide 8 (how each peripheral carries the emulator's commands) |
+| §2 GPIO & UART Integration: integration design, ChipInventor block diagram | Slide 3 (block diagram), slide 4 (integration design), slide 9 (how each peripheral carries the emulator's commands) |
 | §3 Official Firmware Testbench | Slide 5 |
-| §4 Application Definition: Context, Input, Processing, Output, Emulator Values | Slides 9–10, using those exact words |
+| §4 Application Definition: Context, Input, Processing, Output, Emulator Values | Slide 8 (Context, Input, Processing, Output, using those exact words) and slide 10 (Emulator Values) |
 | §5 Firmware: how UART data is handled, **how CRC/Zmmul is calculated**, how GPIO signals are sent | Slide 7, one line per item |
 | §6 Team testbench and tested firmware | Slide 13. **§6 is not in the report** (report = topics 1–5), so this slide is its only place |
 
@@ -64,9 +64,9 @@ benefit. These lines are marked **So what:** in the script below.
 | 5 | 1 · Technical | Official firmware testbench: PASS | 0:20 | 2:10 |
 | 6 | 1 · Technical | Custom instruction `crcb` | 0:30 | 2:40 |
 | 7 | 1 · Technical | Firmware implementation | 0:35 | 3:15 |
-| 8 | 2 · Application Logic | System overview: how the emulator reaches our chip | 0:20 | 3:35 |
-| 9 | 2 · Application Logic | Context → Input → Processing → Output | 0:25 | 4:00 |
-| 10 | 2 · Application Logic | Emulator values (`./emu`) | 0:25 | 4:25 |
+| 8 | 2 · Application Logic | Application definition: Context → Input → Processing → Output | 0:25 | 3:40 |
+| 9 | 2 · Application Logic | Connection logic: `./emu` ↔ RISC-V | 0:20 | 4:00 |
+| 10 | 2 · Application Logic | Emulator values: one real command | 0:25 | 4:25 |
 | 11 | 2 · Application Logic | Demo 1: normal charging session | 0:20 | 4:45 |
 | 12 | 2 · Application Logic | **Demo 2: grid dip and staggered restart** | 0:40 | 5:25 |
 | 13 | 2 · Application Logic | Validation: our testbench and results | 0:40 | 6:05 |
@@ -206,24 +206,33 @@ line on slide 3, not a slide of its own.
 
 ### Slide 6 — Custom instruction `crcb` (0:30) · 1 · Technical
 
-**On screen:**
-- The instruction: `crcb rd, rs1, rs2` = CRC-16 of one byte (rs1) with seed
-  (rs2), in **one instruction**.
-- A bar chart: **software loop 1,276 cycles** vs **`crcb` 60 cycles** → **21×**
-  (same meter frame, both give `0xCC77`).
-- Three icons in a row: **① check the frame · ② chain the frames · ③ time the
-  restart**.
+**On screen:** three builds; exact text in [SLIDES.md](SLIDES.md).
+1. **Speed:** Canva bar chart, "Cycles to CRC one meter frame": software 1,276
+   vs `crcb` 60, badge **21× fewer cycles**, caption "measured in RTL
+   simulation · both give 0xCC77".
+2. **Three jobs:** cards CHECK / CHAIN / TIME, one by one.
+3. **Anatomy strip:** the instruction fields, "hardware does all 8 bit-steps at
+   once", and the pitch line.
+
+**What 21× means (for Q&A, not the slide):** clock cycles to CRC the 6-byte
+payload of one meter frame, measured with the FIRMWARE 6 bench. Both numbers
+include setup and loading each byte; counting only the CRC work, it is about 4
+vs 203 cycles per byte (~50×). It is the CRC step only, not the whole
+application, and it is against a bit-by-bit loop; a table-driven software CRC
+would be closer but needs a 512-byte table, 16× our 32-byte RAM. The speedup
+buys headroom and efficiency, not faster reaction: the chip reacts on the next
+meter reading either way.
 
 **Say:**
-> Our custom instruction, crcb, folds one byte into a CRC-16 in a single
-> instruction. In software the same job is a loop of shifts and XORs: over one
-> meter frame, 1,276 cycles against 60, 21 times faster. But speed isn't the
-> point. In our charger this one instruction does three jobs: it checks each
-> frame, it chains frames together so a missing or replayed one is caught, and
-> it computes each charger's restart delay.
+> crcb computes a CRC-16 of one byte in a single instruction: the hardware does
+> all eight bit-steps at once. *(cut if long)* On one meter reading that's 60
+> cycles against 1,276 in software, 21 times fewer. But speed isn't the point.
+> We gave it three jobs: check every reading, link each reading to the last so
+> missing or repeated ones are caught, and give every charger its own restart
+> moment.
 
 **So what:**
-> The instruction that checks the data also protects the grid.
+> Every RVBL-2 chip has a CRC instruction. We turned ours into grid protection.
 
 ---
 
@@ -254,69 +263,65 @@ state visible in `x4`**
 
 ---
 
-### Slide 8 — System overview: how the emulator reaches our chip (0:20) · 2 · Application Logic
+Slides 8–10 build on each other: **what** the application is (8), **how** the
+emulator reaches the chip (9), then **one real command** on that path (10).
 
-**On screen:** `figures/gpio_uart_process_*.png`. Three columns (emulator,
-peripheral hardware, firmware) and two lanes (GPIO, UART), with numbered steps
-1–10. Reveal the GPIO lane first, then the UART lane.
-- GPIO lane: `-i 0x02` → `pins_i` → DATAIN → `lw` → app rules → `sw 0x30` →
-  DATAOUT → `pins_o` → `-o 0x30`
-- UART lane: `-t4` → `rx_i` → receiver → RXDATA → `lw`, `crcb`, `mul` →
-  `sw TXDATA` → transmitter → `tx_o` → `-r`
+### Slide 8 — Application definition (0:25) · 2 · Application Logic
 
-This is the guide's "connection logic between the emulator and the RISC-V
-processor" in one picture.
+**On screen:** the guide's four words as column headers (System Context /
+Input / Processing / Output), then the application state strip: IDLE 0x00 →
+CONNECTED 0x20 → CHARGING 0x30 ⇄ GRID HOLD 0x60, any state → FAULT 0x80. No
+emulator on this slide. Exact text in [SLIDES.md](SLIDES.md).
 
 **Say:**
-> Now the application. In Stage 4 our chip runs on an AWS FPGA, and the
-> emulator plays the world around it. Everything it sends enters through a
-> peripheral: the car and the emergency stop through GPIO, meter frames through
-> the UART. Everything it checks leaves the same way.
+> Here's what the application does. Context: a public charging station, with
+> our chip as its controller. Inputs: the car's pilot signal, the emergency
+> stop, and a meter reading with voltage, current, frequency and a CRC.
+> Processing: check every reading, bill the energy, watch the grid, and latch
+> any fault. Outputs: contactor, lock, grid hold and fault, plus a sealed
+> session record.
 
 ---
 
-### Slide 9 — Context → Input → Processing → Output (0:25) · 2 · Application Logic
+### Slide 9 — Connection logic: `./emu` ↔ RISC-V (0:20) · 2 · Application Logic
 
-**On screen:** four boxes, using the guide's exact words.
-
-| System Context | System Input | System Processing | System Output |
-|---|---|---|---|
-| Public AC charging station | Pilot code P2–P0 (A…F) · E-stop P3 · 8-byte meter frame: V (0.1 V), I (0.1 A), F (0.01 Hz), CRC | Check each frame (chained CRC) · bill V × I · watch grid health · latch faults | Contactor P4 · lock P5 · grid hold P6 · fault P7 · 8-byte session record over UART |
+**On screen:** `figures/gpio_uart_process_*.png`, titled with the guide's own
+words. Three columns (emulator, peripheral hardware, firmware) and two lanes
+(GPIO, UART), with numbered steps ①–⑩. Reveal the GPIO lane first, then the
+UART lane.
+- GPIO lane: ① `-i` → `pins_i` → ② `lw DATAIN` → ③ app rules → ④ `sw DATAOUT` →
+  ⑤ `pins_o` → `-o`
+- UART lane: ⑥ `-t4` → `rx_i` → ⑦ `lw RXDATA`, `crcb` → ⑧ decide (`mul` for
+  energy) → ⑨ `sw TXDATA` → ⑩ `tx_o` → `-r`
 
 **Say:**
-> Context: a public AC charging station. Input: the pilot code from the car on
-> pins 0 to 2, the emergency stop on pin 3, and an 8-byte meter frame with
-> voltage, current, frequency and a CRC. Processing: check the frame, bill the
-> energy, protect the grid, latch faults. Output: contactor, lock, grid-hold
-> and fault on pins 4 to 7, plus an 8-byte session record over UART.
+> This is the connection logic. The emulator plays the car, the safety button
+> and the meter. Everything it sends enters through GPIO or the UART; the
+> firmware reads it, decides and writes back; and the emulator checks the
+> result on the same pins and serial line.
 
 ---
 
-### Slide 10 — Emulator values (`./emu`) (0:25) · 2 · Application Logic
+### Slide 10 — Emulator values: one real command (0:25) · 2 · Application Logic
 
-**On screen:** the start of scenario S1, one option per line, each with an
-arrow to the pin or byte it drives. Highlight each line as it is spoken.
+**On screen:** an excerpt of scenario S1, one option per row, each tagged with
+its step number from slide 9. Reveal the rows as they are spoken.
 
-```
-./emu -d 0xF0          P7–P4 = chip outputs (observed), P3–P0 = emulator drives
-      -i 0x01          car plugged in (pilot B)
-      -o 0x20          expect: lock closed
-      -i 0x02          car asks to charge (pilot C)
-      -o 0x30          expect: lock + contactor closed
-      -t4 0x00A008FC   meter bytes FC 08 A0 00 → V = 230.0 V, I = 16.0 A
-      -t4 0xCC771388   meter bytes 88 13 77 CC → F = 50.00 Hz, CRC = 0xCC77
-      …
-      -r4 0x000B3B00   read back: energy = 736,000
-      -r2 0x0200       2 frames billed, no fault flags
-      -r2 0xD05C       the record's own CRC
-```
+| Option | Step | Meaning |
+|---|---|---|
+| `-d 0xF0` | setup | P7–P4 watched (chip outputs), P3–P0 driven |
+| `-i 0x01`, `-i 0x02` | ① | car plugged in (pilot B), then asks to charge (pilot C) |
+| `-o 0x20`, `-o 0x30` | ⑤ | expect lock, then lock + contactor |
+| `-t4 0x00A008FC` | ⑥ | meter bytes FC 08 A0 00 → 230.0 V, 16.0 A |
+| `-t4 0xCC771388` | ⑥ | meter bytes 88 13 77 CC → 50.00 Hz, CRC 0xCC77 |
+| `-r4 0x000B3B00` · `-r2 0x0200` · `-r2 0xD05C` | ⑩ | record: energy 736,000 · 2 readings, no faults · its CRC |
 
 **Say:**
-> This is how the emulator talks to our chip. Minus-d 0xF0 makes the top four
-> pins outputs we watch. Minus-i 0x02 is the car asking to charge. Minus-t4
-> sends four meter bytes, low byte first: 230 volts, 16 amps, then 50 hertz and
-> the CRC. Minus-o checks the pins: 0x30 means the contactor is closed. Minus-r
-> reads the session record back.
+> Here's one real command, and each option is one of those steps. Minus-i is
+> step one: the car plugs in, then asks to charge. Minus-o is step five: we
+> check the lock, then the contactor. Minus-t4 is step six: a meter reading,
+> low byte first: 230 volts, 16 amps, 50 hertz and its CRC. And minus-r is step
+> ten: the session record, two readings billed, no faults.
 
 ---
 
@@ -414,38 +419,45 @@ chapter.
 | Central network scheduling | Fails when communications fail, often during the same event |
 | **Ours: delay = CRC(charger ID, event frame)** | **Spread over 8 slots · offline · auditable** |
 
-Second row: **Chip design:** a custom instruction usually does *one* job (speed).
-Ours does **three**.
+Second row: **Chip design:** every RVBL-2 chip has a CRC instruction. Most use
+it for *one* job (checking data). Ours does **three**.
 
 **Say:**
 > Today chargers either restart together, wait a fixed time, which still
 > restarts them together, or wait a random time, which the UK now requires.
 > Random works, but it needs a random source and can't be checked afterwards.
 > Network scheduling fails when communications fail. Ours is spread, offline
-> and auditable. And on the chip side: where a custom instruction usually does
-> one job, ours does three.
+> and auditable. And on the chip side: every RVBL-2 chip has a CRC
+> instruction. Most use it to check data. Ours does three jobs.
 
 ---
 
 ### Slide 15 — Value & practical functionality (0:35) · 3 · Pitch
 
-**On screen:** the title uses the rubric's words. One row per stakeholder:
+**On screen:** the title uses the rubric's words. Every row states an
+**impact** (what changes in the world), not a feature. Exact text in
+[SLIDES.md](SLIDES.md).
+- Three impact tiles first: **A grid dip stays a dip** (0.88 MW ramp, not a
+  7 MW jolt) · **Drivers don't even notice** (pauses and resumes by itself) ·
+  **Every bill can be trusted** (bad readings never billed).
+- Then the stakeholder table (grid operator, driver, charge-point operator,
+  charger maker, regulator), rows revealed one by one. Drop the table if the
+  slide feels crowded; the tiles carry the message.
 
-| Who | Value | Practical functionality |
-|---|---|---|
-| **Grid operator** | **7.94× lower** restart peak after a dip | Works with no network, so it still protects the grid when communications are down |
-| **Charge-point operator** | **Integrity-checked billing:** corrupted, dropped and replayed frames are never billed | Uses the meter it already has; the session record comes out over UART |
-| **Charger manufacturer** (buys the chip) | No real-time clock, random-number generator or modem needed | One small RISC-V chip, a 264-instruction program |
-| **Regulator** | **Auditable:** any charger's delay can be recomputed | Same inputs always give the same delay |
+"Drivers don't even notice" is real firmware behaviour: in GRID_HOLD the lock
+stays on (0x60), charging resumes by itself, and energy keeps counting into the
+same session record. "Lower risk" and "fewer grounds for disputes" are
+deliberate: they follow from the measured peak reduction and the billing
+checks, without claiming to prevent every blackout or dispute.
 
 **Say:**
-> What does that mean in practice? For the grid operator: a restart peak
-> nearly eight times lower, with no network needed. For the charge-point
-> operator: corrupted, dropped or replayed frames are never billed, using the
-> meter they already have. For the charger maker, who buys the chip: no clock,
-> no random-number generator, no modem, just one small RISC-V chip. And for the
-> regulator: every charger's delay can be recomputed from its ID and the event.
-> The same inputs always give the same answer.
+> What does this change? For the grid, a dip stays a dip: a thousand chargers
+> come back as a gentle ramp, not a seven-megawatt jolt. Drivers don't even
+> notice: the car stays locked and charging resumes by itself, one session,
+> one bill. Operators never bill a reading that didn't happen. Manufacturers
+> get grid support without a clock, a random-number chip or a modem, so even
+> the cheapest offline charger can have it. And regulators can prove, after
+> the fact, that every charger behaved.
 
 ---
 
@@ -489,9 +501,10 @@ Ours does **three**.
 | 2, 17 | Rebound figure | `docs/figures/rebound.png` (regenerate: `python chip-inventor/testbench/app/evidence/rebound_sim.py`) |
 | 3 | ChipInventor block diagram | Export from the ChipInventor canvas (after the imem re-upload); colour the wires |
 | 4 | GPIO & UART integration figure; optional pin-cell inset | `docs/video/figures/gpio_uart_integration_{dark,light}.png`, `gpio_pin_cell_{dark,light}.png` (regenerate: `python docs/video/figures/make_figures.py --png`) |
-| 8 | Emulator ↔ peripheral ↔ firmware flow figure | `docs/video/figures/gpio_uart_process_{dark,light}.png` |
+| 8 | Application state strip | Draw in Canva: IDLE 0x00 → CONNECTED 0x20 → CHARGING 0x30 ⇄ GRID HOLD 0x60, any → FAULT 0x80 |
+| 9 | Connection-logic flow figure | `docs/video/figures/gpio_uart_process_{dark,light}.png` |
 | 5 | Official test log and waveform | `python chip-inventor/testbench/organiser/run_tests.py`; waveform: `chip-inventor/sim/organiser/testbench.vcd` in GTKWave |
-| 6 | Cycle bar chart | `python chip-inventor/testbench/app/evidence/run_crc_bench.py` (prints 60 / 1276 / 21×); waveform: `chip-inventor/sim/crc_bench/crc_bench.vcd` |
+| 6 | Cycle bar chart | Build in Canva (Elements → Charts → horizontal bar): software 1,276, `crcb` 60. Numbers from `python chip-inventor/testbench/app/evidence/run_crc_bench.py` (prints 60 / 1276 / 21×); waveform: `chip-inventor/sim/crc_bench/crc_bench.vcd` |
 | 7 | Code snippets | `chip-inventor/firmware/src/main.s`: `poll_uart` (UART in), `of_charging` (`mul`), `set_state` (GPIO out) |
 | 10, 11 | S1 command and run | `chip-inventor/emulator/emu_commands.txt` (S1); run: `python chip-inventor/testbench/app/run_tests.py --top hdl.v --scenario S1`; waveform: `chip-inventor/sim/app/hdl_S1/app.vcd` |
 | 12 | S2 run and waveform | `python chip-inventor/testbench/app/run_tests.py --top hdl.v --scenario S2`; waveform: `chip-inventor/sim/app/hdl_S2/app.vcd`. Show `rx_i`, `pins_o`, `x4_dbg_o` |

@@ -130,20 +130,48 @@ PASS: GPIO and UART firmware test completed successfully
 
 # One instruction. Three jobs.
 
-`crcb rd, rs1, rs2`
-CRC-16 of one byte, in a single instruction
+`crcb rd, rs1, rs2`: CRC-16 of one byte, in a single instruction
 
-**21× faster**
-Software loop: **1,276 cycles** · `crcb`: **60 cycles**
-(one meter frame, both give `0xCC77`)
+**Build 1: speed (left column)**
 
-① **Check** each meter frame
-② **Chain** frames, so a missing or replayed one is caught
-③ **Time** each charger's restart after a grid dip
+Chart title: Cycles to CRC one meter frame
 
-The instruction that checks the data also protects the grid.
+| Method | Cycles |
+|---|---|
+| Software loop | 1,276 |
+| `crcb` | 60 |
 
-[Visual: bar chart, 1,276 vs 60 cycles]
+Badge: **21× fewer cycles**
+Small text: Code size: 11 → 2 instructions per byte
+Caption: Measured in RTL simulation · same data · both give 0xCC77
+
+[Visual: Canva horizontal bar chart, linear scale; software bar muted grey,
+crcb bar in the accent colour; no gridlines or axes]
+
+**Build 2: three jobs (right column, cards appear one by one)**
+
+① **CHECK**
+Every reading is checked on arrival
+Damaged readings are never trusted or billed, and checking uses just 0.2% of the chip's time.
+
+② **CHAIN**
+Every reading is linked to the last one
+Missing or repeated readings are caught without sending any extra data.
+
+③ **TIME**
+Every charger gets its own restart moment
+Chargers restart in turns instead of all at once, cutting the restart surge nearly 8× (7 MW → 0.88 MW) so the grid isn't knocked down a second time.
+
+**Build 3: anatomy (footer strip)**
+
+| 1000000 | rs2 | rs1 | 000 | rd | 0110011 |
+|---|---|---|---|---|---|
+| Xicrc | seed | data | crcb | result | R-type |
+
+Hardware does all 8 bit-steps at once, so a CRC is as fast as an add
+Same instruction format as add / mul · crcb = 1 byte · crch = 2 bytes · crcw = 4 bytes
+
+► **Every RVBL-2 chip has a CRC instruction. We turned ours into grid protection.**
 
 ---
 
@@ -168,60 +196,74 @@ Runs without RAM = fits the smallest, cheapest chip
 
 ---
 
-## Slide 8 — System Overview
+## Slide 8 — Application Definition
 
 `[TAG] 2 · Application Logic`
 
-# How the emulator reaches our chip
+# What our charger controller does
 
-The emulator plays the car, the safety button and the energy meter.
+| System Context | System Input | System Processing | System Output |
+|---|---|---|---|
+| A public AC EV charging station, with our chip as its controller | **Pilot signal** from the car (P2–P0): A unplugged · B plugged in · C wants charge · D ventilation · E/F error | **Check** every meter reading (chained CRC) | **Contactor** (P4): power on/off |
+| | **Emergency stop** (P3) | **Bill** energy: voltage × current | **Lock** (P5): holds the plug |
+| | **Meter reading** over UART, 8 bytes: voltage · current · frequency · CRC | **Watch the grid**: below 49.50 Hz or 207 V → hold | **Grid hold** (P6) |
+| | | **Latch faults**: E-stop · over 32 A · lost meter link · bad pilot | **Fault** (P7) |
+| | | | **Session record** over UART, 8 bytes: energy · status · readings · CRC |
 
-**In:** `-i` pilot & E-stop → GPIO · `-t` meter frames → UART
-**Out:** `-o` contactor, lock, grid hold, fault ← GPIO · `-r` session record ← UART
+**Application states (shown on the chip's debug register x4)**
+IDLE **0x00** → CONNECTED **0x20** → CHARGING **0x30** ⇄ GRID HOLD **0x60**
+Any state → FAULT **0x80** (on E-stop, over-current, lost link or bad pilot)
 
-Our chip only ever uses `lw` and `sw`.
+[Visual: the state strip as a simple left-to-right diagram under the table]
+
+---
+
+## Slide 9 — Connection Logic: `./emu` ↔ RISC-V
+
+`[TAG] 2 · Application Logic`
+
+# Connection logic: ./emu ↔ RISC-V
+
+The emulator plays the car, the safety button and the meter.
+Everything it sends enters through GPIO or UART; everything it checks leaves the same way.
+
+**GPIO lane**
+① Emulator sets the input pins → ② firmware reads DATAIN → ③ decides → ④ writes DATAOUT → ⑤ emulator checks the output pins
+
+**UART lane**
+⑥ Emulator sends meter bytes → ⑦ firmware reads RXDATA and folds each byte with `crcb` → ⑧ decides → ⑨ writes TXDATA → ⑩ emulator reads the session record
+
+The chip only ever uses `lw` and `sw`: no special hooks for the emulator, so the same firmware runs on the FPGA unchanged.
 
 [Visual: docs/video/figures/gpio_uart_process_dark.png (or _light);
 reveal the GPIO lane first, then the UART lane]
 
 ---
 
-## Slide 9 — Context → Input → Processing → Output
+## Slide 10 — Emulator Values: One Real Command
 
 `[TAG] 2 · Application Logic`
 
-# How the application works
+# One real ./emu command, step by step
 
-| System Context | System Input | System Processing | System Output |
-|---|---|---|---|
-| Public AC EV charging station | Pilot code (P2–P0) | Check each frame (chained CRC) | Contactor (P4) |
-| | Emergency stop (P3) | Bill energy: V × I | Lock (P5) |
-| | 8-byte meter frame: V · I · F · CRC | Watch grid health | Grid hold (P6) |
-| | | Latch faults | Fault (P7) |
-| | | | 8-byte session record (UART) |
+| `./emu` option | Step | What it means |
+|---|---|---|
+| `-d 0xF0` | setup | P7–P4 = chip outputs (watched) · P3–P0 = driven by the emulator |
+| `-i 0x01` | ① | Car plugged in (pilot B) |
+| `-o 0x20` | ⑤ | Expect: lock closed |
+| `-i 0x02` | ① | Car asks to charge (pilot C) |
+| `-o 0x30` | ⑤ | Expect: lock + contactor closed |
+| `-t4 0x00A008FC` | ⑥ | Meter: 230.0 V, 16.0 A |
+| `-t4 0xCC771388` | ⑥ | Meter: 50.00 Hz, CRC 0xCC77 |
+| … | | second reading, then unplug (`-i 0x00`, `-o 0x00`) |
+| `-r4 0x000B3B00` | ⑩ | Record: energy 736,000 |
+| `-r2 0x0200` | ⑩ | Record: 2 readings billed, no faults |
+| `-r2 0xD05C` | ⑩ | Record: its own CRC |
 
----
+`-t4` sends 4 bytes, low byte first · Excerpt of scenario S1 in `emu_commands.txt` · all 12 scenarios pass in simulation
 
-## Slide 10 — Emulator Values (`./emu`)
-
-`[TAG] 2 · Application Logic`
-
-# Emulator values: one command, decoded
-
-| `./emu` option | What it means |
-|---|---|
-| `-d 0xF0` | P7–P4 = chip outputs (watched) · P3–P0 = driven by emulator |
-| `-i 0x01` | Car plugged in (pilot B) |
-| `-o 0x20` | Expect: lock closed |
-| `-i 0x02` | Car asks to charge (pilot C) |
-| `-o 0x30` | Expect: lock + contactor closed |
-| `-t4 0x00A008FC` | Meter: V = 230.0 V, I = 16.0 A |
-| `-t4 0xCC771388` | Meter: F = 50.00 Hz, CRC = 0xCC77 |
-| `-r4 0x000B3B00` | Read back: energy = 736,000 |
-| `-r2 0x0200` | 2 frames billed, no fault flags |
-| `-r2 0xD05C` | Record's own CRC |
-
-`-t4` sends 4 bytes, low byte first
+[Visual: optional small copy of the slide 9 figure in a corner, with the
+current step number highlighted as each row is revealed]
 
 ---
 
@@ -304,7 +346,7 @@ Same scenarios exported as real `./emu` commands
 | Central network scheduling | Fails when communications fail |
 | **Ours: delay = CRC(charger ID, event)** | **Spread · offline · auditable** |
 
-**Chip design:** a custom instruction usually does 1 job. Ours does **3**.
+**Chip design:** every RVBL-2 chip has a CRC instruction. Most use it for 1 job (checking data). Ours does **3**.
 
 ---
 
@@ -314,12 +356,23 @@ Same scenarios exported as real `./emu` commands
 
 # Value & practical functionality
 
-| Who | Value | Practical functionality |
+**Three impact tiles (top row)**
+
+| A grid dip stays a dip | Drivers don't even notice | Every bill can be trusted |
 |---|---|---|
-| **Grid operator** | **7.94× lower** restart peak | Works with no network |
-| **Charge-point operator** | Integrity-checked billing: bad, dropped and replayed frames never billed | Uses the meter it already has |
-| **Charger manufacturer** | No clock, random-number generator or modem needed | One small RISC-V chip, 264 instructions |
-| **Regulator** | **Auditable:** any delay can be recomputed | Same inputs → same delay, always |
+| Every 1,000 chargers come back as a 0.88 MW ramp, not a 7 MW jolt | Charging pauses and resumes by itself: car stays locked, one session, one bill | Damaged, missing or replayed readings are never billed |
+
+**Who benefits (table below, rows appear one by one)**
+
+| Who | Impact | How our chip delivers it |
+|---|---|---|
+| **Grid operator** | Lower risk of a second blackout after a dip, and room for more chargers on the same grid | Staggered restarts; works with no network |
+| **Driver** | No replugging after a grid hiccup, and never charged for a reading that didn't happen | Car stays locked and resumes automatically; only verified readings are billed |
+| **Charge-point operator** | Fewer grounds for billing disputes and refunds | Uses its existing meter; the session record leaves sealed |
+| **Charger maker** | Grid support even in cheap chargers with no internet connection | No clock, random-number chip or modem; one small chip |
+| **Regulator** | Rules that can be enforced after the event | Any charger's delay can be recomputed from its ID and the event |
+
+If the slide feels crowded, keep the three tiles and drop the table.
 
 ---
 
