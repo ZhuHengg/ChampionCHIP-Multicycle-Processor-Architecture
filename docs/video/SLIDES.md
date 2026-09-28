@@ -64,7 +64,7 @@ No network · No clock · No random numbers
 
 # One chip, everything a charger needs
 
-- **RVBL-2** multicycle RISC-V core
+- **RVBL-2** multicycle RISC-V core (Stage 2): 9-state FSM, 20 MHz
 - **RV32I + Zmmul + Xicrc** (our custom CRC extension)
 - Instruction ROM · 32-byte data memory · address decoder
 - **GPIO**: 8 pins
@@ -75,35 +75,30 @@ blue = instruction path, green = data memory, orange = GPIO, purple = UART]
 
 ---
 
-## Slide 4 — Hardware Design
+## Slide 4 — Hardware Design: GPIO & UART Integration
 
 `[TAG] 1 · Technical`
 
-# How the core runs
+# Hardware design: GPIO & UART integration
 
-**Control FSM: 9 states**
-RESET → FETCH → DECODE → EXECUTE → WRITE_BACK
-MEM_ADDR → MEM_ACCESS_ADDR / DATA / STORE
+**Memory-mapped, no new instructions**
+`0xF0000000` GPIO · `0xF1000000` UART, reached with plain `lw` / `sw`
 
-| Instruction | Cycles |
-|---|---|
-| ALU / MUL / CRC | 4 |
-| Branch | 3 |
-| Store | 4 |
-| Load | 6 |
+**GPIO**
+8 pin cells: DATADIR · DATAOUT · DATAIN
+Tri-state moved to the pad → split bus `pins_i` / `pins_o` / `pins_oe_o`
 
-**Memory map**
+**UART**
+TX + RX · 115200 baud, 8N1 · 174 clocks per bit
+Mid-bit sampling behind a 2-flop synchroniser
 
-| Address | Peripheral | Registers |
-|---|---|---|
-| `0xF0000000` | GPIO | DATAOUT · DATAIN · DATADIR |
-| `0xF1000000` | UART | TXDATA · RXDATA · CONTROL |
+**Fits the Stage 2 core unchanged**
+Registered reads match the multicycle load timing
 
-20 MHz · split pin bus (in / out / output-enable) · UART 174 clocks per bit
+Standard load/store control of real pins, portable from simulation to FPGA to silicon
 
-Small multicycle core = small chip area = low-cost charger
-
-[Visual: FSM state diagram]
+[Visual: docs/video/figures/gpio_uart_integration_dark.png (or _light)]
+[Optional inset: docs/video/figures/gpio_pin_cell_dark.png, guide vs our pin cell]
 
 ---
 
@@ -177,18 +172,17 @@ Runs without RAM = fits the smallest, cheapest chip
 
 `[TAG] 2 · Application Logic`
 
-# The emulator plays the world around our chip
+# How the emulator reaches our chip
 
-**The car** → pilot signal → pins P2–P0
-**The safety button** → emergency stop → pin P3
-**The energy meter & grid** → meter frames → UART rx
+The emulator plays the car, the safety button and the energy meter.
 
-**Our chip** (Stage 4: on the AWS FPGA)
+**In:** `-i` pilot & E-stop → GPIO · `-t` meter frames → UART
+**Out:** `-o` contactor, lock, grid hold, fault ← GPIO · `-r` session record ← UART
 
-→ Contactor · Lock · Grid hold · Fault (pins P4–P7)
-→ Session record → UART tx
+Our chip only ever uses `lw` and `sw`.
 
-[Visual: system diagram, chip in the centre, emulator roles around it]
+[Visual: docs/video/figures/gpio_uart_process_dark.png (or _light);
+reveal the GPIO lane first, then the UART lane]
 
 ---
 

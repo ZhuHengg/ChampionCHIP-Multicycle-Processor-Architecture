@@ -7,7 +7,7 @@ the presenter says, and which file or run produces the visual.
 - **Recorded in:** Canva, "Present and record" (slides plus presenter camera)
 - **Narration:** a human voice only, with subtitles added afterwards (see
   [Facts to confirm](#8-facts-to-confirm-before-recording))
-- **Target length:** 7:35, leaving 25 s of margin under the 8:00 limit
+- **Target length:** 7:40, leaving 20 s of margin under the 8:00 limit
 - **Deadline:** 30 Sep 2026, 23:59 MYT, shared with the report
 
 ---
@@ -40,6 +40,7 @@ way through without spending time on divider slides.
 | §7.2 Application Logic: working application, **connection logic between `./emu` and the RISC-V processor** | Slides 8–12 (slide 10 decodes one `./emu` line option by option) |
 | §7.3 Pitch: **professional posture**, sell the concept, **value** and **practical functionality** | Slides 14–17; slide 15 uses the rubric's own words as its title; presenter is full frame for this chapter |
 | §1 Project Overview: goal, architecture, general operation | Slides 1–2 (named "Project Overview", tagged 1 · Technical) |
+| §2 GPIO & UART Integration: integration design, ChipInventor block diagram | Slide 3 (block diagram), slide 4 (integration design), slide 8 (how each peripheral carries the emulator's commands) |
 | §3 Official Firmware Testbench | Slide 5 |
 | §4 Application Definition: Context, Input, Processing, Output, Emulator Values | Slides 9–10, using those exact words |
 | §5 Firmware: how UART data is handled, **how CRC/Zmmul is calculated**, how GPIO signals are sent | Slide 7, one line per item |
@@ -59,20 +60,20 @@ benefit. These lines are marked **So what:** in the script below.
 | 1 | 1 · Technical | Project Overview: the problem | 0:25 | 0:30 |
 | 2 | 1 · Technical | Project Overview: our solution | 0:25 | 0:55 |
 | 3 | 1 · Technical | Architecture (ChipInventor) | 0:25 | 1:20 |
-| 4 | 1 · Technical | Hardware design | 0:25 | 1:45 |
-| 5 | 1 · Technical | Official firmware testbench: PASS | 0:20 | 2:05 |
-| 6 | 1 · Technical | Custom instruction `crcb` | 0:30 | 2:35 |
-| 7 | 1 · Technical | Firmware implementation | 0:35 | 3:10 |
-| 8 | 2 · Application Logic | System overview | 0:20 | 3:30 |
-| 9 | 2 · Application Logic | Context → Input → Processing → Output | 0:25 | 3:55 |
-| 10 | 2 · Application Logic | Emulator values (`./emu`) | 0:25 | 4:20 |
-| 11 | 2 · Application Logic | Demo 1: normal charging session | 0:20 | 4:40 |
-| 12 | 2 · Application Logic | **Demo 2: grid dip and staggered restart** | 0:40 | 5:20 |
-| 13 | 2 · Application Logic | Validation: our testbench and results | 0:40 | 6:00 |
-| 14 | 3 · Pitch | Competitive analysis: how we stand out | 0:25 | 6:25 |
-| 15 | 3 · Pitch | Value & practical functionality | 0:35 | 7:00 |
-| 16 | 3 · Pitch | Stage 4 FPGA roadmap | 0:15 | 7:15 |
-| 17 | 3 · Pitch | Closing | 0:20 | 7:35 |
+| 4 | 1 · Technical | Hardware design: GPIO & UART integration | 0:30 | 1:50 |
+| 5 | 1 · Technical | Official firmware testbench: PASS | 0:20 | 2:10 |
+| 6 | 1 · Technical | Custom instruction `crcb` | 0:30 | 2:40 |
+| 7 | 1 · Technical | Firmware implementation | 0:35 | 3:15 |
+| 8 | 2 · Application Logic | System overview: how the emulator reaches our chip | 0:20 | 3:35 |
+| 9 | 2 · Application Logic | Context → Input → Processing → Output | 0:25 | 4:00 |
+| 10 | 2 · Application Logic | Emulator values (`./emu`) | 0:25 | 4:25 |
+| 11 | 2 · Application Logic | Demo 1: normal charging session | 0:20 | 4:45 |
+| 12 | 2 · Application Logic | **Demo 2: grid dip and staggered restart** | 0:40 | 5:25 |
+| 13 | 2 · Application Logic | Validation: our testbench and results | 0:40 | 6:05 |
+| 14 | 3 · Pitch | Competitive analysis: how we stand out | 0:25 | 6:30 |
+| 15 | 3 · Pitch | Value & practical functionality | 0:35 | 7:05 |
+| 16 | 3 · Pitch | Stage 4 FPGA roadmap | 0:15 | 7:20 |
+| 17 | 3 · Pitch | Closing | 0:20 | 7:40 |
 
 Pace: about 150 words per minute. Each script below is sized to its time
 slot; lines marked *(cut if long)* can go if a rehearsal runs over.
@@ -150,26 +151,34 @@ cover.
 
 ---
 
-### Slide 4 — Hardware design (0:25) · 1 · Technical
+### Slide 4 — Hardware design: GPIO & UART integration (0:30) · 1 · Technical
+
+In Stage 3, "hardware design" means the peripheral integration (guide §2 and
+the GPIO/UART block guide). The core itself was Stage 2 work, so it gets one
+line on slide 3, not a slide of its own.
 
 **On screen:**
-- Left: the **control FSM**, nine states: RESET → FETCH → DECODE → EXECUTE →
-  WRITE_BACK, with the memory branch MEM_ADDR → MEM_ACCESS_ADDR/DATA/STORE.
-- A small table of cycles per instruction: ALU/MUL/CRC 4 · branch 3 ·
-  store 4 · load 6.
-- Right: the memory map: `0xF0000000` GPIO (DATAOUT / DATAIN / DATADIR),
-  `0xF1000000` UART (TXDATA / RXDATA / CONTROL).
+- `figures/gpio_uart_integration_*.png`: core → load/store unit → address
+  decoder → IMEM / DMEM / GPIO / UART → pins → emulator.
+- Four short points: memory-mapped with no new instructions · GPIO as 8 pin
+  cells with the tri-state moved to the pad (split `pins_i` / `pins_o` /
+  `pins_oe_o`) · UART TX + RX at 115200 8N1, 174 clocks per bit, mid-bit
+  sampling behind a 2-flop synchroniser · registered reads fit the Stage 2 load
+  timing, so the core FSM is unchanged.
+- Optional inset: `figures/gpio_pin_cell_*.png` (guide Figure 1 vs our pin
+  cell), to show the one deliberate deviation and why.
 
 **Say:**
-> Inside, a nine-state control FSM runs each instruction over several cycles:
-> four for ALU, multiply and CRC, three for branches, six for loads, at 20
-> megahertz. Every address goes through the decoder: addresses starting F0 reach
-> the GPIO, F1 the UART. The pin bus is split into inputs, outputs and
-> output-enables, and the UART runs at 115,200 baud, 174 clocks per bit.
+> For Stage 3 we added GPIO and a UART to our core, with no new instructions.
+> The address decoder maps GPIO at F0 and the UART at F1, so every pin and
+> every serial byte is just a load or a store. The GPIO is eight pin cells,
+> with the tri-state moved out to the pad as separate in, out and enable
+> signals, which is what FPGAs and silicon expect. The UART runs at 115,200
+> baud, 174 clocks per bit.
 
 **So what:**
-> A small multicycle core keeps the chip area down, which is what a
-> cost-sensitive charger needs.
+> Standard load-and-store control of real pins, portable from simulation to
+> FPGA to silicon.
 
 ---
 
@@ -245,22 +254,24 @@ state visible in `x4`**
 
 ---
 
-### Slide 8 — System overview (0:20) · 2 · Application Logic
+### Slide 8 — System overview: how the emulator reaches our chip (0:20) · 2 · Application Logic
 
-**On screen:** a system diagram. In the centre, our chip ("in Stage 4: on the
-AWS FPGA"). Around it, the three things the emulator plays:
-- **The car**: the pilot signal → pins P2–P0
-- **The safety button**: emergency stop → pin P3
-- **The energy meter and grid**: meter frames → UART `rx_i`
+**On screen:** `figures/gpio_uart_process_*.png`. Three columns (emulator,
+peripheral hardware, firmware) and two lanes (GPIO, UART), with numbered steps
+1–10. Reveal the GPIO lane first, then the UART lane.
+- GPIO lane: `-i 0x02` → `pins_i` → DATAIN → `lw` → app rules → `sw 0x30` →
+  DATAOUT → `pins_o` → `-o 0x30`
+- UART lane: `-t4` → `rx_i` → receiver → RXDATA → `lw`, `crcb`, `mul` →
+  `sw TXDATA` → transmitter → `tx_o` → `-r`
 
-Outputs on the right: contactor, lock, grid hold, fault (P4–P7), and the
-session record → UART `tx_o`.
+This is the guide's "connection logic between the emulator and the RISC-V
+processor" in one picture.
 
 **Say:**
-> Now the application. Our chip sits inside a charging station. In Stage 4 it
-> runs on an AWS FPGA, and the emulator plays everything around it: the car,
-> through the pilot pins; the emergency-stop button; and the energy meter,
-> through the UART.
+> Now the application. In Stage 4 our chip runs on an AWS FPGA, and the
+> emulator plays the world around it. Everything it sends enters through a
+> peripheral: the car and the emergency stop through GPIO, meter frames through
+> the UART. Everything it checks leaves the same way.
 
 ---
 
@@ -477,7 +488,8 @@ Ours does **three**.
 |---|---|---|
 | 2, 17 | Rebound figure | `docs/figures/rebound.png` (regenerate: `python chip-inventor/testbench/app/evidence/rebound_sim.py`) |
 | 3 | ChipInventor block diagram | Export from the ChipInventor canvas (after the imem re-upload); colour the wires |
-| 4 | FSM diagram, memory map | Draw in Canva from `docs/HANDOFF_control_unit.md` (FSM) and guide §1.1 / §2.1 (memory map) |
+| 4 | GPIO & UART integration figure; optional pin-cell inset | `docs/video/figures/gpio_uart_integration_{dark,light}.png`, `gpio_pin_cell_{dark,light}.png` (regenerate: `python docs/video/figures/make_figures.py --png`) |
+| 8 | Emulator ↔ peripheral ↔ firmware flow figure | `docs/video/figures/gpio_uart_process_{dark,light}.png` |
 | 5 | Official test log and waveform | `python chip-inventor/testbench/organiser/run_tests.py`; waveform: `chip-inventor/sim/organiser/testbench.vcd` in GTKWave |
 | 6 | Cycle bar chart | `python chip-inventor/testbench/app/evidence/run_crc_bench.py` (prints 60 / 1276 / 21×); waveform: `chip-inventor/sim/crc_bench/crc_bench.vcd` |
 | 7 | Code snippets | `chip-inventor/firmware/src/main.s`: `poll_uart` (UART in), `of_charging` (`mul`), `set_state` (GPIO out) |
