@@ -72,10 +72,10 @@ Official workflow (Submission Guide §1 figure):
 | 1 | GPIO & UART integration | §2 | **Done.** Integrated in `hdl.v` (ChipInventor canvas top), `hdl_ref.v`, `rtl/top.v`. GPIO exposed as split `pins_i/pins_o/pins_oe_o` (no internal tri-state — FPGA-friendly). System test `testbench/system/tb_system.v` (UART + GPIO + MUL + CRC, FIRMWARE 3) passes 13/13 checks on all three tops. |
 | 1b | ChipInventor block diagram image | §2 (mandatory) | **Missing.** `convertion/diagram.json` exists; export an image for the report. |
 | 2 | Official Firmware Testbench | §3 (mandatory) | **Done.** `testbench/organiser/tb_organiser.v` runs the verbatim organiser firmware (FIRMWARE 4). Passes on all three tops: GPIO `0xA → 0xA`, UART `0x30 → 0x30`, plus a GPIO re-check after UART. Still needed: waveform screenshot for the report. Optional: match the organiser's log wording (`[PASS] GPIO: P3-P0 = 0xA, P7-P4 = 0xA`). |
-| 3 | Application Definition | §4 | **Decided** — §7. Freeze protocol/pin map day 1. |
-| 4 | Application Firmware Development | §5 | Not started. Blocked on toolchain install (§8). |
-| 5 | Application Firmware Testbench | §6 | Not started. `tb_system.v` UART driver/monitor is the scaffolding. |
-| 6 | Emulator Preview (`./emu` command set) | §4, §7 | Not started. Generated from the same vectors as step 5 (§7.8). |
+| 3 | Application Definition | §4 | **Done** — §7, frozen. Protocol answered against the emulator's own checklist in `chip-inventor/emulator/README.md`. |
+| 4 | Application Firmware Development | §5 | **Done.** `chip-inventor/firmware/src/main.s` (264 words, `FIRMWARE 5`), built with the organiser's vendored Firmware-Builder (`riscv64-unknown-elf`, MSYS2 UCRT64). Toolchain validated by rebuilding the organiser's own firmware byte-for-byte (21/21 lines identical). All five states, chained-CRC frame validation (`crcb`), `mul` metering, over-current and CRC-lost faults, and the CRC-hashed grid-hold restart. |
+| 5 | Application Firmware Testbench | §6 | **Done.** `testbench/app/` models `./emu` + the FPGA wrapper (one `emu_*` task per option). 15 scenarios × 3 tops = 45 runs, all as expected (H1 is an expected-fail harness self-check). 36 pytest cases cover the golden model and the scenario set. |
+| 6 | Emulator Preview (`./emu` command set) | §4, §7 | **Done.** `chip-inventor/emulator/emu_commands.txt` — 12 `./emu` command lines (S1–S11 + S1X), generated from the golden model, plus `run_scenarios.sh` to run them on the FPGA and `README.md` answering the organiser's protocol checklist. |
 | — | `convertion/new_export/hdl.v` | — | Has FIRMWARE 1–3 only (no 4). Matters only if that export goes back into ChipInventor. |
 
 ---
@@ -369,8 +369,8 @@ most. We did not just use the custom instruction; we found three jobs for it.
 | # | Proof | Tool | When | Why |
 |---|---|---|---|---|
 | P1 | **Delay-spread check.** Histogram of the restart delay over ~10,000 charger IDs × events | Python golden model | Day 1, **before freezing the hash** | CRC is linear, so for sequential IDs the low 3 bits may not spread evenly. If they don't, fix the hash (different bit slice, or hash twice) before writing firmware. Checking our own claim is itself a sign of rigour |
-| P2 | **Rebound simulation.** 1,000 chargers × 7 kW through a grid dip: all restarting at once = 7 MW in one frame; spread over 8 frames ≈ 0.9 MW per frame (~8× lower peak) | Python | Day 3 | One graph that turns the pitch into evidence |
-| P3 | **Co-design numbers.** Cycles for a frame CRC with `crcb` vs a bitwise software CRC; note a table-driven CRC needs 512 B = 16× our DMEM | Testbench, `pc_dbg_o` cycle count | Day 3 | Guide §5 asks how CRC/Zmmul are used |
+| P2 | **Rebound simulation.** 1,000 chargers × 7 kW through a grid dip: all restarting at once = 7.0 MW in one frame; CRC-hashed staggering spreads load across 8 frames, peak ≈ 0.88 MW (**7.94× reduction**). See `testbench/app/evidence/rebound_sim.py` and `docs/figures/rebound.png` | Python | Day 3 | One graph that turns the pitch into evidence |
+| P3 | **Co-design numbers.** 6-byte frame CRC: `crcb` = **60 cycles**, software shift-xor = **1276 cycles** (**21× speedup**). Both produce 0xCC77. A table-driven CRC needs 512 B = 16× our DMEM. See `testbench/app/evidence/run_crc_bench.py` (FIRMWARE 6, `tb_crc_bench.v`) | Testbench, `x4_dbg_o` cycle count | Day 3 | Guide §5 asks how CRC/Zmmul are used |
 | P4 | **Two FSMs in one waveform.** Hardware control-unit state and application state (`x4_dbg_o`) side by side | GTKWave | Day 3 | Continues our Phase 2 edge visually |
 
 #### What it is not — honesty statements for the report

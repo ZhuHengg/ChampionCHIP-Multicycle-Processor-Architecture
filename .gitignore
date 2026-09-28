@@ -41,6 +41,7 @@ docs/superpowers/
 
 # Stage 3 app simulation scratch (scenario dirs, vvp/vcd)
 chip-inventor/sim/app/
+chip-inventor/sim/crc_bench/
 
 # firmware object files: build/firmware.{bin,txt,dmp,elf} ARE committed deliverables
 chip-inventor/firmware/build/*.o

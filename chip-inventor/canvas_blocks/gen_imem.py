@@ -10,7 +10,8 @@ testbench/firmware.py. Upload rtl/imem.v as the canvas imem block code.
 FIRMWARE 4 (the organiser's verbatim GPIO/UART test firmware) and FIRMWARE 5
 (our Stage 3 grid-aware EV charger application) are loaded from a
 Firmware-Builder firmware.txt, so rerun this script after rebuilding
-chip-inventor/firmware/ with `make`.
+chip-inventor/firmware/ with `make`. FIRMWARE 6 is the crcb vs software
+CRC-16 cycle bench.
 """
 from pathlib import Path
 import re

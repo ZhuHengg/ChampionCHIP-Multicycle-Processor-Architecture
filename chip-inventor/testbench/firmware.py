@@ -177,8 +177,65 @@ def app_program():
     return _load_firmware_txt(_APP_TXT, 'grid-aware EV charger application')
 
 
+# Registers for crc_bench_program
+_B = 5          # t0 — scratch / byte value
+_CRC_HW = 6    # t1 — hardware CRC result
+_CRC_SW = 7    # t2 — software CRC result
+_POLY = 10     # a0 — polynomial 0x1021
+_CNT = 11      # a1 — bit counter
+_BIT = 12      # a2 — extracted bit
+
+
+def crc_bench_program():
+    """CRC-16 speed bench: hardware crcb vs software shift-xor loop on the
+    6-byte payload of a standard meter frame (2300 V, 160 I, 5000 F).
+    x4 transitions: 0->1 (hw start), 1->2 (hw done / sw start), 2->3 (sw done),
+    then x4 = (crc_hw << 16) | crc_sw and park."""
+    a = Asm()
+    payload = [0xFC, 0x08, 0xA0, 0x00, 0x88, 0x13]
+
+    # --- hardware CRC via crcb ---
+    a.li(4, 1, 'x4 = 1: hw CRC start')
+    a.li(_CRC_HW, 0xFFFF, 'seed')
+    for b in payload:
+        a.li(_B, b)
+        a.crc('crcb', _CRC_HW, _B, _CRC_HW)
+
+    # --- software CRC (MSB-first, poly 0x1021, 8 bits per byte) ---
+    a.li(4, 2, 'x4 = 2: sw CRC start')
+    a.li(_CRC_SW, 0xFFFF, 'seed')
+    a.li(_POLY, 0x1021)
+    for idx, b in enumerate(payload):
+        lbl = f'sw_bit{idx}'
+        skip = f'sw_skip{idx}'
+        a.li(_B, b)
+        a.i('slli', _B, _B, 8)
+        a.r('xor', _CRC_SW, _CRC_SW, _B)
+        a.li(_CNT, 8)
+        a.label(lbl)
+        a.i('slli', _CRC_SW, _CRC_SW, 1)
+        a.i('srli', _BIT, _CRC_SW, 16)
+        a.i('andi', _BIT, _BIT, 1)
+        a.branch('beq', _BIT, 0, skip)
+        a.r('xor', _CRC_SW, _CRC_SW, _POLY)
+        a.label(skip)
+        a.addi(_CNT, _CNT, -1)
+        a.branch('bne', _CNT, 0, lbl)
+    a.li(_B, 0xFFFF)
+    a.r('and', _CRC_SW, _CRC_SW, _B)
+
+    # --- done: x4 = 3, then x4 = (hw << 16) | sw ---
+    a.li(4, 3, 'x4 = 3: both done')
+    a.i('slli', _B, _CRC_HW, 16)
+    a.r('or', 4, _B, _CRC_SW)
+    a.label('park')
+    a.jal(0, 'park')
+    return a
+
+
 PROGRAMS = {1: ('GPIO system test', gpio_program),
             2: ('UART echo test', uart_program),
             3: ('full system test', system_program),
             4: ('organiser official GPIO/UART firmware', organiser_program),
-            5: ('grid-aware EV charger application', app_program)}
+            5: ('grid-aware EV charger application', app_program),
+            6: ('crcb vs software CRC-16 cycle bench', crc_bench_program)}

@@ -193,18 +193,170 @@ Disassembly of section .text:
   400234:	00008067          	ret
 
 00400238 <poll_uart>:
-  400238:	0084a283          	lw	t0,8(s1)
-  40023c:	0022f293          	andi	t0,t0,2
-  400240:	00028e63          	beqz	t0,40025c <pu_done>
-  400244:	0004a423          	sw	zero,8(s1)
-  400248:	0044a303          	lw	t1,4(s1)
-  40024c:	001c8c93          	addi	s9,s9,1
-  400250:	00800393          	li	t2,8
-  400254:	007cc463          	blt	s9,t2,40025c <pu_done>
-  400258:	00000c93          	li	s9,0
+  400238:	00008f93          	mv	t6,ra
+  40023c:	0084a283          	lw	t0,8(s1)
+  400240:	0022f293          	andi	t0,t0,2
+  400244:	0a028e63          	beqz	t0,400300 <pu_done>
+  400248:	0004a423          	sw	zero,8(s1)
+  40024c:	0044a303          	lw	t1,4(s1)
+  400250:	0ff37313          	zext.b	t1,t1
+  400254:	00600393          	li	t2,6
+  400258:	067cde63          	bge	s9,t2,4002d4 <pu_crc_field>
+  40025c:	000c8463          	beqz	s9,400264 <pu_seed>
+  400260:	0080006f          	j	400268 <pu_fold>
 
-0040025c <pu_done>:
-  40025c:	00008067          	ret
+00400264 <pu_seed>:
+  400264:	00090713          	mv	a4,s2
+
+00400268 <pu_fold>:
+  400268:	80e30733          	.insn	4, 0x80e30733
+  40026c:	00000393          	li	t2,0
+  400270:	027c8463          	beq	s9,t2,400298 <pu_v_lo>
+  400274:	00100393          	li	t2,1
+  400278:	027c8463          	beq	s9,t2,4002a0 <pu_v_hi>
+  40027c:	00200393          	li	t2,2
+  400280:	027c8663          	beq	s9,t2,4002ac <pu_i_lo>
+  400284:	00300393          	li	t2,3
+  400288:	027c8663          	beq	s9,t2,4002b4 <pu_i_hi>
+  40028c:	00400393          	li	t2,4
+  400290:	027c8863          	beq	s9,t2,4002c0 <pu_f_lo>
+  400294:	0340006f          	j	4002c8 <pu_f_hi>
+
+00400298 <pu_v_lo>:
+  400298:	00030793          	mv	a5,t1
+  40029c:	0600006f          	j	4002fc <pu_advance>
+
+004002a0 <pu_v_hi>:
+  4002a0:	00831393          	slli	t2,t1,0x8
+  4002a4:	0077e7b3          	or	a5,a5,t2
+  4002a8:	0540006f          	j	4002fc <pu_advance>
+
+004002ac <pu_i_lo>:
+  4002ac:	00030813          	mv	a6,t1
+  4002b0:	04c0006f          	j	4002fc <pu_advance>
+
+004002b4 <pu_i_hi>:
+  4002b4:	00831393          	slli	t2,t1,0x8
+  4002b8:	00786833          	or	a6,a6,t2
+  4002bc:	0400006f          	j	4002fc <pu_advance>
+
+004002c0 <pu_f_lo>:
+  4002c0:	00030893          	mv	a7,t1
+  4002c4:	0380006f          	j	4002fc <pu_advance>
+
+004002c8 <pu_f_hi>:
+  4002c8:	00831393          	slli	t2,t1,0x8
+  4002cc:	0078e8b3          	or	a7,a7,t2
+  4002d0:	02c0006f          	j	4002fc <pu_advance>
+
+004002d4 <pu_crc_field>:
+  4002d4:	00600393          	li	t2,6
+  4002d8:	007c9663          	bne	s9,t2,4002e4 <pu_crc_hi>
+  4002dc:	00030193          	mv	gp,t1
+  4002e0:	01c0006f          	j	4002fc <pu_advance>
+
+004002e4 <pu_crc_hi>:
+  4002e4:	00831393          	slli	t2,t1,0x8
+  4002e8:	0071e1b3          	or	gp,gp,t2
+  4002ec:	01c000ef          	jal	400308 <on_frame>
+  4002f0:	00000c93          	li	s9,0
+  4002f4:	000f8093          	mv	ra,t6
+  4002f8:	00008067          	ret
+
+004002fc <pu_advance>:
+  4002fc:	001c8c93          	addi	s9,s9,1
+
+00400300 <pu_done>:
+  400300:	000f8093          	mv	ra,t6
+  400304:	00008067          	ret
+
+00400308 <on_frame>:
+  400308:	00008f13          	mv	t5,ra
+  40030c:	00000613          	li	a2,0
+  400310:	00371463          	bne	a4,gp,400318 <of_seed>
+  400314:	00100613          	li	a2,1
+
+00400318 <of_seed>:
+  400318:	00018913          	mv	s2,gp
+  40031c:	02061463          	bnez	a2,400344 <of_valid>
+  400320:	001b0b13          	addi	s6,s6,1
+  400324:	00200293          	li	t0,2
+  400328:	0e5b4863          	blt	s6,t0,400418 <of_done>
+  40032c:	00400293          	li	t0,4
+  400330:	0e520463          	beq	tp,t0,400418 <of_done>
+  400334:	04000293          	li	t0,64
+  400338:	005aeab3          	or	s5,s5,t0
+  40033c:	dedff0ef          	jal	400128 <enter_fault>
+  400340:	0d80006f          	j	400418 <of_done>
+
+00400344 <of_valid>:
+  400344:	00000b13          	li	s6,0
+  400348:	00200293          	li	t0,2
+  40034c:	00520863          	beq	tp,t0,40035c <of_charging>
+  400350:	00300293          	li	t0,3
+  400354:	08520863          	beq	tp,t0,4003e4 <of_hold>
+  400358:	0c00006f          	j	400418 <of_done>
+
+0040035c <of_charging>:
+  40035c:	14000293          	li	t0,320
+  400360:	0302ca63          	blt	t0,a6,400394 <of_overcurrent>
+  400364:	000012b7          	lui	t0,0x1
+  400368:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  40036c:	0258cc63          	blt	a7,t0,4003a4 <of_grid_hold>
+  400370:	000012b7          	lui	t0,0x1
+  400374:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  400378:	0257c663          	blt	a5,t0,4003a4 <of_grid_hold>
+  40037c:	030782b3          	mul	t0,a5,a6
+  400380:	005989b3          	add	s3,s3,t0
+  400384:	0ff00293          	li	t0,255
+  400388:	085a0863          	beq	s4,t0,400418 <of_done>
+  40038c:	001a0a13          	addi	s4,s4,1
+  400390:	0880006f          	j	400418 <of_done>
+
+00400394 <of_overcurrent>:
+  400394:	02000293          	li	t0,32
+  400398:	005aeab3          	or	s5,s5,t0
+  40039c:	d8dff0ef          	jal	400128 <enter_fault>
+  4003a0:	0780006f          	j	400418 <of_done>
+
+004003a4 <of_grid_hold>:
+  4003a4:	08000293          	li	t0,128
+  4003a8:	005aeab3          	or	s5,s5,t0
+  4003ac:	00100293          	li	t0,1
+  4003b0:	80328333          	.insn	4, 0x80328333
+  4003b4:	00000293          	li	t0,0
+  4003b8:	80628333          	.insn	4, 0x80628333
+  4003bc:	05900293          	li	t0,89
+  4003c0:	80628333          	.insn	4, 0x80628333
+  4003c4:	04d00293          	li	t0,77
+  4003c8:	80628333          	.insn	4, 0x80628333
+  4003cc:	00737313          	andi	t1,t1,7
+  4003d0:	00230c13          	addi	s8,t1,2
+  4003d4:	00000b93          	li	s7,0
+  4003d8:	00300513          	li	a0,3
+  4003dc:	d69ff0ef          	jal	400144 <set_state>
+  4003e0:	0380006f          	j	400418 <of_done>
+
+004003e4 <of_hold>:
+  4003e4:	000012b7          	lui	t0,0x1
+  4003e8:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  4003ec:	0258c263          	blt	a7,t0,400410 <of_hold_reset>
+  4003f0:	000012b7          	lui	t0,0x1
+  4003f4:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  4003f8:	0057cc63          	blt	a5,t0,400410 <of_hold_reset>
+  4003fc:	001b8b93          	addi	s7,s7,1
+  400400:	018bcc63          	blt	s7,s8,400418 <of_done>
+  400404:	00200513          	li	a0,2
+  400408:	d3dff0ef          	jal	400144 <set_state>
+  40040c:	00c0006f          	j	400418 <of_done>
+
+00400410 <of_hold_reset>:
+  400410:	00000b93          	li	s7,0
+  400414:	0040006f          	j	400418 <of_done>
+
+00400418 <of_done>:
+  400418:	000f0093          	mv	ra,t5
+  40041c:	00008067          	ret
 
 Disassembly of section .riscv.attributes:
 
