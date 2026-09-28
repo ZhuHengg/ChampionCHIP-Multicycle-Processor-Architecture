@@ -338,15 +338,23 @@ Same scenarios exported as real `./emu` commands
 
 # How we stand out
 
-| How chargers restart today | Weakness |
-|---|---|
-| All at once | Rebound spike can trip the grid again |
-| Fixed delay | Everyone still restarts together |
-| Random delay | Needs a random source · can't be checked afterwards |
-| Central network scheduling | Fails when communications fail |
-| **Ours: delay = CRC(charger ID, event)** | **Spread · offline · auditable** |
+How chargers restart after a grid dip:
+
+| | Restart at once | Fixed delay | Random delay | Network scheduled | **Ours: CRC-timed** |
+|---|---|---|---|---|---|
+| Spreads the restart surge | ✗ | ✗ | ✓ | ✓ | **✓** |
+| Works with no network | ✓ | ✓ | ✓ | ✗ | **✓** |
+| No random-number source needed | ✓ | ✓ | ✗ | ✓ | **✓** |
+| Restart moment can be re-checked afterwards | ✓ | ✓ | ✗ | ◐ | **✓** |
+
+✓ yes · ✗ no · ◐ only if the server's logs survive
+
+Only ours ticks every box.
 
 **Chip design:** every RVBL-2 chip has a CRC instruction. Most use it for 1 job (checking data). Ours does **3**.
+
+[Design: highlight the "Ours" column (accent colour background or border);
+✗ in muted red, ✓ in green; reveal the rows one by one]
 
 ---
 

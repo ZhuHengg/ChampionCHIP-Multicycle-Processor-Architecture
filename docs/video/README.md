@@ -411,24 +411,32 @@ chapter.
 
 **On screen:**
 
-| How chargers restart today | Weakness |
-|---|---|
-| All at once when the grid recovers | The rebound spike can trip the grid again |
-| Fixed delay | Everyone waits the same time, so they still restart together |
-| Random delay (UK smart-charging rules) | Needs a random source; can't be checked afterwards |
-| Central network scheduling | Fails when communications fail, often during the same event |
-| **Ours: delay = CRC(charger ID, event frame)** | **Spread over 8 slots · offline · auditable** |
+A comparison matrix: four ways chargers restart today, plus ours, against four
+criteria. Exact table in [SLIDES.md](SLIDES.md).
 
-Second row: **Chip design:** every RVBL-2 chip has a CRC instruction. Most use
+| | Restart at once | Fixed delay | Random delay | Network scheduled | **Ours: CRC-timed** |
+|---|---|---|---|---|---|
+| Spreads the restart surge | ✗ | ✗ | ✓ | ✓ | **✓** |
+| Works with no network | ✓ | ✓ | ✓ | ✗ | **✓** |
+| No random-number source needed | ✓ | ✓ | ✗ | ✓ | **✓** |
+| Restart moment can be re-checked afterwards | ✓ | ✓ | ✗ | ◐ | **✓** |
+
+Below it: **Chip design:** every RVBL-2 chip has a CRC instruction. Most use
 it for *one* job (checking data). Ours does **three**.
 
+**Kept honest:** a random delay spreads the surge as well as ours, so we do not
+claim a better spread. Our edge is getting the spread *and* staying offline,
+random-free and re-checkable at once. There is no billing row on purpose: some
+markets already use cryptographically signed meter data, which is stronger than
+a CRC.
+
 **Say:**
-> Today chargers either restart together, wait a fixed time, which still
-> restarts them together, or wait a random time, which the UK now requires.
-> Random works, but it needs a random source and can't be checked afterwards.
-> Network scheduling fails when communications fail. Ours is spread, offline
-> and auditable. And on the chip side: every RVBL-2 chip has a CRC
-> instruction. Most use it to check data. Ours does three jobs.
+> Today a charger restarts at once or after a fixed delay, so the whole fleet
+> still comes back together. A random delay spreads them, but needs a random
+> source and can't be checked afterwards. Network scheduling works until the
+> network fails. Ours is the only one that ticks every box. And on the chip
+> side: every RVBL-2 chip has a CRC instruction. Most use it to check data.
+> Ours does three jobs.
 
 ---
 
@@ -571,7 +579,7 @@ If a rehearsal runs long, cut the lines marked *(cut if long)* first.
 
 | Claim | Where | Action |
 |---|---|---|
-| The UK requires a randomised delay on smart chargers | Slide 14 | Confirm against the UK *Electric Vehicles (Smart Charge Points) Regulations 2021* before saying "by law"; if in doubt, say "the UK's smart-charging rules use a random delay" |
+| The UK requires a randomised delay on smart chargers | Slide 14 (optional) | The script no longer names the UK. If you add it as a real-world example, confirm it against the UK *Electric Vehicles (Smart Charge Points) Regulations 2021* first |
 | "Human narration only, subtitles mandatory" | §7 Delivery | From earlier competition slides, not in the Stage 3 guide. Confirm with the organisers; human narration plus subtitles is safe either way |
 | Any Malaysian EV statistic added to slide 1 | Slide 1 | Only use a figure with a source you can cite |
 | YouTube visibility (public or unlisted) | Upload | Check the submission platform's instructions |
