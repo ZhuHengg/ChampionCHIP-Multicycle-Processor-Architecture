@@ -370,9 +370,11 @@ Only ours ticks every box.
 
 **Three impact tiles (top row)**
 
-| A grid dip stays a dip | Drivers don't even notice | Every bill can be trusted |
+| Protects the grid | No hassle for drivers | Fair bills |
 |---|---|---|
-| Every 1,000 chargers come back as a 0.88 MW ramp, not a 7 MW jolt | Charging pauses and resumes by itself: car stays locked, one session, one bill | Damaged, missing or replayed readings are never billed |
+| **8× smaller power surge** | **Charging restarts by itself** | **Only real readings are billed** |
+| After a power dip, chargers switch back on in turns, not all at once. | The car stays plugged in and locked, with no need to replug. | Broken, missing or repeated meter readings are never charged. |
+| *(small: 7 MW → 0.88 MW per 1,000 chargers)* | | |
 
 **Who benefits (table below, rows appear one by one)**
 

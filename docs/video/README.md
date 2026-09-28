@@ -454,14 +454,14 @@ a CRC.
 **On screen:** the title uses the rubric's words. Every row states an
 **impact** (what changes in the world), not a feature. Exact text in
 [SLIDES.md](SLIDES.md).
-- Three impact tiles first: **A grid dip stays a dip** (0.88 MW ramp, not a
-  7 MW jolt) · **Drivers don't even notice** (pauses and resumes by itself) ·
-  **Every bill can be trusted** (bad readings never billed).
+- Three impact tiles first: **Protects the grid** (8× smaller power surge) ·
+  **No hassle for drivers** (charging restarts by itself) · **Fair bills**
+  (only real readings are billed).
 - Then the stakeholder table (grid operator, driver, charge-point operator,
   charger maker, regulator), rows revealed one by one. Drop the table if the
   slide feels crowded; the tiles carry the message.
 
-"Drivers don't even notice" is real firmware behaviour: in GRID_HOLD the lock
+"No hassle for drivers" is real firmware behaviour: in GRID_HOLD the lock
 stays on (0x60), charging resumes by itself, and energy keeps counting into the
 same session record. "Lower risk" and "fewer grounds for disputes" are
 deliberate: they follow from the measured peak reduction and the billing
