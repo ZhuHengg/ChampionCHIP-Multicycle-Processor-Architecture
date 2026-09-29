@@ -70,10 +70,10 @@ Five simulations pass:
 - GPIO plus address decoder: reset, each pin high/low/released, mixed
   directions, input sampling, output isolation, read-only DATAIN, byte masks,
   reserved bits/addresses, registered read timing and memory decode regression.
-- Stage 2 official firmware with `hdl.v`.
+- Official Stage 3 organiser GPIO/UART firmware with `hdl.v`.
 - CPU GPIO program with `hdl.v`: stores directions/output, loads all three
   registers, checks external input bits and verifies physical output levels.
-- The same Stage 2 and GPIO CPU simulations with `rtl/top.v`.
+- The same organiser and GPIO CPU simulations with `rtl/top.v`.
 
 ## Assumptions and remaining hardware work
 

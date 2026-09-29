@@ -49,7 +49,8 @@ Both runners accept --iverilog and --vvp executable paths. UART tests cover
 register access, byte masks, read-only RXDATA, reserved address decoding, LSB-first
 TX timing, busy commands, TXDATA changes during transmission, full duplex,
 RXDONE clearing, receive overwrite, and reset. A CPU lw/sw echo test and the
-original Stage 2 firmware run against both flattened entry points. Scratch ROMs
+official Stage 3 organiser firmware (testbench/testbench.v) run against all
+top-level entry points. Scratch ROMs
 and simulation outputs stay under ignored sim/uart; the shipped ROM is unchanged.
 Simulation uses a shorter divider to keep tests quick. FPGA pin assignments,
 ChipInventor diagrams, synthesis and physical layout artifacts are not regenerated.

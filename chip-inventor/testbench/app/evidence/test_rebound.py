@@ -1,4 +1,4 @@
-"""Tests for the fleet-rebound simulation (proof P2 of spec SS7.1)."""
+"""Tests for the fleet-rebound simulation."""
 import sys
 from pathlib import Path
 

@@ -84,10 +84,10 @@ export TEMP="$TMP" TMPDIR="$TMP"
 After rebuilding, load the new image into the RTL with:
 
 ```bash
-python chip-inventor/canvas_blocks/gen_imem.py
+python chip-inventor/testbench/gen_imem.py
 ```
 
-which regenerates `rtl/imem.v` and syncs `hdl.v`, `hdl_ref.v`, `rtl/top.v`.
+which regenerates `rtl/imem.v` and syncs `hdl.v`, `rtl/top.v`.
 Re-uploading `rtl/imem.v` to the ChipInventor canvas is a manual step.
 
 ## Xicrc instructions

@@ -1,88 +1,141 @@
-// testbench.v -- runs organiser Stage 2 validation firmware (baked into
-// hdl.v's imem) against ChipInventor wiring of the full multicycle core.
-// Pass/fail contract matches tb/system/tb_top_organiser.v: firmware
-// self-loops (`j .`) when done, x4==0 -> PASS, x4==0xFFFFFFFF -> FAIL.
+`timescale 1ns/1ps
+// testbench.v -- Official Stage 3 GPIO/UART firmware validation.
+// Runs FIRMWARE 4 (the verbatim official Stage 3 GPIO/UART test firmware,
+// see external/CCX_Malaysia_Edition_Stage_3/RVBL-GPIO-UART-Test-Firmware)
+// against the organiser's own minimum test: P3-0 = 0xA must appear as
+// P7-4 = 0xA (DATAOUT = 0xA0), and a byte sent on UART RX (0x30) must be
+// echoed back on UART TX.
 //
-// Uses only top-level ports (pc_dbg_o, x4_dbg_o) -- ChipInventor's canvas
-// compiler rejects hierarchical dot-refs into instance internals.
-//
-// Fixed cycle count instead of self-loop detection: firmware has a real
-// backward loop (copy_loop, 3 iterations) before its terminal `j .`, so
-// a generic revisited-PC detector can't tell them apart. rtl/top.v +
-// tb/system/tb_top_organiser.v already confirmed settling at pc=0x004003ec
-// after exactly 979 cycles; reused directly here as EXPECTED_CYCLES.
+// Firmware behavior (main.s): P7-4 output / P3-0 input, continuously
+// copy P3-0 -> P7-4, then wait for one UART RX byte, echo it on TX, and
+// repeat -- GPIO and UART both run in the same infinite loop.
+module testbench;
 
-module testbench();
+    reg clk = 0;
+    always #25 clk = ~clk;                 // 20 MHz, matches config.json
 
-reg  clk_i = 0;
-reg  rst_i = 1;
-wire halt_o;
-wire [31:0] pc_dbg_o;
-wire [31:0] x4_dbg_o;
+    localparam integer BIT = 174;          // 20 MHz / 115200 baud
 
-integer errors;
-integer i;
-localparam EXPECTED_CYCLES = 979; // confirmed against rtl/top.v + tb/system/tb_top_organiser.v
-localparam SETTLE_MARGIN   = 20;  // extra cycles run past EXPECTED_CYCLES before sampling x4
-localparam EXPECTED_PC     = 32'h004003ec;
+    reg  rst = 1, rx = 1;
+    reg  [3:0] sw_p3_0 = 4'h0;             // external stimulus on P3-0
+    wire [7:0] pins_i, pins_o, pins_oe_o;
+    wire tx;
 
-top ai45 (
-    .clk_i     (clk_i),
-    .rst_i     (rst_i),
-    .halt_o    (halt_o),
-    .pc_dbg_o  (pc_dbg_o),
-    .x4_dbg_o  (x4_dbg_o)
-);
+    // Pad model: a pin reads back what the chip drives when output-enabled
+    // (P7-4), otherwise the external stimulus (P3-0).
+    assign pins_i = (pins_o & pins_oe_o) | ({4'h0, sw_p3_0} & ~pins_oe_o);
 
-always #5 clk_i = ~clk_i;
+    top dut (.clk_i(clk), .rst_i(rst), .rx_i(rx), .tx_o(tx),
+             .pins_i(pins_i), .pins_o(pins_o), .pins_oe_o(pins_oe_o));
 
-initial begin
-    $dumpfile("testbench.vcd");
-    $dumpvars(0, testbench);
+    // Select this test's program in imem (0 = Stage 2, the default).
+    // IMEM_INST is imem's instance name in the top: blk3564_70 on the
+    // ChipInventor canvas; run_tests.py overrides it for rtl/top.v.
+`ifndef IMEM_INST
+`define IMEM_INST blk3564_70
+`endif
+    defparam dut.`IMEM_INST.FIRMWARE = 4;
 
-    errors = 0;
+    integer errors = 0;
+    integer i;
+    reg [7:0] rxb;
 
-    @(posedge clk_i); #1; // RESET latched
+    // Poll pins_o[7:4] until it matches `exp` or `limit` clocks pass.
+    task wait_gpio_echo(input [3:0] exp, input integer limit, input [8*24-1:0] what);
+        integer n;
+        begin
+            n = 0;
+            while (pins_o[7:4] !== exp && n < limit) begin
+                @(negedge clk);
+                n = n + 1;
+            end
+            if (pins_o[7:4] !== exp) begin
+                $display("FAIL [%0s] P7-4 = %h, expected %h (timed out after %0d clocks)",
+                          what, pins_o[7:4], exp, n);
+                errors = errors + 1;
+            end else
+                $display("PASS [%0s] P3-0 = 0x%h, P7-4 = 0x%h (%0d clocks)", what, exp, exp, n);
+        end
+    endtask
 
-    rst_i = 0;
-    @(posedge clk_i); #1; // RESET -> FETCH (instruction 0)
+    task send_byte(input [7:0] b);
+        integer k;
+        begin
+            @(negedge clk); rx = 0;                  // start bit
+            repeat (BIT) @(negedge clk);
+            for (k = 0; k < 8; k = k + 1) begin       // LSB first
+                rx = b[k];
+                repeat (BIT) @(negedge clk);
+            end
+            rx = 1;                                   // stop bit
+            repeat (BIT) @(negedge clk);
+        end
+    endtask
 
-    if (pc_dbg_o !== 32'h00400000) begin
-        $display("FAIL [entry pc] exp=00400000 got=%h", pc_dbg_o);
-        errors = errors + 1;
+    task recv_byte(output [7:0] b);
+        integer k;
+        begin
+            @(negedge tx);                            // start bit edge
+            repeat (BIT / 2) @(posedge clk);
+            if (tx !== 1'b0) begin
+                $display("FAIL [tx start bit] not low at mid-bit");
+                errors = errors + 1;
+            end
+            for (k = 0; k < 8; k = k + 1) begin
+                repeat (BIT) @(posedge clk);
+                b[k] = tx;
+            end
+            repeat (BIT) @(posedge clk);
+            if (tx !== 1'b1) begin
+                $display("FAIL [tx stop bit] not high");
+                errors = errors + 1;
+            end
+        end
+    endtask
+
+    initial begin
+        $dumpfile("testbench.vcd");
+        $dumpvars(0, testbench);
+
+        sw_p3_0 = 4'hA;
+        repeat (3) @(negedge clk);
+        rst = 0;
+        repeat (100) @(negedge clk);       // let DATADIR setup + first echo settle
+
+        // GPIO: P3-0 = 0xA must appear as P7-4 = 0xA (DATAOUT = 0xA0).
+        if (pins_oe_o !== 8'hF0) begin
+            $display("FAIL [GPIO direction] pins_oe_o = %h, expected f0 (P7-4 out)", pins_oe_o);
+            errors = errors + 1;
+        end
+        wait_gpio_echo(4'hA, 300, "GPIO");
+
+
+        sw_p3_0 = 4'h5;
+
+        // UART: send 0x30 through RX, expect 0x30 echoed back through TX.
+        fork
+            send_byte(8'h30);
+            recv_byte(rxb);
+        join
+        if (rxb !== 8'h30) begin
+            $display("FAIL [UART echo] RX = 30, TX = %h", rxb);
+            errors = errors + 1;
+        end else
+            $display("PASS [UART] RX = 0x30, TX = 0x30");
+
+        wait_gpio_echo(4'h5, 300, "GPIO after UART");
+
+        if (errors == 0)
+            $display("PASS: GPIO and UART firmware test completed successfully");
+        else
+            $display("FAIL: %0d organiser firmware check(s) failed", errors);
+        $finish;
     end
 
-    for (i = 0; i < EXPECTED_CYCLES + SETTLE_MARGIN - 1; i = i + 1)
-        @(posedge clk_i);
-    #1;
-
-    $display("t=%0t: pc=%h x4=%h (after %0d cycles)",
-              $time, pc_dbg_o, x4_dbg_o, EXPECTED_CYCLES + SETTLE_MARGIN);
-
-    if (pc_dbg_o !== EXPECTED_PC) begin
-        $display("FAIL [terminal pc] exp=%h got=%h -- program has not settled at the expected self-loop address",
-                  EXPECTED_PC, pc_dbg_o);
-        errors = errors + 1;
+    initial begin
+        #2_000_000;                        // 40k cycles
+        $display("FAIL [timeout]");
+        $finish;
     end
-
-    // x4 == 0 -> PASS, x4 == 0xFFFFFFFF -> FAIL (organiser spec)
-    if (x4_dbg_o === 32'h00000000) begin
-        $display("PASS [organiser firmware self-check] x4 = 0x00000000 (PASS)");
-    end else if (x4_dbg_o === 32'hFFFFFFFF) begin
-        $display("FAIL [organiser firmware self-check] x4 = 0xFFFFFFFF (FAIL) -- pc=%h", pc_dbg_o);
-        errors = errors + 1;
-    end else begin
-        $display("FAIL [organiser firmware self-check] x4 = %h -- neither PASS (0) nor FAIL (0xFFFFFFFF)",
-                  x4_dbg_o);
-        errors = errors + 1;
-    end
-
-    if (errors == 0)
-        $display("ALL TESTS PASSED");
-    else
-        $display("%0d CHECK(S) FAILED", errors);
-
-    $finish;
-end
 
 endmodule

@@ -5,8 +5,6 @@ formats, computes every CRC, and produces the expected value of every ./emu
 -o / -r check. The firmware in chip-inventor/firmware/src/main.s must agree
 with this model bit for bit.
 
-Spec: docs/STAGE3_STRATEGY.md SS7.4 (meter frame), SS7.5 (session record),
-SS7.6 (FSM, frame rules, constants).
 """
 import struct
 

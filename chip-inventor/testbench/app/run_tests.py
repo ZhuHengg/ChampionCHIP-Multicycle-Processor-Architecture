@@ -3,7 +3,7 @@
     python chip-inventor/testbench/app/run_tests.py
         [--iverilog PATH] [--vvp PATH] [--top REL]... [--scenario NAME]...
 
-Defaults to every top (hdl.v = ChipInventor canvas export, hdl_ref.v,
+Defaults to every top (hdl.v = ChipInventor canvas export,
 rtl/top.v) x every scenario in scenarios.SCENARIOS. Builds into the ignored
 chip-inventor/sim/app/<toptag>_<scenario>/. Exits non-zero on any failure.
 """
@@ -19,7 +19,7 @@ sys.path.insert(0, str(HERE))
 
 from scenarios import SCENARIOS  # noqa: E402
 
-TOPS = ('hdl.v', 'hdl_ref.v', 'rtl/top.v')
+TOPS = ('hdl.v', 'rtl/top.v')
 
 
 def imem_instance(top_file):

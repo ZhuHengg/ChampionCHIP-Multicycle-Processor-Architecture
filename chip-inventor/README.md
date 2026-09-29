@@ -1,62 +1,314 @@
-# ChampionCHIP RVBL-2 — ChipInventor Build
+# ChampionCHIP RVBL-2 — Stage 3 Submission
 
-ChipInventor-assisted synthesis and validation package for the RVBL-2
-multicycle RISC-V core (RV32I + Zmmul + Xicrc). Everything referenced
-below lives inside this `chip-inventor/` folder — no paths point
-outside it. This folder mirrors `final-submission/` (the submission
-copy); both are kept in sync.
+Multicycle RISC-V processor (RV32I + Zmmul + Xicrc) with GPIO and UART
+peripherals, running a **grid-aware EV charging-station controller**
+application. Built with ChipInventor, validated in simulation, targeting
+Sky130 via OpenLane.
+
+**Team:** Zhu Heng  
+**Application:** IEC 61851 control-pilot FSM with autonomous grid support,
+CRC-chained metering, and fleet-staggered restart.
+
+---
 
 ## Contents
 
 ```
-hdl.v               flattened canvas netlist (all modules, incl. imem
-                     with the baked-in Stage 2 validation firmware)
-rtl/                 same modules split one-per-file, mirrors hdl.v
+rtl/                 Verilog modules, one per file
+  alu_eq26.v           ALU (RV32I arithmetic/logic)
+  branch_comparator_eq26.v
+  control_unit_eq26.v  Multicycle FSM controller
+  crc.eq26.v           CRC-16 custom instruction (Xicrc)
+  mult_eq26.v          32×32 multiplier (Zmmul)
+  lsu_eq26.v           Load/store unit
+  regfile_eq.v         32×32 register file
+  dmem_eq26.v          Data memory (32 bytes)
+  imm_extend_eq26.v    Immediate generator
+  address_decoder.v    Memory-mapped peripheral routing
+  gpio.v               8-pin GPIO peripheral (Stage 3)
+  uart.v               UART controller (Stage 3)
+  uart_tx.v            UART transmitter (115200 8-N-1)
+  uart_rx.v            UART receiver
+  imem.v               Instruction memory (ROM)
+  top.v                Top-level SoC integration
+  fetch_registers.v    PC and instruction registers
+  ir_splitter_eq26.v   Instruction field splitter
+  mux_alu_a.v          ALU operand A mux
+  mux_alu_b.v          ALU operand B mux
+  mux_result.v         Write-back result mux
+  mux_mem_addr.v       Memory address mux
+  mux_pc_next.v        Next-PC mux
+  alu_out_reg.v        ALU output register
+  reg32_dff_eq26.v     Generic 32-bit register
+
+hdl.v                Flattened canvas netlist (all modules in one file)
 simulate.v           ChipInventor simulation harness
-testbench/           firmware + per-module simulation evidence (below)
-results/final/       GDSII + gate-level netlist (OpenLane output)
-logs/                OpenLane synthesis run log
-convertion/          ChipInventor JSON->Verilog converter log + diagram.json
-config.json          OpenLane synthesis config
-front.hex            firmware hex image
+config.json          OpenLane synthesis configuration
+front.hex            Firmware hex image
 fpga_exec.sh         FPGA execution script
-README.md            this file
+
+firmware/            Application firmware (Stage 3)
+  src/main.s           Assembly source (grid-aware EV charger)
+  build/firmware.bin   Raw binary
+  build/firmware.txt   Verilog ROM image
+  build/firmware.dmp   Disassembly listing
+  build/firmware.elf   Linked ELF
+  Makefile             Build via RVBL-Firmware-Builder toolchain
+  bsp/custom.ld        Linker script
+  scripts/bin2rom.py   Binary-to-ROM converter
+
+testbench/           Simulation and validation evidence
+  testbench.v                  Official Stage 3 GPIO/UART firmware testbench
+  run_tests.py                 Runs testbench.v against both top-level designs
+  gen_imem.py                  Regenerates rtl/imem.v and syncs hdl.v, rtl/top.v
+  sim_testbench_output.log     Console output (PASS)
+  testbench.vcd                Full waveform dump
+  full_firmware_waveform/      Waveform screenshots
+  module_testbench/            Per-module directed testbenches:
+    alu/                         ALU — all ops
+    branch_comparator/           All 6 branch conditions
+    control_unit/                15 instruction types
+    crc/                         CRCB/CRCH/CRCW
+    imm/                         I/S/B/U immediates
+    lsu/                         SW/SB/LW/LB/LBU
+    memory_mapping/              Address decoder + DMEM/IMEM
+    multiplier/                  MUL/MULH/MULHSU/MULHU
+    regfile/                     Read/write + x0 protection
+  gpio/                Stage 3 GPIO testbench + runner
+  uart/                Stage 3 UART testbench + runner
+  app/                 Application testbench (emulator model)
+    golden.py            Bit-exact Python golden model
+    test_golden.py       pytest for golden model
+    scenarios.py         12 scenarios (S1–S11, S1X) + 3 harness (H0–H2)
+    test_scenarios.py    pytest for scenarios
+    tb_app.v             Verilog emulator + FPGA wrapper model
+    run_tests.py         Builds and runs all scenarios × all tops
+    evidence/            Rebound simulation + CRC benchmark
+
+emulator/            Emulator interface
+  emu_commands.txt     Generated ./emu command lines for all scenarios
+  run_scenarios.sh     Shell script to run on FPGA
+  README.md
+
+convertion/          ChipInventor converter output
+  diagram.json         Block diagram source
+  logs/converter.log
+
+sim/                 Simulation scratch (gitignored)
+  gpio/                GPIO simulation runs
+  uart/                UART simulation runs
+  system/              Full system simulation runs
+  app/                 Application scenario runs
 ```
 
-## 1. Project functionality
+---
 
-- **RV32I base** — `alu_eq26`, `branch_comparator_eq26`,
-  `imm_extend_eq26`, `lsu_eq26`, `regfile_eq`, `dmem_eq26`,
-  `control_unit_eq26`
-- **Zmmul** — `mult_eq26`
-- **Xicrc** — `crc.eq26`
-- **GDSII via OpenLane** — `results/final/gds/top.gds`
-- **Gate-level netlist** — `results/final/verilog/gl/top.v`,
-  `results/final/verilog/gl/top.nl.v`
-- **`config.json`** — OpenLane synthesis config used for the run above
+## 1. Processor Architecture
 
-Synthesis flow result — see `logs/synthesis-output.log`:
+Multicycle RISC-V core with a 7-state hardware FSM
+(FETCH, DECODE, EXECUTE, MEM_ACCESS_ADDR, MEM_ACCESS_DATA, WRITE_BACK, HALT).
+All 47 instructions execute in 3–6 cycles.
+
+| Extension | Instructions | Module |
+|---|---|---|
+| RV32I | 40 (arithmetic, logic, load, store, branch, jump, upper-imm, system) | `alu_eq26`, `branch_comparator_eq26`, `control_unit_eq26`, `lsu_eq26` |
+| Zmmul | 4 (MUL, MULH, MULHSU, MULHU) | `mult_eq26` |
+| Xicrc | 3 (CRCB, CRCH, CRCW) | `crc.eq26` |
+
+Memory map:
+- `0x00400000` — IMEM (instruction ROM, up to 1024 words)
+- `0x10010000` — DMEM (32 bytes SRAM)
+- `0xF0000000` — GPIO (DATAOUT +0, DATAIN +4, DATADIR +8)
+- `0xF1000000` — UART (TXDATA +0, RXDATA +4, CONTROL +8)
+
+---
+
+## 2. GPIO & UART Integration (Stage 3)
+
+### GPIO (Block Guide §1)
+
+Eight bidirectional pins with independent direction control. Memory-mapped
+registers at `0xF0000000`. Tri-state pads are external; GPIO exposes
+`pins_i`, `pins_o`, `pins_oe_o`.
+
+- DATAOUT (+0x00): drive output pin values
+- DATAIN (+0x04): read input pin levels
+- DATADIR (+0x08): 0 = input, 1 = output per pin
+
+### UART (Block Guide §2)
+
+Full-duplex 115200 baud 8-N-1 serial controller at `0xF1000000`.
+Independent TX/RX shift registers. Two-flop synchronizer on RX.
+
+- TXDATA (+0x00): byte to transmit
+- RXDATA (+0x04): received byte
+- CONTROL (+0x08): TRANSMIT (bit 0, W), RXDONE (bit 1, RW), TXDONE (bit 2, R)
+
+### Integration
+
+Both peripherals connect through `address_decoder.v`, which routes
+load/store operations based on the upper address bits. No new control-unit
+states or instructions were needed — GPIO and UART are accessed with
+standard `lw`/`sw` instructions to their memory-mapped addresses.
+
+---
+
+## 3. Official Firmware Testbench — PASS
+
+The organiser's official GPIO/UART test firmware
+([RVBL-GPIO-UART-Test-Firmware](https://github.com/championchip-experience-community/CCX_Malaysia_Edition_Stage_3/tree/main/RVBL-GPIO-UART-Test-Firmware),
+FIRMWARE 4, loaded verbatim from `external/CCX_Malaysia_Edition_Stage_3/`)
+is validated by `testbench/testbench.v` against the organiser's own minimum
+test: P3-0 = 0xA must appear as P7-4 = 0xA (DATAOUT = 0xA0), and a byte sent
+on UART RX (0x30) must be echoed back on UART TX. It is also exercised
+through the application testbench's harness scenarios (H0, H2). Additionally,
+dedicated GPIO and UART testbenches (`testbench/gpio/`, `testbench/uart/`)
+validate each peripheral in isolation and as part of the full system.
 
 ```
-[INFO]: There are no hold violations in the design at the Typical corner.
-[INFO]: There are no setup violations in the design at the Typical corner.
-[SUCCESS]: Flow complete.
+PASS [GPIO] P3-0 = 0xa, P7-4 = 0xa (0 clocks)
+PASS [UART] RX = 0x30, TX = 0x30
+PASS [GPIO after UART] P3-0 = 0x5, P7-4 = 0x5 (0 clocks)
+PASS: GPIO and UART firmware test completed successfully
 ```
 
-Non-blocking warnings only: max slew and max fanout at the Typical
-corner (see the same log for the referenced STA report path), plus the
-usual deprecated-option/missing-SDC warnings OpenLane always prints.
+Evidence:
+- `testbench/testbench.v` — Official Stage 3 firmware testbench (FIRMWARE 4)
+- `testbench/run_tests.py` — Runs it against both top-level designs (hdl.v, rtl/top.v)
+- `testbench/sim_testbench_output.log` — Console output (PASS)
+- `testbench/testbench.vcd` — Waveform dump
+- `sim/organiser/` — Organiser firmware simulation runs (gitignored)
+- `sim/gpio/` — GPIO simulation waveforms and logs
+- `sim/uart/` — UART simulation waveforms and logs
+- `sim/system/` — Full system simulation
+- `testbench/gpio/README.md` — GPIO test details (5 simulations)
+- `testbench/uart/README.md` — UART test details
 
-## 2. Validation firmware execution
+---
 
-`hdl.v`'s `imem` module has the **official Stage 2 validation firmware**
-baked in — confirmed word-for-word identical to
-[`CCX_Malaysia_Edition_Firmware_Stage_2/firmware.txt`](https://github.com/championchip-experience-community/CCX_Malaysia_Edition_Firmware_Stage_2),
-not a mock. Pass/fail contract per that repo's spec: entry PC =
-`0x00400000`, terminal self-loop, `x4 == 0x00000000` → PASS,
-`x4 == 0xFFFFFFFF` → FAIL.
+## 4. Application — Grid-Aware EV Charging-Station Controller
 
-### Full-firmware result: PASS ✅
+### System Context
+
+A Level 2 AC charging station that autonomously manages vehicle charging
+while responding to real-time grid conditions (frequency dips, voltage sags).
+
+### System Input
+
+- **GPIO inputs (P0–P3):** IEC 61851 control-pilot state (3-bit code) and
+  emergency-stop trip signal
+- **UART input:** 8-byte energy-meter frames containing voltage (0.1V),
+  current (0.1A), frequency (0.01Hz), and CRC-16 integrity check
+
+### System Processing
+
+1. **Control-pilot FSM** — five states (IDLE, CONNECTED, CHARGING, GRID_HOLD,
+   FAULT) driven by GPIO inputs, with stabilisation loop for multi-step
+   transitions
+2. **CRC-16 frame validation** — hardware `crcb` instruction (Xicrc) verifies
+   each meter frame; CRC chain detects dropped/replayed frames
+3. **Grid health monitoring** — frequency and voltage thresholds trigger
+   GRID_HOLD with contactor open
+4. **Staggered restart** — CRC hash of charger ID produces per-charger delay
+   (2–9 frames), preventing fleet-wide rebound when the grid recovers
+5. **Energy metering** — `mul` instruction (Zmmul) accumulates V×I per valid
+   frame; frame counter saturates at 255
+
+### System Output
+
+- **GPIO outputs (P4–P7):** contactor control, cable lock, grid-hold LED,
+  fault LED — output pattern encodes FSM state
+- **UART output:** 8-byte session record on session end (energy, status flags,
+  frame count, CRC-16)
+
+### Emulator Values
+
+Each `./emu` command maps to one scenario:
+- `-d 0xF0` — direction: P7–P4 output, P3–P0 input
+- `-i <hex>` — set GPIO input (control pilot + safety trip)
+- `-o <hex>` — check GPIO output (state-dependent pattern)
+- `-t8 <bytes>` — send meter frame via UART (8 bytes, LE)
+- `-r8 <bytes>` — read session record via UART (8 bytes, LE)
+
+Full command lines in `emulator/emu_commands.txt`.
+
+---
+
+## 5. Firmware Development
+
+Assembly source: `firmware/src/main.s` (265 instruction words, 26% of IMEM).
+
+**Architecture:** register-only, stackless, polling-based. All state lives in
+CPU registers (32 bytes of DMEM is unused). Main loop: `apply_pins` (GPIO FSM)
+then `poll_uart` (byte-by-byte UART receive with incremental CRC).
+
+**Build pipeline:**
+```
+main.s → as → main.o → gcc -nostdlib → firmware.elf → objcopy → firmware.bin → bin2rom.py → firmware.txt
+```
+
+**Three uses of the Xicrc `crcb` instruction:**
+1. Frame integrity — CRC each payload byte, compare computed vs received
+2. Chain continuity — seed from previous frame's CRC field detects drops/replays
+3. Restart hash — CRC of charger ID produces staggered grid-hold delay
+
+**CRC performance:** hardware `crcb` is 21× faster than software shift-XOR
+(~60 vs ~1,276 cycles for 6 bytes), critical for the 1,740-cycle inter-byte
+budget at 115200 baud.
+
+---
+
+## 6. Custom Firmware Validation
+
+### Golden Model
+
+`testbench/app/golden.py` is a bit-exact Python implementation of the
+firmware's FSM, CRC chain, energy metering, and session record generation.
+All expected values are computed by the model — none are hand-written.
+36 pytest cases cover all model functions.
+
+### Scenario Coverage
+
+12 application scenarios + 3 harness scenarios, each run against 2 top-level
+designs (hdl.v, rtl/top.v) = **30 simulation runs**.
+
+| Scenario | Tests |
+|---|---|
+| S1 | Idle — no car, outputs safe |
+| S2 | Normal charge session — connect, charge, unplug, verify record |
+| S3 | Grid hold — frequency dip triggers hold, staggered restart |
+| S4 | Overcurrent fault — I > 32.0 A triggers FAULT |
+| S5 | Emergency stop — safety trip triggers FAULT |
+| S6 | CRC corruption — bad frame, counter increments |
+| S7 | CRC chain break — two consecutive bad frames trigger FAULT |
+| S8 | Unplug during charging — record sent |
+| S9 | Invalid pilot — CP ≥ 4 triggers FAULT |
+| S10 | Replayed frame — chain detects replay |
+| S11 | Stale inputs at boot |
+| S1X | Back-to-back bytes (no gap) — timing stress test |
+| H0–H2 | Harness validation with organiser firmware |
+
+Run: `python testbench/app/run_tests.py`
+
+### Rebound Simulation
+
+1,000 chargers through a grid dip: **7.94× peak-load reduction** vs
+simultaneous restart. Evidence in `testbench/app/evidence/`.
+
+---
+
+## 7. Stage 2 Validation — PASS
+
+The official Stage 2 validation firmware
+([CCX_Malaysia_Edition_Firmware_Stage_2](https://github.com/championchip-experience-community/CCX_Malaysia_Edition_Firmware_Stage_2))
+is baked into `imem` as FIRMWARE 0 (the default) and confirmed word-for-word
+identical. `top` exposes both the original debug ports (`pc_dbg_o`,
+`x4_dbg_o`, `halt_o`) and the Stage 3 GPIO/UART ports
+(`pins_i`/`pins_o`/`pins_oe_o`, `rx_i`/`tx_o`) side by side, so the
+Stage 2 self-check (entry PC `0x00400000`, terminal self-loop
+`0x004003ec`, x4 sentinel `0x00000000`) remains reproducible against the
+debug ports at any time; `testbench/testbench.v` was repointed to the
+Stage 3 organiser firmware check (§3) as the primary evidence file.
 
 ```
 t=9996: pc=004003ec x4=00000000 (after 999 cycles)
@@ -64,74 +316,70 @@ PASS [organiser firmware self-check] x4 = 0x00000000 (PASS)
 ALL TESTS PASSED
 ```
 
-| Check | Expected | Got | Result |
-|---|---|---|---|
-| Entry PC | `0x00400000` | `0x00400000` | ✅ PASS |
-| Terminal self-loop PC | `0x004003ec` | `0x004003ec` | ✅ PASS |
-| x4 sentinel | `0x00000000` | `0x00000000` | ✅ PASS |
-| Cycle count | 979 (+20 margin) | settled at 999 | ✅ PASS |
+Evidence: `testbench/full_firmware_waveform/`
 
-Cycle count independently confirmed against the legacy slice's
-`rtl/top.v` + `tb/system/tb_top_organiser.v` — reused directly here as
-`EXPECTED_CYCLES` (see `testbench/testbench.v` header).
+### Per-Module Testbenches — All PASS
 
-Evidence:
-- [`testbench/sim_testbench_output.log`](testbench/sim_testbench_output.log) — console output of the run above
-- [`testbench/testbench.vcd`](testbench/testbench.vcd) — full waveform dump
-- [`testbench/full_firmware_waveform/`](testbench/full_firmware_waveform/) — waveform screenshots (`gtkwave_screenshot.png`, `full_view_wavescreenshot.png`, `waveform_0_500ms.png`, `zoom_in_x4_and_pc_end_waveform.png`)
+| Module | Testbench | Result |
+|---|---|---|
+| ALU | `module_testbench/alu/` | PASS — all ops |
+| Branch comparator | `module_testbench/branch_comparator/` | PASS — BEQ/BNE/BLT/BGE/BLTU/BGEU |
+| Control unit | `module_testbench/control_unit/` | PASS — 15 instruction types |
+| CRC (Xicrc) | `module_testbench/crc/` | PASS — CRCB/CRCH/CRCW |
+| Immediate extend | `module_testbench/imm/` | PASS — I/S/B/U |
+| LSU | `module_testbench/lsu/` | PASS — SW/SB/LW/LB/LBU |
+| Memory mapping | `module_testbench/memory_mapping/` | PASS — DMEM + IMEM |
+| Multiplier (Zmmul) | `module_testbench/multiplier/` | PASS — MUL/MULH/MULHSU/MULHU |
+| Register file | `module_testbench/regfile/` | PASS — incl. x0 protection |
 
-Reproduce:
+### ISA Coverage — 47/47
+
+| Category | Count |
+|---|---|
+| Arithmetic and Logic (Register) | 10/10 |
+| Arithmetic and Logic (Immediate) | 9/9 |
+| Load | 5/5 |
+| Store | 3/3 |
+| Branch | 6/6 |
+| Jump | 2/2 |
+| Upper Immediate | 2/2 |
+| System / Synchronization | 3/3 |
+| Multiplication (Zmmul) | 4/4 |
+| CRC (Xicrc) | 3/3 |
+
+---
+
+## 8. Reproducing
+
+### Official Stage 3 firmware simulation
 ```bash
 cd chip-inventor
-iverilog -o testbench/sim_testbench.vvp hdl.v testbench/testbench.v
-vvp testbench/sim_testbench.vvp | tee testbench/sim_testbench_output.log
-gtkwave testbench/testbench.vcd
+iverilog -g2012 -o testbench/sim_testbench.vvp hdl.v testbench/testbench.v
+vvp testbench/sim_testbench.vvp
+```
+Or across both top-level designs: `python testbench/run_tests.py`
+
+### Per-module testbenches
+Each module under `testbench/module_testbench/` has its own `.v` file,
+output log, and waveform screenshot.
+
+### GPIO / UART peripheral tests
+```bash
+python testbench/gpio/run_tests.py
+python testbench/uart/run_tests.py
 ```
 
-### Per-module testbenches — all PASS ✅
+### Application scenarios (all 30 runs)
+```bash
+python testbench/app/run_tests.py
+```
 
-In addition to the full-firmware run above, every individual block has
-its own directed testbench under `testbench/module_testbench/`, each
-with its own `.v` source, console log, and waveform screenshot:
+### Golden model tests
+```bash
+python -m pytest testbench/app -q
+```
 
-| Module | Testbench | Log result |
-|---|---|---|
-| ALU | `alu/alu_testbench.v` | ✅ PASS — all cases SUCCESS |
-| Branch comparator | `branch_comparator/branchcomparator_testbench.v` | ✅ PASS — all cases SUCCESS |
-| Control unit | `control_unit/control_unit_testbench.v` | ✅ PASS — 15 cases (R-type, I-type, store, load, branch, MUL, JAL, JALR, LUI, AUIPC, CRC, illegal opcode, EBREAK, FENCE, ECALL/halt), all SUCCESS |
-| CRC (Xicrc) | `crc/crc_testbench.v` | ✅ PASS — CRCB/CRCH/CRCW all PASS |
-| Immediate extend | `imm/imm_testbench.v` | ✅ PASS — I/S/B/U formats SUCCESS |
-| LSU | `lsu/lsu_testbench.v` | ✅ PASS — SW/SB/LW/LB/LBU all SUCCESS |
-| Memory mapping (address decoder + DMEM/IMEM) | `memory_mapping/memory_mapping_testbench.v` | ✅ PASS — DMEM write/readback + IMEM read SUCCESS |
-| Multiplier (Zmmul) | `multiplier/mult_testbench.v` | ✅ PASS — MUL/MULH/MULHSU/MULHU all SUCCESS |
-| Register file | `regfile/regfile_testbench.v` | ✅ PASS, incl. x0 write-protection check |
-
-No `FAIL` lines appear in any of the nine module logs.
-
-### ISA coverage — 47/47
-
-| Category | Expected | Covered | Source |
-|---|---|---|---|
-| Arithmetic and Logic (Register) | 10 | 10/10 | Full firmware run exercises ADD/SUB/SLL/SLT/SLTU/XOR/SRL/SRA/OR/AND |
-| Arithmetic and Logic (Immediate) | 9 | 9/9 | Full firmware run exercises all 9 I-type ALU ops |
-| Load | 5 | 5/5 | Full firmware run exercises LB/LH/LW/LBU/LHU |
-| Store | 3 | 3/3 | Full firmware run exercises SB/SH/SW |
-| Branch | 6 | 6/6 | Full firmware run + `branch_comparator_testbench.v` (BEQ/BNE/BLT/BGE/BLTU/BGEU) |
-| Jump | 2 | 2/2 | Full firmware run + `control_unit_testbench.v` (JAL/JALR) |
-| Upper Immediate | 2 | 2/2 | Full firmware run + `control_unit_testbench.v` (LUI/AUIPC) |
-| System / Synchronization | 3 | 3/3 | `control_unit_testbench.v` (ECALL/EBREAK/FENCE — not exercised by the firmware itself, since it terminates via a self-loop rather than a trap) |
-| Multiplication (Zmmul) | 4 | 4/4 | `mult_testbench.v` (MUL/MULH/MULHSU/MULHU) |
-| CRC (Xicrc) | 3 | 3/3 | `crc_testbench.v` (CRCB/CRCH/CRCW) |
-| **Total** | **47** | **47/47** | |
-
-Full instruction-by-instruction decode of every word in `rtl/imem.v`
-(the baked-in Stage 2 firmware) confirms 44/47 mnemonics appear directly
-in the firmware; the remaining 3 (ECALL, EBREAK, FENCE) are covered by
-`control_unit_testbench.v` instead, since the firmware halts by looping
-on its own address rather than trapping.
-
-## 3. Reproducing the OpenLane flow
-
-The synthesis run referenced above was produced through ChipInventor's
-OpenLane integration using `config.json` in this folder. `logs/synthesis-output.log`
-is the full console output of that run, start to finish.
+### Firmware build (requires RISC-V toolchain)
+```bash
+cd firmware && make
+```

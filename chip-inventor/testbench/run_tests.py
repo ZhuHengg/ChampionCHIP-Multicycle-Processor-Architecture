@@ -1,9 +1,8 @@
 """Run from any directory: python run_tests.py [--iverilog PATH] [--vvp PATH].
 
 Builds into ignored chip-inventor/sim/organiser. For every top
-(hdl.v = the ChipInventor canvas top, hdl_ref.v, rtl/top.v): the Stage 2
-firmware check, and the organiser's official Stage 3 GPIO/UART test
-firmware (FIRMWARE 4, loaded verbatim from
+(hdl.v = the ChipInventor canvas top, rtl/top.v): the official
+Stage 3 GPIO/UART test firmware (FIRMWARE 4, loaded verbatim from
 external/CCX_Malaysia_Edition_Stage_3/RVBL-GPIO-UART-Test-Firmware),
 checked against that folder's own minimum test: P3-0 = 0xA -> P7-4 = 0xA,
 and UART RX 0x30 -> TX 0x30. The design files are used exactly as checked
@@ -15,7 +14,7 @@ import re
 import subprocess
 
 HERE = Path(__file__).resolve().parent
-CHIP = HERE.parents[1]
+CHIP = HERE.parent
 
 
 def imem_instance(top_file):
@@ -39,18 +38,16 @@ def main():
         result = subprocess.run([args.vvp, str(out)], check=True, cwd=scratch,
                                 capture_output=True, text=True)
         print(name + ':\n' + result.stdout)
-        if 'PASS: GPIO and UART firmware test completed successfully' not in result.stdout \
-                and 'ALL TESTS PASSED' not in result.stdout:
+        if 'PASS: GPIO and UART firmware test completed successfully' not in result.stdout:
             raise RuntimeError(name + ' failed')
         if 'FAIL' in result.stdout:
             raise RuntimeError(name + ' failed')
 
-    tops = ['hdl.v', 'hdl_ref.v', 'rtl/top.v']
+    tops = ['hdl.v', 'rtl/top.v']
     for rel in [t for t in tops if (CHIP / t).exists()]:
         top = CHIP / rel
         tag = rel.replace('/', '_').replace('.v', '')
-        run(tag + '_stage2', [top, CHIP/'testbench/testbench.v'])
-        run(tag + '_organiser', [top, HERE/'tb_organiser.v'],
+        run(tag + '_organiser', [top, HERE/'testbench.v'],
             ['-DIMEM_INST=' + imem_instance(top)])
 
 
