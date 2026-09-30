@@ -1,4 +1,4 @@
-"""Test firmware for the FIRMWARE-selectable imem (see canvas_blocks/gen_imem.py).
+"""Test firmware for the FIRMWARE-selectable imem (see testbench/gen_imem.py).
 
 Each program returns an Asm-like object with .assemble(); gen_imem.py
 assembles them into imem's ROMs:
