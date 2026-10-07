@@ -38,51 +38,76 @@ continuously in the main loop. Consequences for the emulator:
   every loop pass, so it does not need a UART byte to make progress. (The
   organiser's own test firmware *does*, which is why their README example only
   passes when `IN` already holds the value at boot — see §"What we rely on".)
-- The pilot/safety rules are re-applied until the state stops changing, so
-  `-i 0x02` from IDLE settles straight to CHARGING (IDLE → CONNECTED →
-  CHARGING) before the next option is processed.
+- A charge request stays CONNECTED (`0x20`) until a healthy meter frame arrives.
+  The 500 ms meter watchdog requires regular accepted frames during a session.
 
 ## 3. How many bytes go to the processor over UART RX
 
-**8 bytes per meter frame**, and any number of frames per command. There is no
-header, length byte or resync marker: frames are aligned by byte count from
-reset, because the emulator always sends whole frames.
+Protocol v2 uses **11?20 wire bytes per frame**: two `0x7E` markers surrounding
+an escaped nine-byte body. Send both markers for every frame. Adjacent frames may
+share a marker, but a fresh start marker is required after a long pause.
+The old unframed eight-byte application input format is no longer supported.
+The organiser's separate FIRMWARE 4 UART echo protocol is unchanged.
 
 ## 4. The order and meaning of those bytes
 
-One meter frame, all fields little-endian (which is the order `./emu -t` sends):
+Unescaped body, with all multibyte values little-endian:
 
-| Bytes | Field | Unit | Example |
-|---|---|---|---|
-| 0–1 | `V` voltage | 0.1 V | 2300 = 230.0 V |
-| 2–3 | `I` current | 0.1 A | 160 = 16.0 A |
-| 4–5 | `F` frequency | 0.01 Hz | 5000 = 50.00 Hz |
-| 6–7 | `CRC` | CRC-16 over bytes 0–5 | — |
+| Bytes | Field | Unit |
+|---|---|---|
+| 0 | Sequence | Increment modulo 256 for every generated measurement |
+| 1?2 | Voltage | 0.1 V |
+| 3?4 | Current | 0.1 A |
+| 5?6 | Frequency | 0.01 Hz |
+| 7?8 | CRC-16 | Covers bytes 0?6, fixed seed `0xFFFF`, poly `0x1021`, no reflection/xorout |
 
-As emulator options, one frame is two words:
+Escape **every** body byte equal to `0x7E` or `0x7D` as `0x7D` followed by that
+byte XOR `0x20`. This includes sequence and CRC bytes. Other escape pairs are
+invalid. The receiver accepts exactly nine decoded bytes followed by a marker;
+short or oversized bodies cannot be billed. It never waits indefinitely for a
+missing byte: **100 ms without another byte discards an unfinished frame**.
+That byte timer is separate from the 500 ms accepted-meter-data watchdog.
 
-```shell
--t4 (I << 16 | V)   -t4 (CRC << 16 | F)
+The first accepted frame establishes sequence after processor reset or a new
+vehicle session. Thereafter `delta = (sequence - previous) & 255` is used:
+
+| Delta | Action |
+|---|---|
+| 1 | Accept normal next frame |
+| 2?127 | Accept current frame, flag a gap with status bit `0x40`; missing measurements are not billed |
+| 0 or 128?255 | Reject duplicate/backward/ambiguous sequence; do not refresh the watchdog |
+
+Only valid CRC and acceptable sequence refresh meter freshness. Bad CRC, bad
+framing, sequence rejection, or a partial timeout count as rejected frames.
+Two consecutive rejections latch FAULT, reusing link-error bit `0x40`.
+A successful frame clears that consecutive-error count but never releases a
+latched FAULT or METER_TIMEOUT. A new session resets the sequence baseline and
+parser, allowing a restarted sender to begin at zero. An 8-bit sequence is not
+cryptographic replay protection and cannot distinguish every old replay after wrap.
+
+Example: sequence 0, 230.0 V, 16.0 A, 50.00 Hz:
+
+```text
+7E 00 FC 08 A0 00 88 13 A9 33 7E
 ```
 
-**The CRC chain is the point of the protocol.** The CRC-16 (poly `0x1021`,
-non-reflected, xorout 0 — our `crcb` instruction) is seeded not with `0xFFFF`
-every time, but with **the CRC field of the previous frame received**, valid or
-not (`0xFFFF` after reset). The meter advances its chain on every frame it
-sends.
+Generate bytes or emulator transmit options with the actual sender helper:
 
-Why: the emulator allows only 8 reply bytes per command, so there is no room
-for per-frame acknowledgement — the meter cannot know which frames the charger
-accepted. Seeding from the previous *transmitted* CRC makes the chain
-self-resynchronising:
+```sh
+python emulator/meter_protocol.py --sequence 0 --voltage 2300 --current 160 --frequency 5000
+python emulator/meter_protocol.py --sequence 0 --voltage 2300 --current 160 --frequency 5000 --format emu
+```
 
-| Event | Cost |
-|---|---|
-| corrupted payload | exactly one rejected frame |
-| dropped or re-ordered frame | one rejected frame (the one after the gap) |
-| replayed frame, or corrupted CRC field | two rejected frames → `FAULT` |
+The second command prints:
 
-Two consecutive rejected frames latch `FAULT` with the CRC-lost flag.
+```text
+-t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9
+```
+
+Append those options to the same `./emu` invocation as the GPIO/session commands;
+starting another invocation resets the processor. Keep every inter-byte/host gap
+below 100 ms, and accepted complete frames within the 500 ms watchdog deadline.
+Use `frame_body` and `encode_frame` from `meter_protocol.py` in a real meter sender.
 
 ## 5. How many bytes the firmware returns
 
@@ -105,7 +130,8 @@ GPIO output byte per state:
 | `CONNECTED` | `0x20` | lock |
 | `CHARGING` | `0x30` | lock + contactor |
 | `GRID_HOLD` | `0x60` | lock + grid-hold |
-| `FAULT` | `0x80` | fault (latched) |
+| `FAULT` | `0x80` | fault (latched), state code 4 |
+| `METER_TIMEOUT` | `0x80` | meter timeout (latched), state code 5 |
 
 The session record (UART TX), 8 bytes:
 
@@ -118,8 +144,7 @@ The session record (UART TX), 8 bytes:
 
 As options: `-r4 ENERGY -r2 (FRAMES << 8 | STATUS) -r2 CRC`.
 
-Cause flags: `0x08` E-stop, `0x10` CP error, `0x20` over-current, `0x40` CRC
-chain lost, `0x80` grid hold occurred.
+Cause flags: `0x08` E-stop, `0x10` CP error, `0x20` over-current, `0x40` link error / sequence gap, `0x80` grid hold occurred.
 
 ---
 
@@ -133,7 +158,7 @@ golden model. Run them all with `run_scenarios.sh`.
 | S1 | Normal session: plug in, charge two frames, unplug |
 | S1X | S1 with back-to-back UART bytes (no gap between bytes or frames) |
 | S2 | Grid under-frequency → hold → CRC-timed restart on the predicted frame |
-| S3 | Corrupted frame and dropped frame each cost one frame; chain resynchronises |
+| S3 | Corrupted/missing frames; next intact frame is accepted, gap flagged |
 | S4 | Meter link lost: two bad frames in a row latch `FAULT` |
 | S5 | E-stop while charging, latched until released **and** unplugged |
 | S6 | Plug straight into CP C, unplug while charging |
@@ -141,7 +166,7 @@ golden model. Run them all with `run_scenarios.sh`.
 | S8 | Ventilation (CP D) refused; CP E latches `FAULT` |
 | S9 | Invalid pilot code 7 latches `FAULT` |
 | S10 | Replayed frame rejected, and the next one too → `FAULT` |
-| S11 | Stale pins at boot: CP C already asserted, settles to CHARGING |
+| S11 | Stale pins at boot: CP C already asserted, waits for healthy data |
 
 ## What we rely on in the emulator
 
@@ -167,7 +192,7 @@ Verified by reading `RVBL-Emulator/src/emu.c` in full:
    from the `[ok]` / `[error]` lines and ignores `$?`. Worth reporting to the
    organisers.
 7. **Each AXI access sleeps 50 ms**, so the host is far slower than the chip;
-   the firmware never races the emulator.
+   those delays must stay below the configured inter-byte and meter deadlines.
 
 ## How `emu_commands.txt` is generated
 
@@ -179,5 +204,12 @@ python chip-inventor/testbench/app/scenarios.py
 `-o` and `-r` value is computed by the model rather than written by hand. The
 same scenario objects drive the Verilog testbench
 (`chip-inventor/testbench/app/`), where each `emu_*` task mirrors one emulator
-option — so a passing simulation is a passing `./emu` command against our RTL,
-and the same lines should run unchanged on the FPGA.
+option — simulation verifies the command sequence against RTL. Real FPGA host pacing
+and hardware operation still require validation.
+
+
+Emulator word packing appends up to three harmless `0x7E` end markers so each
+write uses `-t4`. For the nominal frame this reduces four host writes to three,
+leaving more margin below the meter watchdog when one frame is corrupted. The
+plain hex encoder still emits the canonical 11-byte nominal frame. A Python
+regression checks nominal good/bad/good frames with 50 ms host access delays.

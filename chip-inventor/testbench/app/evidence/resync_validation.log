@@ -1,0 +1,97 @@
+UART protocol v2 validation - 2026-10-07
+Firmware: 370 instruction words; FIRMWARE 5
+Python: 78 passed
+Production-divider timer/MMIO/independence/saturation/reset unit: PASS
+
+PASS resync_hdl.v_dropped_body_byte_1
+PASS resync_hdl.v_dropped_body_byte_2
+PASS resync_hdl.v_dropped_body_byte_3
+PASS resync_hdl.v_dropped_body_byte_4
+PASS resync_hdl.v_dropped_body_byte_5
+PASS resync_hdl.v_dropped_body_byte_6
+PASS resync_hdl.v_dropped_body_byte_7
+PASS resync_hdl.v_dropped_body_byte_8
+PASS resync_hdl.v_dropped_body_byte_9
+PASS resync_hdl.v_inserted_byte
+PASS resync_hdl.v_shared_marker
+PASS resync_hdl.v_noise
+PASS resync_hdl.v_invalid_escape
+PASS resync_hdl.v_dangling_escape
+PASS resync_hdl.v_partial_timeout
+PASS resync_hdl.v_late_tail
+PASS resync_hdl.v_escaped_data_and_sequence
+PASS resync_hdl.v_sequence_wrap
+PASS resync_hdl.v_duplicate_recovery
+PASS resync_hdl.v_fault_stays_latched
+PASS resync_hdl.v_escaped_crc
+PASS resync_hdl.v_new_session_reset
+PASS resync_rtl_top.v_dropped_body_byte_1
+PASS resync_rtl_top.v_dropped_body_byte_2
+PASS resync_rtl_top.v_dropped_body_byte_3
+PASS resync_rtl_top.v_dropped_body_byte_4
+PASS resync_rtl_top.v_dropped_body_byte_5
+PASS resync_rtl_top.v_dropped_body_byte_6
+PASS resync_rtl_top.v_dropped_body_byte_7
+PASS resync_rtl_top.v_dropped_body_byte_8
+PASS resync_rtl_top.v_dropped_body_byte_9
+PASS resync_rtl_top.v_inserted_byte
+PASS resync_rtl_top.v_shared_marker
+PASS resync_rtl_top.v_noise
+PASS resync_rtl_top.v_invalid_escape
+PASS resync_rtl_top.v_dangling_escape
+PASS resync_rtl_top.v_partial_timeout
+PASS resync_rtl_top.v_late_tail
+PASS resync_rtl_top.v_escaped_data_and_sequence
+PASS resync_rtl_top.v_sequence_wrap
+PASS resync_rtl_top.v_duplicate_recovery
+PASS resync_rtl_top.v_fault_stays_latched
+PASS resync_rtl_top.v_escaped_crc
+PASS resync_rtl_top.v_new_session_reset
+
+44/44 UART recovery RTL runs passed.
+Partial-timeout/late-tail cases accelerate timers 100x; UART speed is unchanged.
+
+PASS hdl H0: PASS; evidence sim/app/hdl_H0/run.log
+PASS hdl H1: expected-FAIL; evidence sim/app/hdl_H1/run.log
+PASS hdl H2: PASS; evidence sim/app/hdl_H2/run.log
+PASS hdl S1: PASS; evidence sim/app/hdl_S1/run.log
+PASS hdl S1X: PASS; evidence sim/app/padded_hdl_S1X/run.log
+PASS hdl S2: PASS; evidence sim/app/hdl_S2/run.log
+PASS hdl S3: PASS; evidence sim/app/padded_hdl_S3/run.log
+PASS hdl S4: PASS; evidence sim/app/hdl_S4/run.log
+PASS hdl S5: PASS; evidence sim/app/hdl_S5/run.log
+PASS hdl S6: PASS; evidence sim/app/hdl_S6/run.log
+PASS hdl S7: PASS; evidence sim/app/hdl_S7/run.log
+PASS hdl S8: PASS; evidence sim/app/hdl_S8/run.log
+PASS hdl S9: PASS; evidence sim/app/hdl_S9/run.log
+PASS hdl S10: PASS; evidence sim/app/hdl_S10/run.log
+PASS hdl S11: PASS; evidence sim/app/hdl_S11/run.log
+PASS rtl_top H0: PASS; evidence sim/app/rtl_top_H0/run.log
+PASS rtl_top H1: expected-FAIL; evidence sim/app/rtl_top_H1/run.log
+PASS rtl_top H2: PASS; evidence sim/app/rtl_top_H2/run.log
+PASS rtl_top S1: PASS; evidence sim/app/rtl_top_S1/run.log
+PASS rtl_top S1X: PASS; evidence sim/app/padded_rtl_top_S1X/run.log
+PASS rtl_top S2: PASS; evidence sim/app/rtl_top_S2/run.log
+PASS rtl_top S3: PASS; evidence sim/app/padded_rtl_top_S3/run.log
+PASS rtl_top S4: PASS; evidence sim/app/rtl_top_S4/run.log
+PASS rtl_top S5: PASS; evidence sim/app/rtl_top_S5/run.log
+PASS rtl_top S6: PASS; evidence sim/app/rtl_top_S6/run.log
+PASS rtl_top S7: PASS; evidence sim/app/rtl_top_S7/run.log
+PASS rtl_top S8: PASS; evidence sim/app/rtl_top_S8/run.log
+PASS rtl_top S9: PASS; evidence sim/app/rtl_top_S9/run.log
+PASS rtl_top S10: PASS; evidence sim/app/rtl_top_S10/run.log
+PASS rtl_top S11: PASS; evidence sim/app/rtl_top_S11/run.log
+PASS watchdog suite; detail in sim/app/resync_checks/watchdog.log
+PASS uart suite; detail in sim/app/resync_checks/uart.log
+PASS gpio suite; detail in sim/app/resync_checks/gpio.log
+
+Full v2 runner completed: 30/30 as expected; H1 intentionally rejects a mismatch on each top.
+Final padded-command checks additionally completed: 4/4 S1X and S3 runs.
+14/14 watchdog runs; 5/5 UART and 5/5 GPIO runs passed.
+Firmware source/artifact SHA-256:
+ba4ffdb89c8dffa064e3fb5ccb2b01060646127d427a932b18263081fe0ef3e4  firmware/src/main.s
+8d547cfda1a55b2e90d6ebb6853214376591898f8b231101ae865e0caf8161f1  firmware/build/firmware.bin
+2415af9e79f0087e02a1bc9217728a0658763fe9caf1c5af366af5db4cdb24da  rtl/meter_timer.v
+971732562242179f57165c600d7d226bba8d1d0fd8b1a116595ce4c22609e09a  rtl/address_decoder.v
+bf76175e5fb61c6535ec72b5d55501032c547faf0e1c9432b206b4e7c3fac3af  emulator/meter_protocol.py
+No FPGA programming or physical implementation verification performed.

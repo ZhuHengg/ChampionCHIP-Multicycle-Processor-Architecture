@@ -1,0 +1,71 @@
+Latest main integration validation - 2026-10-07
+Base: 4f230410aed9e380def1da6eb26ed907f185e9fb
+Firmware: 370 words
+Python: 78 passed
+UART recovery: 44/44 passed
+Watchdog: 14/14 passed
+Timer unit: PASS
+
+PASS resync_hdl.v_dangling_escape
+PASS resync_hdl.v_dropped_body_byte_1
+PASS resync_hdl.v_dropped_body_byte_2
+PASS resync_hdl.v_dropped_body_byte_3
+PASS resync_hdl.v_dropped_body_byte_4
+PASS resync_hdl.v_dropped_body_byte_5
+PASS resync_hdl.v_dropped_body_byte_6
+PASS resync_hdl.v_dropped_body_byte_7
+PASS resync_hdl.v_dropped_body_byte_8
+PASS resync_hdl.v_dropped_body_byte_9
+PASS resync_hdl.v_duplicate_recovery
+PASS resync_hdl.v_escaped_crc
+PASS resync_hdl.v_escaped_data_and_sequence
+PASS resync_hdl.v_fault_stays_latched
+PASS resync_hdl.v_inserted_byte
+PASS resync_hdl.v_invalid_escape
+PASS resync_hdl.v_late_tail
+PASS resync_hdl.v_new_session_reset
+PASS resync_hdl.v_noise
+PASS resync_hdl.v_partial_timeout
+PASS resync_hdl.v_sequence_wrap
+PASS resync_hdl.v_shared_marker
+PASS resync_rtl_top.v_dangling_escape
+PASS resync_rtl_top.v_dropped_body_byte_1
+PASS resync_rtl_top.v_dropped_body_byte_2
+PASS resync_rtl_top.v_dropped_body_byte_3
+PASS resync_rtl_top.v_dropped_body_byte_4
+PASS resync_rtl_top.v_dropped_body_byte_5
+PASS resync_rtl_top.v_dropped_body_byte_6
+PASS resync_rtl_top.v_dropped_body_byte_7
+PASS resync_rtl_top.v_dropped_body_byte_8
+PASS resync_rtl_top.v_dropped_body_byte_9
+PASS resync_rtl_top.v_duplicate_recovery
+PASS resync_rtl_top.v_escaped_crc
+PASS resync_rtl_top.v_escaped_data_and_sequence
+PASS resync_rtl_top.v_fault_stays_latched
+PASS resync_rtl_top.v_inserted_byte
+PASS resync_rtl_top.v_invalid_escape
+PASS resync_rtl_top.v_late_tail
+PASS resync_rtl_top.v_new_session_reset
+PASS resync_rtl_top.v_noise
+PASS resync_rtl_top.v_partial_timeout
+PASS resync_rtl_top.v_sequence_wrap
+PASS resync_rtl_top.v_shared_marker
+PASS watchdog_hdl.v_corrupt_frame
+PASS watchdog_hdl.v_hold_silence
+PASS watchdog_hdl.v_idle_and_reset
+PASS watchdog_hdl.v_no_initial_frame
+PASS watchdog_hdl.v_partial_frame
+PASS watchdog_hdl.v_refresh_and_latch
+PASS watchdog_hdl.v_silence_500ms
+PASS watchdog_rtl_top.v_corrupt_frame
+PASS watchdog_rtl_top.v_hold_silence
+PASS watchdog_rtl_top.v_idle_and_reset
+PASS watchdog_rtl_top.v_no_initial_frame
+PASS watchdog_rtl_top.v_partial_frame
+PASS watchdog_rtl_top.v_refresh_and_latch
+PASS watchdog_rtl_top.v_silence_500ms
+PASS watchdog_timer_unit
+f84010b82d9b11ee2e39b13c81e18e0246b315d290b3ad8a1c44cbdfda1d41e1  firmware/src/main.s
+8d547cfda1a55b2e90d6ebb6853214376591898f8b231101ae865e0caf8161f1  firmware/build/firmware.bin
+d3187fdc7aad2f980cf83eee38e6ec384d8e502354d649e22a517f4acd3586e4  hdl.v
+8ea1d29a2380b40c4d71402b96cceb2e3ad41aca547e6da38c46a69edfdc9bfe  rtl/top.v

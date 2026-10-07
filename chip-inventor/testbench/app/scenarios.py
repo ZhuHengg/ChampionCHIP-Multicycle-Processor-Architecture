@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from golden import Charger, Meter, corrupt, restart_delay  # noqa: F401
+from golden import Charger, Meter, corrupt, restart_delay, encode_frame, transmit_options  # noqa: F401
 
 HERE = Path(__file__).resolve().parent
 CHIP = HERE.parents[1]
@@ -73,14 +73,12 @@ class Scenario:
         return self
 
     # ---- composites ----------------------------------------------------
-    def frame(self, frame8):
-        """Feed one 8-byte meter frame: -t4 (I<<16|V), -t4 (CRC<<16|F)."""
-        if len(frame8) != 8:
-            raise ValueError('meter frame must be 8 bytes')
-        self.t(4, int.from_bytes(frame8[0:4], 'little'))
-        self.t(4, int.from_bytes(frame8[4:8], 'little'))
+    def frame(self, body):
+        """Transmit an escaped protocol-v2 frame in supported emulator chunks."""
+        for n, value in transmit_options(encode_frame(body)):
+            self.t(n, value)
         if self.model is not None:
-            self.model.rx_frame(frame8)
+            self.model.rx_frame(body)
         return self
 
     def record(self):
@@ -200,7 +198,7 @@ def _app():
     s.i(1).o().i(2).o()
     s.frame(N(m)).o()
     trigger = m.frame(2300, 160, 4920)         # F < F_LOW -> GRID_HOLD
-    delay = restart_delay(int.from_bytes(trigger[6:], 'little'))
+    delay = restart_delay(int.from_bytes(trigger[-2:], 'little'))
     s.frame(trigger).o()
     s.frame(m.frame(2300, 160, 4940)).o()      # still unhealthy: count resets
     for _ in range(delay):                     # healthy frames; the last one
@@ -209,13 +207,13 @@ def _app():
     s.i(1).o().i(0).o().record()
 
     # ---- S3: corrupted frame and dropped frame ---------------------------
-    s, m = new('S3', 'corrupted frame and dropped frame each cost one frame'), Meter()
+    s, m = new('S3', 'corrupted and missing frames: next valid frame recovers'), Meter()
     s.i(1).o().i(2).o()
     s.frame(N(m)).o()
     s.frame(corrupt(N(m))).o()                 # rejected
-    s.frame(N(m)).o()                          # chain resynchronises
+    s.frame(N(m)).o()                          # valid independent CRC recovers
     N(m)                                       # generated but never delivered
-    s.frame(N(m)).o()                          # rejected: chain skipped a step
+    s.frame(N(m)).o()                          # accepted: forward sequence gap is flagged
     s.frame(N(m)).o()                          # accepted again
     s.i(0).o().record()
 
@@ -239,7 +237,7 @@ def _app():
 
     # ---- S6: straight to C, unplug under load ----------------------------
     s, m = new('S6', 'plug straight into CP C, then unplug while charging'), Meter()
-    s.i(2).o()                                 # IDLE -> CONNECTED -> CHARGING
+    s.i(2).o()                                 # CONNECTED until first healthy frame
     s.frame(N(m)).o()
     s.i(0).o().record()
 
@@ -253,7 +251,7 @@ def _app():
     # ---- S8: ventilation required, then CP error -------------------------
     s = new('S8', 'ventilation (CP D) refused; CP E latches FAULT')
     s.i(1).o().i(3).o()                        # D refused, stays CONNECTED
-    s.i(2).o()                                 # C -> CHARGING
+    s.i(2).o()                                 # C waits for healthy meter data
     s.i(3).o()                                 # D -> back to CONNECTED
     s.i(4).o()                                 # E -> FAULT, CP-error flag
     s.i(0).o().record()
@@ -263,22 +261,22 @@ def _app():
     s.i(1).o().i(7).o().i(0).o().record()
 
     # ---- S10: replayed frame ---------------------------------------------
-    s, m = new('S10', 'replayed frame rejected, and the next one too -> FAULT'), Meter()
+    s, m = new('S10', 'two replayed frames rejected -> FAULT'), Meter()
     s.i(1).o().i(2).o()
     f1 = N(m)
     f2 = N(m)
     s.frame(f1).o()
     s.frame(f2).o()
     s.frame(f1).o()                            # replay -> rejected
-    s.frame(N(m)).o()                          # chain broken -> FAULT
+    s.frame(f1).o()                            # second replay -> FAULT
     s.i(0).o().record()
 
     # ---- S11: stale input pins at power-up -------------------------------
     # emu.c keeps IN across its reset, so the firmware can boot with CP = C
-    # already asserted and must settle straight to CHARGING.
-    s, m = new('S11', 'stale pins at boot: CP C already asserted, settles to CHARGING',
+    # already asserted; the contactor must remain open until healthy data.
+    s, m = new('S11', 'stale pins at boot: CP C waits for healthy meter data',
                preset_in=0x02), Meter()
-    s.o()                                      # 0x30 without any -i
+    s.o()                                      # 0x20 without any -i
     s.frame(N(m)).o()
     s.i(0).o().record()
 

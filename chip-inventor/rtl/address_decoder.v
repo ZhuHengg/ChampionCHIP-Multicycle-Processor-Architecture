@@ -10,6 +10,8 @@ module address_decoder (
     input  wire [31:0] imem_data_i,
     input  wire [31:0] gpio_data_i,
     input  wire [31:0] uart_data_i,
+    input  wire [31:0] timer_data_i,
+    output wire timer_we_o, timer_oe_o,
 
     output wire [31:0] address_o,     // word address (zero-extended)
     output wire        dmem_we_o,
@@ -39,6 +41,10 @@ module address_decoder (
     wire is_uart = (address_i[31:4] == 28'hF100000) &&
                    (address_i[3:2] != 2'b11);
 
+    wire is_timer = (address_i[31:3] == (32'hF2000000 >> 3));
+    assign timer_we_o = we_i && is_timer && (bw_i == 4'b1111);
+    assign timer_oe_o = oe_i && is_timer;
+
     wire is_imem = (address_i >= IMEM_LOW) && (address_i <= IMEM_HIGH);
     wire is_dmem = (address_i >= DMEM_LOW) && (address_i <= DMEM_HIGH);
 
@@ -61,6 +67,8 @@ module address_decoder (
             data_o = gpio_data_i;
         else if (is_uart)
             data_o = uart_data_i;
+        else if (is_timer)
+            data_o = timer_data_i;
         else if (is_dmem)
             data_o = dmem_data_i;
         else if (is_imem)

@@ -64,6 +64,14 @@ module testbench;
              .rx_i(rx), .tx_o(tx), .pc_dbg_o(pc_dbg), .x4_dbg_o(x4_dbg));
 
     defparam dut.`IMEM_INST.FIRMWARE = `FIRMWARE_SEL;
+`ifdef WATCHDOG_TIMER_HZ
+    // Accelerate only the watchdog divider in focused tests; UART stays 20 MHz.
+    defparam dut.meter_timer_inst.CLK_HZ = `WATCHDOG_TIMER_HZ;
+    always @(negedge tx) begin
+        if (!rst && pins_o[4] !== 1'b0)
+            $fatal(1, "contactor must open before fault report transmission");
+    end
+`endif
 
     integer errors = 0;
     integer aborted = 0;                   // emu.c: first [error] -> main_end
@@ -270,13 +278,18 @@ module testbench;
     endtask
 
     initial begin
+`ifndef NO_VCD
         $dumpfile("app.vcd");
         $dumpvars(0, testbench);
+`endif
 `include "scenario.vh"
     end
 
     initial begin
-        #250_000_000;                      // 5,000,000 cycles at 20 MHz
+`ifndef TB_TIMEOUT_NS
+`define TB_TIMEOUT_NS 250_000_000
+`endif
+        #(`TB_TIMEOUT_NS);
         $display("[tb] FAIL timeout");
         $display("SCENARIO RESULT: FAIL (%0d errors)", errors + 1);
         $finish;

@@ -10,16 +10,16 @@ is a passing `./emu` command** — and the same command lines, exported to
 
 | File | Role |
 |---|---|
-| `golden.py` | the golden model: frame/record formats, CRC chain, FSM (spec §7.4–7.6) |
+| `golden.py` | the golden model: frame/record formats, framed UART, sequence checks, FSM (spec §7.4–7.6) |
 | `test_golden.py` | pytest for the model |
 | `scenarios.py` | scenario DSL, harness scenarios H0–H2, application scenarios S1–S11 + S1X; exports `emu_commands.txt` |
 | `test_scenarios.py` | pytest for the scenario set |
 | `tb_app.v` | the emulator + wrapper model |
 | `run_tests.py` | builds and runs every top × scenario |
 
-The golden model is the single source of truth: every expected `-o` and `-r`
-value is computed by it, never written by hand, so the scenarios cannot drift
-from the specification.
+The standard emulator scenarios compute expected `-o` and `-r` values from
+the golden model. Focused fault-injection runners separately use independent
+state and accounting expectations to check the RTL.
 
 ## What the testbench models
 
@@ -49,7 +49,7 @@ firmware transmits must be read by some `-r`.
 ## Running
 
 ```bash
-# everything: 3 tops x 15 scenarios
+# everything: 2 tops x 15 scenarios
 python chip-inventor/testbench/app/run_tests.py
 
 # filter by scenario and/or top
@@ -121,3 +121,43 @@ the testbench itself before it is trusted to judge our application:
   `0x02` from a previous run**, which is why the scenario sets
   `PRESET_IN=0x02`. Our own firmware polls its inputs continuously, so for us
   `-i` and `-o` work in any order.
+
+## Meter watchdog regression
+
+```sh
+python testbench/app/run_watchdog_tests.py
+```
+
+This runs a timer/MMIO unit test and seven scenarios on each top-level design.
+The unit test verifies the production 20 MHz millisecond divider; the SoC tests
+accelerate the timer alone by 100x and retain the firmware's 500-tick deadline.
+Expectations for state and report contents are independent of the Charger model.
+New model tests in `test_watchdog.py` cover the exact 499/500 ms boundary,
+refresh, corrupt/partial frames, initial gating, fault latching, and reconnect.
+
+`run_tests.py --no-vcd` skips waveform generation. Application scenarios now
+expect CONNECTED (`0x20`) before the first healthy measurement, including S11.
+The golden model advances time explicitly with `advance_ms`; ordinary scenario
+construction does not model host access delays. FPGA host pacing must keep valid
+meter frames within the configured timeout.
+
+## UART frame resynchronization
+
+`test_resync.py` injects dropped/inserted bytes, framing/escape errors, stale
+partial frames, duplicate/out-of-order sequences, and wraparound. The sender's
+known wire vector is checked against the independent golden CRC implementation.
+
+```sh
+python testbench/app/run_resync_tests.py
+```
+
+This runner exercises 22 fault/recovery cases on each top with explicit expected
+energy, status, and frame counts; it does not derive expectations from Charger.
+Most tests use production UART/timer timing. The two partial-timeout cases per
+top accelerate only the timer divider by 100x. `--case NAME` and `--top PATH`
+select a subset. Full application scenarios now transmit protocol-v2 wire frames.
+
+Emulator transmit options pad complete frames with empty markers into full-word
+writes to reduce host delays. `--run-tag NAME` isolates application runner output
+when checking variants concurrently; a tagged padded-command check covers S1X
+and S3 on both top-level designs in addition to the full unpadded v2 regression.

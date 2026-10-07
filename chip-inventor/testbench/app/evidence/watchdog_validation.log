@@ -1,0 +1,58 @@
+Meter watchdog validation - 2026-10-07
+Firmware: 317 words; FIRMWARE 5
+Python suite: 49 passed
+Timer divider/MMIO/saturation unit test: PASS
+GPIO suite: 5/5 PASS
+UART suite: 5/5 PASS
+
+PASS hdl H0: PASS
+PASS hdl H1: expected-FAIL
+PASS hdl H2: PASS
+PASS hdl S1: PASS
+PASS hdl S1X: PASS
+PASS hdl S2: PASS
+PASS hdl S3: PASS
+PASS hdl S4: PASS
+PASS hdl S5: PASS
+PASS hdl S6: PASS
+PASS hdl S7: PASS
+PASS hdl S8: PASS
+PASS hdl S9: PASS
+PASS hdl S10: PASS
+PASS hdl S11: PASS
+PASS rtl_top H0: PASS
+PASS rtl_top H1: expected-FAIL
+PASS rtl_top H2: PASS
+PASS rtl_top S1: PASS
+PASS rtl_top S1X: PASS
+PASS rtl_top S2: PASS
+PASS rtl_top S3: PASS
+PASS rtl_top S4: PASS
+PASS rtl_top S5: PASS
+PASS rtl_top S6: PASS
+PASS rtl_top S7: PASS
+PASS rtl_top S8: PASS
+PASS rtl_top S9: PASS
+PASS rtl_top S10: PASS
+PASS rtl_top S11: PASS
+
+Watchdog SoC tests: divider accelerated 100x; production divider independently unit-tested.
+PASS watchdog_hdl.v_corrupt_frame
+PASS watchdog_hdl.v_hold_silence
+PASS watchdog_hdl.v_idle_and_reset
+PASS watchdog_hdl.v_no_initial_frame
+PASS watchdog_hdl.v_partial_frame
+PASS watchdog_hdl.v_refresh_and_latch
+PASS watchdog_hdl.v_silence_500ms
+PASS watchdog_rtl_top.v_corrupt_frame
+PASS watchdog_rtl_top.v_hold_silence
+PASS watchdog_rtl_top.v_idle_and_reset
+PASS watchdog_rtl_top.v_no_initial_frame
+PASS watchdog_rtl_top.v_partial_frame
+PASS watchdog_rtl_top.v_refresh_and_latch
+PASS watchdog_rtl_top.v_silence_500ms
+
+30/30 application regression runs as expected (H1 intentionally rejects a mismatch on each top).
+14/14 watchdog SoC runs passed.
+Both top-level timer, decoder and ROM modules match canonical RTL.
+No FPGA programming or physical implementation verification performed.

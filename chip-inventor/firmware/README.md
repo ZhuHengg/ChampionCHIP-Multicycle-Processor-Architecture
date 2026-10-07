@@ -108,3 +108,27 @@ Before writing any application code, the toolchain was checked against the
 organiser's own output: building their
 `RVBL-GPIO-UART-Test-Firmware/src/main.s` with this builder reproduces their
 committed `firmware.txt` exactly (21 lines, `diff` clean).
+
+## Meter-data watchdog update (7 October 2026)
+
+The firmware now waits for a healthy initial meter frame and faults after 500 ms
+without a complete CRC-valid frame during a session. It requires the new MMIO
+timer at `0xF2000000`. Timeout uses report state code 5 and opens the contactor
+before sending the report. See [improvement made.md](../improvement%20made.md).
+
+An additional portable build helper is available; it also synchronizes both ROMs:
+
+```sh
+python firmware/scripts/build.py --tool-prefix /path/to/riscv-none-elf-
+```
+
+Run it from the project root. This helper invokes GNU assembler/linker/binutils
+and does not require make or MSYS2. It leaves the organiser's tools unchanged.
+
+## UART protocol v2
+
+FIRMWARE 5 now expects escaped marker-delimited meter frames with sequence numbers
+and independent per-frame CRC. The additional timer register at `0xF2000004`
+measures the 100 ms partial-frame timeout. Build and upload the updated RTL and
+firmware together; update the meter sender using `emulator/meter_protocol.py`.
+See `emulator/README.md` for the exact wire format and migration details.

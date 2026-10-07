@@ -7,6 +7,10 @@ with this model bit for bit.
 
 """
 import struct
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "emulator"))
+from meter_protocol import encode_frame, frame_body, transmit_options, MARKER, ESCAPE
 
 # Constants (spec SS7.6). Placeholders, not real grid-code values.
 F_LOW = 4950            # 49.50 Hz
@@ -17,9 +21,13 @@ CHARGER_ID = 0x4D590001  # "MY" + 0001, hashed as bytes 01 00 59 4D
 
 # Application states; the firmware mirrors these in tp (x4).
 IDLE, CONNECTED, CHARGING, GRID_HOLD, FAULT = range(5)
+METER_TIMEOUT = 5       # latched fault; distinct low-three-bit report state
+METER_TIMEOUT_MS = 500
+RX_TIMEOUT_MS = 100
 
 # DATAOUT per state (spec SS7.3/7.6).
 OUT = {IDLE: 0x00, CONNECTED: 0x20, CHARGING: 0x30, GRID_HOLD: 0x60, FAULT: 0x80}
+OUT[METER_TIMEOUT] = 0x80
 
 # STATUS cause flags (spec SS7.6).
 F_ESTOP = 0x08
@@ -60,22 +68,19 @@ def record_bytes(energy, status, frames):
 
 
 class Meter:
-    """The station energy meter. Advances its CRC chain on every frame it
-    produces, whether or not the charger accepts it (spec SS7.4)."""
-
-    def __init__(self):
-        self.chain = 0xFFFF
+    """Produces unescaped protocol-v2 bodies; encode_frame produces wire bytes."""
+    def __init__(self, sequence=0):
+        self.sequence = sequence
 
     def frame(self, v, i, f):
-        payload = struct.pack('<HHH', v, i, f)
-        crc = crc16(payload, self.chain)
-        self.chain = crc
-        return payload + crc.to_bytes(2, 'little')
+        body = frame_body(self.sequence, v, i, f)
+        self.sequence = (self.sequence + 1) & 255
+        return body
 
 
 def corrupt(frame):
-    """Flip bit 0 of byte 0, leaving the CRC field intact."""
-    return bytes([frame[0] ^ 1]) + frame[1:]
+    """Corrupt voltage, retaining the CRC and sequence for rejection tests."""
+    return frame[:1] + bytes([frame[1] ^ 1]) + frame[2:]
 
 
 class Charger:
@@ -90,10 +95,38 @@ class Charger:
         self.bad = 0            # consecutive bad frames
         self.hold = 0           # healthy frames seen in GRID_HOLD
         self.delay = 0          # healthy frames required
-        self.seed = 0xFFFF      # CRC chain seed
+        self.last_sequence = None
         self.pins = 0
         self.tx = []
         self._buf = bytearray()
+        self._active = False
+        self._escape = False
+        self.rx_age_ms = 0
+        self.age_ms = 0
+        self.healthy = False
+
+    def advance_ms(self, elapsed):
+        """Advance hardware time explicitly; silence and partial frames count."""
+        if elapsed < 0:
+            raise ValueError('elapsed time must be non-negative')
+        # A large model time step must preserve which deadline expires first.
+        partial_due = RX_TIMEOUT_MS - self.rx_age_ms if self._active else float('inf')
+        meter_due = (METER_TIMEOUT_MS - self.age_ms
+                     if self.state in (CONNECTED, CHARGING, GRID_HOLD) else float('inf'))
+        self.age_ms = min(0xFFFFFFFF, self.age_ms + elapsed)
+        self.rx_age_ms = min(0xFFFFFFFF, self.rx_age_ms + elapsed)
+        if partial_due < meter_due:
+            self._check_partial_timeout()
+            self.check_timeout()
+        else:
+            self.check_timeout()
+            self._check_partial_timeout()
+
+    def check_timeout(self):
+        if self.state in (CONNECTED, CHARGING, GRID_HOLD) and self.age_ms >= METER_TIMEOUT_MS:
+            self.healthy = False
+            self.state = METER_TIMEOUT
+            self._record(METER_TIMEOUT)
 
     @property
     def out(self):
@@ -108,20 +141,20 @@ class Charger:
         self.state = FAULT
 
     def set_inputs(self, value):
-        """Apply the pilot/safety rules until the state is stable, so CP = C
-        straight from IDLE walks IDLE -> CONNECTED -> CHARGING (spec SS7.6)."""
+        """Apply pilot/safety rules until stable; charging needs healthy data."""
         self.pins = value & 0xFF
         while True:
             before = self.state
             self._step_pins()
             if self.state == before:
+                self.check_timeout()
                 return
 
     def _step_pins(self):
         cp = self.pins & 0x07
         safety = bool(self.pins & SAFETY)
 
-        if self.state == FAULT:
+        if self.state in (FAULT, METER_TIMEOUT):
             # Latched: only a clear safety pin and CP = A release it, no record.
             if not safety and cp == 0:
                 self.state = IDLE
@@ -137,9 +170,14 @@ class Charger:
         if self.state == IDLE:
             if cp in (1, 2, 3):
                 self.energy = self.frames = self.flags = 0
+                self.age_ms = 0
+                self.healthy = False
+                self.last_sequence = None
+                self._buf.clear()
+                self._active = self._escape = False
                 self.state = CONNECTED
         elif self.state == CONNECTED:
-            if cp == 2:
+            if cp == 2 and self.healthy and self.age_ms < METER_TIMEOUT_MS:
                 self.state = CHARGING
             elif cp == 0:
                 self._record(IDLE)
@@ -152,31 +190,91 @@ class Charger:
                 self._record(IDLE)
                 self.state = IDLE
 
+    def _bad_frame(self):
+        self.bad = min(2, self.bad + 1)
+        if self.bad >= 2 and self.state not in (FAULT, METER_TIMEOUT):
+            self._enter_fault(F_CRC_LOST)
+
+    def _check_partial_timeout(self):
+        if self._active and self.rx_age_ms >= RX_TIMEOUT_MS:
+            partial = bool(self._buf) or self._escape
+            self._active = self._escape = False
+            self._buf.clear()
+            if partial:
+                self._bad_frame()
+
     def rx_byte(self, b):
-        """Bytes are framed by count from reset -- no resync byte, the
-        emulator always sends whole frames (spec SS7.6)."""
-        self._buf.append(b & 0xFF)
-        if len(self._buf) == 8:
-            frame, self._buf = bytes(self._buf), bytearray()
-            self._on_frame(frame)
+        """Consume a raw wire byte, recovering at the next unescaped marker."""
+        self._check_partial_timeout()
+        b &= 255
+        if b == MARKER:
+            if self._active and (self._buf or self._escape):
+                if not self._escape and len(self._buf) == 9:
+                    self._on_frame(bytes(self._buf))
+                else:
+                    self._bad_frame()
+            self._buf.clear()
+            self._active, self._escape = True, False
+            self.rx_age_ms = 0
+            return
+        if not self._active:
+            return
+        self.rx_age_ms = 0
+        if self._escape:
+            if b not in (MARKER ^ 0x20, ESCAPE ^ 0x20):
+                self._active = self._escape = False
+                self._buf.clear()
+                self._bad_frame()
+                return
+            b ^= 0x20
+            self._escape = False
+        elif b == ESCAPE:
+            self._escape = True
+            return
+        if len(self._buf) >= 9:
+            self._active = False
+            self._buf.clear()
+            self._bad_frame()
+            return
+        self._buf.append(b)
 
     def rx_frame(self, frame):
-        for b in frame:
+        for b in encode_frame(frame):
             self.rx_byte(b)
 
     def _on_frame(self, frame):
-        field = int.from_bytes(frame[6:], 'little')
-        valid = crc16(frame[:6], self.seed) == field
-        self.seed = field                      # rule 1: always advance
-
-        if not valid:                          # rule 2: counted in FAULT too
-            self.bad += 1
-            if self.bad >= 2 and self.state != FAULT:
-                self._enter_fault(F_CRC_LOST)
+        self.check_timeout()
+        field = int.from_bytes(frame[-2:], 'little')
+        if crc16(frame[:7]) != field:
+            self._bad_frame()
             return
+        seq = frame[0]
+        if self.last_sequence is not None:
+            delta = (seq - self.last_sequence) & 255
+            if delta == 0 or delta >= 128:
+                self._bad_frame()
+                return
+            if delta != 1:
+                self.flags |= F_CRC_LOST
+        self.last_sequence = seq
 
         self.bad = 0                           # rule 3: reset in every state
-        v, i, f = struct.unpack('<HHH', frame[:6])
+        v, i, f = struct.unpack('<HHH', frame[1:7])
+        self.age_ms = 0
+        self.healthy = i <= I_MAX and f >= F_LOW and v >= V_SAG
+
+        if self.state == CONNECTED and (self.pins & 0x0F) == 2:
+            # Evaluate the initial frame before permitting the contactor.
+            if i > I_MAX:
+                self._enter_fault(F_OVERCURRENT)
+                return
+            if not self.healthy:
+                self.flags |= F_GRID_HOLD
+                self.delay = restart_delay(field)
+                self.hold = 0
+                self.state = GRID_HOLD
+                return
+            self.state = CHARGING
 
         if self.state == CHARGING:
             if i > I_MAX:

@@ -54,7 +54,11 @@ def main():
     parser.add_argument('--vvp', default='vvp')
     parser.add_argument('--top', action='append', dest='tops')
     parser.add_argument('--scenario', action='append', dest='names')
+    parser.add_argument('--no-vcd', action='store_true', help='skip waveform files')
+    parser.add_argument('--run-tag', default='', help='isolate scratch output for concurrent runs')
     args = parser.parse_args()
+    if args.run_tag and not re.fullmatch(r'[A-Za-z0-9_-]+', args.run_tag):
+        parser.error('--run-tag must contain only letters, digits, underscores or hyphens')
 
     tops = args.tops or [t for t in TOPS if (CHIP / t).exists()]
     names = args.names or list(SCENARIOS)
@@ -68,13 +72,16 @@ def main():
         tag = rel.replace('/', '_').replace('.v', '')
         for name in names:
             s = SCENARIOS[name]
-            work = CHIP / 'sim/app' / f'{tag}_{name}'
+            prefix = args.run_tag + '_' if args.run_tag else ''
+            work = CHIP / 'sim/app' / f'{prefix}{tag}_{name}'
             work.mkdir(parents=True, exist_ok=True)
             (work / 'scenario.vh').write_text(s.to_vh(), encoding='utf-8')
 
             defines = [f'-DIMEM_INST={imem_instance(top)}',
                        f'-DFIRMWARE_SEL={s.firmware}',
                        f'-DPRESET_IN={s.preset_in}']
+            if args.no_vcd:
+                defines.append('-DNO_VCD')
             if s.stream:
                 # No gap before a -t and none between its bytes: the meter
                 # streams frames back to back.

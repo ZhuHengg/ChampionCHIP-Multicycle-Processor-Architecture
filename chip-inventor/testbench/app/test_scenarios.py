@@ -31,7 +31,7 @@ def test_s2_hold_length():
     m = Meter()
     m.frame(2300, 160, 5000)
     trigger = m.frame(2300, 160, 4920)
-    delay = restart_delay(int.from_bytes(trigger[6:], 'little'))
+    delay = restart_delay(int.from_bytes(trigger[-2:], 'little'))
     # One -o 0x60 for the triggering frame, one for the unhealthy frame that
     # resets the count, then one per hold frame except the last (which
     # restarts charging).
@@ -44,7 +44,7 @@ def test_s2_hold_length():
 
 
 def test_s3_record():
-    assert '-r4 0x0010D880 -r2 0x0300' in SCENARIOS['S3'].to_emu()
+    assert '-r4 0x00167600 -r2 0x0440' in SCENARIOS['S3'].to_emu()
 
 
 def test_s4_record():
@@ -72,15 +72,15 @@ def test_s10_record():
     assert '-r2 0x0244' in SCENARIOS['S10'].to_emu()
 
 
-def test_s11_boots_charging():
+def test_s11_boots_with_contactor_open():
     s = SCENARIOS['S11']
     first_o = next(op for op in s.ops if op[0] == 'o')
-    assert first_o[1] == 0x30
+    assert first_o[1] == 0x20
     assert s.preset_in == 0x02
 
 
 def test_first_frame_emu_encoding():
-    assert '-t4 0x00A008FC' in SCENARIOS['S1'].to_emu()
+    assert '-t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9' in SCENARIOS['S1'].to_emu()
 
 
 def test_s1x_streams():

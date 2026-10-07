@@ -1,5 +1,5 @@
 
-build/firmware.elf:     file format elf32-littleriscv
+C:\Users\SHIYI\Downloads\ChampionCHIP-Stage3-main\ChampionCHIP-latest\chip-inventor\firmware\build\firmware.elf:     file format elf32-littleriscv
 
 
 Disassembly of section .text:
@@ -11,352 +11,482 @@ Disassembly of section .text:
   40000c:	00542423          	sw	t0,8(s0) # f0000008 <GPIO_BASE+0x8>
   400010:	00042023          	sw	zero,0(s0)
   400014:	00000213          	li	tp,0
-  400018:	00010937          	lui	s2,0x10
-  40001c:	fff90913          	addi	s2,s2,-1 # ffff <CRC_INIT>
-  400020:	00000993          	li	s3,0
-  400024:	00000a13          	li	s4,0
-  400028:	00000a93          	li	s5,0
-  40002c:	00000b13          	li	s6,0
-  400030:	00000b93          	li	s7,0
-  400034:	00000c13          	li	s8,0
-  400038:	00000c93          	li	s9,0
+  400018:	fff00913          	li	s2,-1
+  40001c:	00000993          	li	s3,0
+  400020:	00000a13          	li	s4,0
+  400024:	00000a93          	li	s5,0
+  400028:	00000b13          	li	s6,0
+  40002c:	00000b93          	li	s7,0
+  400030:	00000c13          	li	s8,0
+  400034:	00000c93          	li	s9,0
+  400038:	00000113          	li	sp,0
 
 0040003c <main_loop>:
-  40003c:	00c000ef          	jal	400048 <apply_pins>
-  400040:	1f8000ef          	jal	400238 <poll_uart>
-  400044:	ff9ff06f          	j	40003c <main_loop>
+  40003c:	010000ef          	jal	40004c <apply_pins>
+  400040:	114000ef          	jal	400154 <check_meter_timeout>
+  400044:	25c000ef          	jal	4002a0 <poll_uart>
+  400048:	ff5ff06f          	j	40003c <main_loop>
 
-00400048 <apply_pins>:
-  400048:	00008d93          	mv	s11,ra
+0040004c <apply_pins>:
+  40004c:	00008d93          	mv	s11,ra
 
-0040004c <ap_again>:
-  40004c:	00442283          	lw	t0,4(s0)
-  400050:	0072f593          	andi	a1,t0,7
-  400054:	0082f613          	andi	a2,t0,8
-  400058:	00020d13          	mv	s10,tp
-  40005c:	00400293          	li	t0,4
-  400060:	02520263          	beq	tp,t0,400084 <ap_fault>
-  400064:	02061a63          	bnez	a2,400098 <ap_estop>
-  400068:	00400293          	li	t0,4
-  40006c:	0255de63          	bge	a1,t0,4000a8 <ap_cp_error>
-  400070:	00000293          	li	t0,0
-  400074:	04520263          	beq	tp,t0,4000b8 <ap_idle>
-  400078:	00100293          	li	t0,1
-  40007c:	04520c63          	beq	tp,t0,4000d4 <ap_connected>
-  400080:	0700006f          	j	4000f0 <ap_session>
+00400050 <ap_again>:
+  400050:	00442283          	lw	t0,4(s0)
+  400054:	0072f593          	andi	a1,t0,7
+  400058:	0082f613          	andi	a2,t0,8
+  40005c:	00020d13          	mv	s10,tp
+  400060:	00400293          	li	t0,4
+  400064:	02525263          	bge	tp,t0,400088 <ap_fault>
+  400068:	02061a63          	bnez	a2,40009c <ap_estop>
+  40006c:	00400293          	li	t0,4
+  400070:	0255de63          	bge	a1,t0,4000ac <ap_cp_error>
+  400074:	00000293          	li	t0,0
+  400078:	04520263          	beq	tp,t0,4000bc <ap_idle>
+  40007c:	00100293          	li	t0,1
+  400080:	06520663          	beq	tp,t0,4000ec <ap_connected>
+  400084:	0980006f          	j	40011c <ap_session>
 
-00400084 <ap_fault>:
-  400084:	08061e63          	bnez	a2,400120 <ap_done>
-  400088:	08059c63          	bnez	a1,400120 <ap_done>
-  40008c:	00000513          	li	a0,0
-  400090:	0b4000ef          	jal	400144 <set_state>
-  400094:	0880006f          	j	40011c <ap_check>
+00400088 <ap_fault>:
+  400088:	0c061263          	bnez	a2,40014c <ap_done>
+  40008c:	0c059063          	bnez	a1,40014c <ap_done>
+  400090:	00000513          	li	a0,0
+  400094:	118000ef          	jal	4001ac <set_state>
+  400098:	0b00006f          	j	400148 <ap_check>
 
-00400098 <ap_estop>:
-  400098:	00800293          	li	t0,8
-  40009c:	005aeab3          	or	s5,s5,t0
-  4000a0:	088000ef          	jal	400128 <enter_fault>
-  4000a4:	0780006f          	j	40011c <ap_check>
+0040009c <ap_estop>:
+  40009c:	00800293          	li	t0,8
+  4000a0:	005aeab3          	or	s5,s5,t0
+  4000a4:	0ec000ef          	jal	400190 <enter_fault>
+  4000a8:	0a00006f          	j	400148 <ap_check>
 
-004000a8 <ap_cp_error>:
-  4000a8:	01000293          	li	t0,16
-  4000ac:	005aeab3          	or	s5,s5,t0
-  4000b0:	078000ef          	jal	400128 <enter_fault>
-  4000b4:	0680006f          	j	40011c <ap_check>
+004000ac <ap_cp_error>:
+  4000ac:	01000293          	li	t0,16
+  4000b0:	005aeab3          	or	s5,s5,t0
+  4000b4:	0dc000ef          	jal	400190 <enter_fault>
+  4000b8:	0900006f          	j	400148 <ap_check>
 
-004000b8 <ap_idle>:
-  4000b8:	06058463          	beqz	a1,400120 <ap_done>
-  4000bc:	00000993          	li	s3,0
-  4000c0:	00000a13          	li	s4,0
-  4000c4:	00000a93          	li	s5,0
-  4000c8:	00100513          	li	a0,1
-  4000cc:	078000ef          	jal	400144 <set_state>
-  4000d0:	04c0006f          	j	40011c <ap_check>
+004000bc <ap_idle>:
+  4000bc:	08058863          	beqz	a1,40014c <ap_done>
+  4000c0:	00000993          	li	s3,0
+  4000c4:	00000a13          	li	s4,0
+  4000c8:	00000a93          	li	s5,0
+  4000cc:	00000113          	li	sp,0
+  4000d0:	fff00913          	li	s2,-1
+  4000d4:	00000c93          	li	s9,0
+  4000d8:	f20002b7          	lui	t0,0xf2000
+  4000dc:	0002a023          	sw	zero,0(t0) # f2000000 <METER_TIMER>
+  4000e0:	00100513          	li	a0,1
+  4000e4:	0c8000ef          	jal	4001ac <set_state>
+  4000e8:	0600006f          	j	400148 <ap_check>
 
-004000d4 <ap_connected>:
-  4000d4:	00200293          	li	t0,2
-  4000d8:	00558663          	beq	a1,t0,4000e4 <ap_conn_charge>
-  4000dc:	02058663          	beqz	a1,400108 <ap_unplug>
-  4000e0:	0400006f          	j	400120 <ap_done>
+004000ec <ap_connected>:
+  4000ec:	00200293          	li	t0,2
+  4000f0:	00558663          	beq	a1,t0,4000fc <ap_conn_charge>
+  4000f4:	04058063          	beqz	a1,400134 <ap_unplug>
+  4000f8:	0540006f          	j	40014c <ap_done>
 
-004000e4 <ap_conn_charge>:
-  4000e4:	00200513          	li	a0,2
-  4000e8:	05c000ef          	jal	400144 <set_state>
-  4000ec:	0300006f          	j	40011c <ap_check>
+004000fc <ap_conn_charge>:
+  4000fc:	04010863          	beqz	sp,40014c <ap_done>
+  400100:	f20002b7          	lui	t0,0xf2000
+  400104:	0002a303          	lw	t1,0(t0) # f2000000 <METER_TIMER>
+  400108:	1f400293          	li	t0,500
+  40010c:	04537063          	bgeu	t1,t0,40014c <ap_done>
+  400110:	00200513          	li	a0,2
+  400114:	098000ef          	jal	4001ac <set_state>
+  400118:	0300006f          	j	400148 <ap_check>
 
-004000f0 <ap_session>:
-  4000f0:	00058c63          	beqz	a1,400108 <ap_unplug>
-  4000f4:	00200293          	li	t0,2
-  4000f8:	02558463          	beq	a1,t0,400120 <ap_done>
-  4000fc:	00100513          	li	a0,1
-  400100:	044000ef          	jal	400144 <set_state>
-  400104:	0180006f          	j	40011c <ap_check>
+0040011c <ap_session>:
+  40011c:	00058c63          	beqz	a1,400134 <ap_unplug>
+  400120:	00200293          	li	t0,2
+  400124:	02558463          	beq	a1,t0,40014c <ap_done>
+  400128:	00100513          	li	a0,1
+  40012c:	080000ef          	jal	4001ac <set_state>
+  400130:	0180006f          	j	400148 <ap_check>
 
-00400108 <ap_unplug>:
-  400108:	00000513          	li	a0,0
-  40010c:	038000ef          	jal	400144 <set_state>
-  400110:	00000513          	li	a0,0
-  400114:	080000ef          	jal	400194 <send_record>
-  400118:	0040006f          	j	40011c <ap_check>
+00400134 <ap_unplug>:
+  400134:	00000513          	li	a0,0
+  400138:	074000ef          	jal	4001ac <set_state>
+  40013c:	00000513          	li	a0,0
+  400140:	0bc000ef          	jal	4001fc <send_record>
+  400144:	0040006f          	j	400148 <ap_check>
 
-0040011c <ap_check>:
-  40011c:	f3a218e3          	bne	tp,s10,40004c <ap_again>
+00400148 <ap_check>:
+  400148:	f1a214e3          	bne	tp,s10,400050 <ap_again>
 
-00400120 <ap_done>:
-  400120:	000d8093          	mv	ra,s11
-  400124:	00008067          	ret
+0040014c <ap_done>:
+  40014c:	000d8093          	mv	ra,s11
+  400150:	00008067          	ret
 
-00400128 <enter_fault>:
-  400128:	00008e93          	mv	t4,ra
-  40012c:	00400513          	li	a0,4
-  400130:	014000ef          	jal	400144 <set_state>
-  400134:	00400513          	li	a0,4
-  400138:	05c000ef          	jal	400194 <send_record>
-  40013c:	000e8093          	mv	ra,t4
-  400140:	00008067          	ret
+00400154 <check_meter_timeout>:
+  400154:	02020c63          	beqz	tp,40018c <wd_done>
+  400158:	00400293          	li	t0,4
+  40015c:	02525863          	bge	tp,t0,40018c <wd_done>
+  400160:	f20002b7          	lui	t0,0xf2000
+  400164:	0002a303          	lw	t1,0(t0) # f2000000 <METER_TIMER>
+  400168:	1f400293          	li	t0,500
+  40016c:	02536063          	bltu	t1,t0,40018c <wd_done>
+  400170:	00000113          	li	sp,0
+  400174:	00008e93          	mv	t4,ra
+  400178:	00500513          	li	a0,5
+  40017c:	030000ef          	jal	4001ac <set_state>
+  400180:	00500513          	li	a0,5
+  400184:	078000ef          	jal	4001fc <send_record>
+  400188:	000e8093          	mv	ra,t4
 
-00400144 <set_state>:
-  400144:	00050213          	mv	tp,a0
-  400148:	00000313          	li	t1,0
-  40014c:	02650263          	beq	a0,t1,400170 <ss_idle>
-  400150:	00100313          	li	t1,1
-  400154:	02650263          	beq	a0,t1,400178 <ss_connected>
-  400158:	00200313          	li	t1,2
-  40015c:	02650263          	beq	a0,t1,400180 <ss_charging>
-  400160:	00300313          	li	t1,3
-  400164:	02650263          	beq	a0,t1,400188 <ss_hold>
-  400168:	08000393          	li	t2,128
-  40016c:	0200006f          	j	40018c <ss_write>
+0040018c <wd_done>:
+  40018c:	00008067          	ret
 
-00400170 <ss_idle>:
-  400170:	00000393          	li	t2,0
-  400174:	0180006f          	j	40018c <ss_write>
+00400190 <enter_fault>:
+  400190:	00008e93          	mv	t4,ra
+  400194:	00400513          	li	a0,4
+  400198:	014000ef          	jal	4001ac <set_state>
+  40019c:	00400513          	li	a0,4
+  4001a0:	05c000ef          	jal	4001fc <send_record>
+  4001a4:	000e8093          	mv	ra,t4
+  4001a8:	00008067          	ret
 
-00400178 <ss_connected>:
-  400178:	02000393          	li	t2,32
-  40017c:	0100006f          	j	40018c <ss_write>
+004001ac <set_state>:
+  4001ac:	00050213          	mv	tp,a0
+  4001b0:	00000313          	li	t1,0
+  4001b4:	02650263          	beq	a0,t1,4001d8 <ss_idle>
+  4001b8:	00100313          	li	t1,1
+  4001bc:	02650263          	beq	a0,t1,4001e0 <ss_connected>
+  4001c0:	00200313          	li	t1,2
+  4001c4:	02650263          	beq	a0,t1,4001e8 <ss_charging>
+  4001c8:	00300313          	li	t1,3
+  4001cc:	02650263          	beq	a0,t1,4001f0 <ss_hold>
+  4001d0:	08000393          	li	t2,128
+  4001d4:	0200006f          	j	4001f4 <ss_write>
 
-00400180 <ss_charging>:
-  400180:	03000393          	li	t2,48
-  400184:	0080006f          	j	40018c <ss_write>
+004001d8 <ss_idle>:
+  4001d8:	00000393          	li	t2,0
+  4001dc:	0180006f          	j	4001f4 <ss_write>
 
-00400188 <ss_hold>:
-  400188:	06000393          	li	t2,96
+004001e0 <ss_connected>:
+  4001e0:	02000393          	li	t2,32
+  4001e4:	0100006f          	j	4001f4 <ss_write>
 
-0040018c <ss_write>:
-  40018c:	00742023          	sw	t2,0(s0)
-  400190:	00008067          	ret
+004001e8 <ss_charging>:
+  4001e8:	03000393          	li	t2,48
+  4001ec:	0080006f          	j	4001f4 <ss_write>
 
-00400194 <send_record>:
-  400194:	00008e13          	mv	t3,ra
-  400198:	015565b3          	or	a1,a0,s5
-  40019c:	00010637          	lui	a2,0x10
-  4001a0:	fff60613          	addi	a2,a2,-1 # ffff <CRC_INIT>
-  4001a4:	0009d693          	srli	a3,s3,0x0
-  4001a8:	0ff6f513          	zext.b	a0,a3
-  4001ac:	80c50633          	.insn	4, 0x80c50633
-  4001b0:	068000ef          	jal	400218 <tx_wait>
-  4001b4:	0089d693          	srli	a3,s3,0x8
-  4001b8:	0ff6f513          	zext.b	a0,a3
-  4001bc:	80c50633          	.insn	4, 0x80c50633
-  4001c0:	058000ef          	jal	400218 <tx_wait>
-  4001c4:	0109d693          	srli	a3,s3,0x10
-  4001c8:	0ff6f513          	zext.b	a0,a3
-  4001cc:	80c50633          	.insn	4, 0x80c50633
-  4001d0:	048000ef          	jal	400218 <tx_wait>
-  4001d4:	0189d693          	srli	a3,s3,0x18
-  4001d8:	0ff6f513          	zext.b	a0,a3
-  4001dc:	80c50633          	.insn	4, 0x80c50633
-  4001e0:	038000ef          	jal	400218 <tx_wait>
-  4001e4:	0ff5f513          	zext.b	a0,a1
-  4001e8:	80c50633          	.insn	4, 0x80c50633
-  4001ec:	02c000ef          	jal	400218 <tx_wait>
-  4001f0:	0ffa7513          	zext.b	a0,s4
-  4001f4:	80c50633          	.insn	4, 0x80c50633
-  4001f8:	020000ef          	jal	400218 <tx_wait>
-  4001fc:	0ff67513          	zext.b	a0,a2
-  400200:	018000ef          	jal	400218 <tx_wait>
-  400204:	00865513          	srli	a0,a2,0x8
-  400208:	0ff57513          	zext.b	a0,a0
-  40020c:	00c000ef          	jal	400218 <tx_wait>
-  400210:	000e0093          	mv	ra,t3
-  400214:	00008067          	ret
+004001f0 <ss_hold>:
+  4001f0:	06000393          	li	t2,96
 
-00400218 <tx_wait>:
-  400218:	0084a283          	lw	t0,8(s1) # f1000008 <UART_BASE+0x8>
-  40021c:	0042f293          	andi	t0,t0,4
-  400220:	fe028ce3          	beqz	t0,400218 <tx_wait>
-  400224:	00a4a023          	sw	a0,0(s1)
-  400228:	0084a283          	lw	t0,8(s1)
-  40022c:	0012e293          	ori	t0,t0,1
-  400230:	0054a423          	sw	t0,8(s1)
-  400234:	00008067          	ret
+004001f4 <ss_write>:
+  4001f4:	00742023          	sw	t2,0(s0)
+  4001f8:	00008067          	ret
 
-00400238 <poll_uart>:
-  400238:	00008f93          	mv	t6,ra
-  40023c:	0084a283          	lw	t0,8(s1)
-  400240:	0022f293          	andi	t0,t0,2
-  400244:	0a028e63          	beqz	t0,400300 <pu_done>
-  400248:	0004a423          	sw	zero,8(s1)
-  40024c:	0044a303          	lw	t1,4(s1)
-  400250:	0ff37313          	zext.b	t1,t1
-  400254:	00600393          	li	t2,6
-  400258:	067cde63          	bge	s9,t2,4002d4 <pu_crc_field>
-  40025c:	000c8463          	beqz	s9,400264 <pu_seed>
-  400260:	0080006f          	j	400268 <pu_fold>
+004001fc <send_record>:
+  4001fc:	00008e13          	mv	t3,ra
+  400200:	015565b3          	or	a1,a0,s5
+  400204:	00010637          	lui	a2,0x10
+  400208:	fff60613          	addi	a2,a2,-1 # ffff <CRC_INIT>
+  40020c:	0009d693          	srli	a3,s3,0x0
+  400210:	0ff6f513          	zext.b	a0,a3
+  400214:	80c50633          	.insn	4, 0x80c50633
+  400218:	068000ef          	jal	400280 <tx_wait>
+  40021c:	0089d693          	srli	a3,s3,0x8
+  400220:	0ff6f513          	zext.b	a0,a3
+  400224:	80c50633          	.insn	4, 0x80c50633
+  400228:	058000ef          	jal	400280 <tx_wait>
+  40022c:	0109d693          	srli	a3,s3,0x10
+  400230:	0ff6f513          	zext.b	a0,a3
+  400234:	80c50633          	.insn	4, 0x80c50633
+  400238:	048000ef          	jal	400280 <tx_wait>
+  40023c:	0189d693          	srli	a3,s3,0x18
+  400240:	0ff6f513          	zext.b	a0,a3
+  400244:	80c50633          	.insn	4, 0x80c50633
+  400248:	038000ef          	jal	400280 <tx_wait>
+  40024c:	0ff5f513          	zext.b	a0,a1
+  400250:	80c50633          	.insn	4, 0x80c50633
+  400254:	02c000ef          	jal	400280 <tx_wait>
+  400258:	0ffa7513          	zext.b	a0,s4
+  40025c:	80c50633          	.insn	4, 0x80c50633
+  400260:	020000ef          	jal	400280 <tx_wait>
+  400264:	0ff67513          	zext.b	a0,a2
+  400268:	018000ef          	jal	400280 <tx_wait>
+  40026c:	00865513          	srli	a0,a2,0x8
+  400270:	0ff57513          	zext.b	a0,a0
+  400274:	00c000ef          	jal	400280 <tx_wait>
+  400278:	000e0093          	mv	ra,t3
+  40027c:	00008067          	ret
 
-00400264 <pu_seed>:
-  400264:	00090713          	mv	a4,s2
+00400280 <tx_wait>:
+  400280:	0084a283          	lw	t0,8(s1) # f1000008 <UART_BASE+0x8>
+  400284:	0042f293          	andi	t0,t0,4
+  400288:	fe028ce3          	beqz	t0,400280 <tx_wait>
+  40028c:	00a4a023          	sw	a0,0(s1)
+  400290:	0084a283          	lw	t0,8(s1)
+  400294:	0012e293          	ori	t0,t0,1
+  400298:	0054a423          	sw	t0,8(s1)
+  40029c:	00008067          	ret
 
-00400268 <pu_fold>:
-  400268:	80e30733          	.insn	4, 0x80e30733
-  40026c:	00000393          	li	t2,0
-  400270:	027c8463          	beq	s9,t2,400298 <pu_v_lo>
-  400274:	00100393          	li	t2,1
-  400278:	027c8463          	beq	s9,t2,4002a0 <pu_v_hi>
-  40027c:	00200393          	li	t2,2
-  400280:	027c8663          	beq	s9,t2,4002ac <pu_i_lo>
-  400284:	00300393          	li	t2,3
-  400288:	027c8663          	beq	s9,t2,4002b4 <pu_i_hi>
-  40028c:	00400393          	li	t2,4
-  400290:	027c8863          	beq	s9,t2,4002c0 <pu_f_lo>
-  400294:	0340006f          	j	4002c8 <pu_f_hi>
+004002a0 <poll_uart>:
+  4002a0:	00008f93          	mv	t6,ra
+  4002a4:	020c8263          	beqz	s9,4002c8 <pu_read>
+  4002a8:	f20002b7          	lui	t0,0xf2000
+  4002ac:	0042a303          	lw	t1,4(t0) # f2000004 <METER_TIMER+0x4>
+  4002b0:	06400393          	li	t2,100
+  4002b4:	00736a63          	bltu	t1,t2,4002c8 <pu_read>
+  4002b8:	01fcf393          	andi	t2,s9,31
+  4002bc:	00000c93          	li	s9,0
+  4002c0:	00038463          	beqz	t2,4002c8 <pu_read>
+  4002c4:	190000ef          	jal	400454 <on_bad_frame>
 
-00400298 <pu_v_lo>:
-  400298:	00030793          	mv	a5,t1
-  40029c:	0600006f          	j	4002fc <pu_advance>
+004002c8 <pu_read>:
+  4002c8:	0084a283          	lw	t0,8(s1)
+  4002cc:	0022f293          	andi	t0,t0,2
+  4002d0:	0e028863          	beqz	t0,4003c0 <pu_done>
+  4002d4:	0004a423          	sw	zero,8(s1)
+  4002d8:	0044a303          	lw	t1,4(s1)
+  4002dc:	0ff37313          	zext.b	t1,t1
+  4002e0:	07e00293          	li	t0,126
+  4002e4:	0e530863          	beq	t1,t0,4003d4 <pu_marker>
+  4002e8:	0c0c8c63          	beqz	s9,4003c0 <pu_done>
+  4002ec:	f20002b7          	lui	t0,0xf2000
+  4002f0:	0002a223          	sw	zero,4(t0) # f2000004 <METER_TIMER+0x4>
+  4002f4:	010cf393          	andi	t2,s9,16
+  4002f8:	00039a63          	bnez	t2,40030c <pu_unescape>
+  4002fc:	07d00293          	li	t0,125
+  400300:	02531263          	bne	t1,t0,400324 <pu_decoded>
+  400304:	010cec93          	ori	s9,s9,16
+  400308:	0b80006f          	j	4003c0 <pu_done>
 
-004002a0 <pu_v_hi>:
-  4002a0:	00831393          	slli	t2,t1,0x8
-  4002a4:	0077e7b3          	or	a5,a5,t2
-  4002a8:	0540006f          	j	4002fc <pu_advance>
+0040030c <pu_unescape>:
+  40030c:	05e00293          	li	t0,94
+  400310:	00530663          	beq	t1,t0,40031c <pu_unescape_ok>
+  400314:	05d00293          	li	t0,93
+  400318:	0a531863          	bne	t1,t0,4003c8 <pu_reject>
 
-004002ac <pu_i_lo>:
-  4002ac:	00030813          	mv	a6,t1
-  4002b0:	04c0006f          	j	4002fc <pu_advance>
+0040031c <pu_unescape_ok>:
+  40031c:	02034313          	xori	t1,t1,32
+  400320:	02fcfc93          	andi	s9,s9,47
 
-004002b4 <pu_i_hi>:
-  4002b4:	00831393          	slli	t2,t1,0x8
-  4002b8:	00786833          	or	a6,a6,t2
-  4002bc:	0400006f          	j	4002fc <pu_advance>
-
-004002c0 <pu_f_lo>:
-  4002c0:	00030893          	mv	a7,t1
-  4002c4:	0380006f          	j	4002fc <pu_advance>
-
-004002c8 <pu_f_hi>:
-  4002c8:	00831393          	slli	t2,t1,0x8
-  4002cc:	0078e8b3          	or	a7,a7,t2
-  4002d0:	02c0006f          	j	4002fc <pu_advance>
-
-004002d4 <pu_crc_field>:
-  4002d4:	00600393          	li	t2,6
-  4002d8:	007c9663          	bne	s9,t2,4002e4 <pu_crc_hi>
-  4002dc:	00030193          	mv	gp,t1
-  4002e0:	01c0006f          	j	4002fc <pu_advance>
-
-004002e4 <pu_crc_hi>:
-  4002e4:	00831393          	slli	t2,t1,0x8
-  4002e8:	0071e1b3          	or	gp,gp,t2
-  4002ec:	01c000ef          	jal	400308 <on_frame>
-  4002f0:	00000c93          	li	s9,0
-  4002f4:	000f8093          	mv	ra,t6
-  4002f8:	00008067          	ret
-
-004002fc <pu_advance>:
-  4002fc:	001c8c93          	addi	s9,s9,1
-
-00400300 <pu_done>:
-  400300:	000f8093          	mv	ra,t6
-  400304:	00008067          	ret
-
-00400308 <on_frame>:
-  400308:	00008f13          	mv	t5,ra
-  40030c:	00000613          	li	a2,0
-  400310:	00371463          	bne	a4,gp,400318 <of_seed>
-  400314:	00100613          	li	a2,1
-
-00400318 <of_seed>:
-  400318:	00018913          	mv	s2,gp
-  40031c:	02061463          	bnez	a2,400344 <of_valid>
-  400320:	001b0b13          	addi	s6,s6,1
-  400324:	00200293          	li	t0,2
-  400328:	0e5b4863          	blt	s6,t0,400418 <of_done>
-  40032c:	00400293          	li	t0,4
-  400330:	0e520463          	beq	tp,t0,400418 <of_done>
-  400334:	04000293          	li	t0,64
-  400338:	005aeab3          	or	s5,s5,t0
-  40033c:	dedff0ef          	jal	400128 <enter_fault>
-  400340:	0d80006f          	j	400418 <of_done>
-
-00400344 <of_valid>:
-  400344:	00000b13          	li	s6,0
+00400324 <pu_decoded>:
+  400324:	00fcf393          	andi	t2,s9,15
+  400328:	00900293          	li	t0,9
+  40032c:	0853de63          	bge	t2,t0,4003c8 <pu_reject>
+  400330:	00700293          	li	t0,7
+  400334:	0653dc63          	bge	t2,t0,4003ac <pu_crc_field>
+  400338:	80e30733          	.insn	4, 0x80e30733
+  40033c:	02038c63          	beqz	t2,400374 <pu_sequence>
+  400340:	00100293          	li	t0,1
+  400344:	02538c63          	beq	t2,t0,40037c <pu_v_lo>
   400348:	00200293          	li	t0,2
-  40034c:	00520863          	beq	tp,t0,40035c <of_charging>
+  40034c:	02538c63          	beq	t2,t0,400384 <pu_v_hi>
   400350:	00300293          	li	t0,3
-  400354:	08520863          	beq	tp,t0,4003e4 <of_hold>
-  400358:	0c00006f          	j	400418 <of_done>
+  400354:	02538e63          	beq	t2,t0,400390 <pu_i_lo>
+  400358:	00400293          	li	t0,4
+  40035c:	02538e63          	beq	t2,t0,400398 <pu_i_hi>
+  400360:	00500293          	li	t0,5
+  400364:	04538063          	beq	t2,t0,4003a4 <pu_f_lo>
+  400368:	00831293          	slli	t0,t1,0x8
+  40036c:	0058e8b3          	or	a7,a7,t0
+  400370:	04c0006f          	j	4003bc <pu_advance>
 
-0040035c <of_charging>:
-  40035c:	14000293          	li	t0,320
-  400360:	0302ca63          	blt	t0,a6,400394 <of_overcurrent>
-  400364:	000012b7          	lui	t0,0x1
-  400368:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
-  40036c:	0258cc63          	blt	a7,t0,4003a4 <of_grid_hold>
-  400370:	000012b7          	lui	t0,0x1
-  400374:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
-  400378:	0257c663          	blt	a5,t0,4003a4 <of_grid_hold>
-  40037c:	030782b3          	mul	t0,a5,a6
-  400380:	005989b3          	add	s3,s3,t0
-  400384:	0ff00293          	li	t0,255
-  400388:	085a0863          	beq	s4,t0,400418 <of_done>
-  40038c:	001a0a13          	addi	s4,s4,1
-  400390:	0880006f          	j	400418 <of_done>
+00400374 <pu_sequence>:
+  400374:	01031193          	slli	gp,t1,0x10
+  400378:	0440006f          	j	4003bc <pu_advance>
 
-00400394 <of_overcurrent>:
-  400394:	02000293          	li	t0,32
-  400398:	005aeab3          	or	s5,s5,t0
-  40039c:	d8dff0ef          	jal	400128 <enter_fault>
-  4003a0:	0780006f          	j	400418 <of_done>
+0040037c <pu_v_lo>:
+  40037c:	00030793          	mv	a5,t1
+  400380:	03c0006f          	j	4003bc <pu_advance>
 
-004003a4 <of_grid_hold>:
-  4003a4:	08000293          	li	t0,128
-  4003a8:	005aeab3          	or	s5,s5,t0
-  4003ac:	00100293          	li	t0,1
-  4003b0:	80328333          	.insn	4, 0x80328333
-  4003b4:	00000293          	li	t0,0
-  4003b8:	80628333          	.insn	4, 0x80628333
-  4003bc:	05900293          	li	t0,89
-  4003c0:	80628333          	.insn	4, 0x80628333
-  4003c4:	04d00293          	li	t0,77
-  4003c8:	80628333          	.insn	4, 0x80628333
-  4003cc:	00737313          	andi	t1,t1,7
-  4003d0:	00230c13          	addi	s8,t1,2
-  4003d4:	00000b93          	li	s7,0
-  4003d8:	00300513          	li	a0,3
-  4003dc:	d69ff0ef          	jal	400144 <set_state>
-  4003e0:	0380006f          	j	400418 <of_done>
+00400384 <pu_v_hi>:
+  400384:	00831293          	slli	t0,t1,0x8
+  400388:	0057e7b3          	or	a5,a5,t0
+  40038c:	0300006f          	j	4003bc <pu_advance>
 
-004003e4 <of_hold>:
-  4003e4:	000012b7          	lui	t0,0x1
-  4003e8:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
-  4003ec:	0258c263          	blt	a7,t0,400410 <of_hold_reset>
-  4003f0:	000012b7          	lui	t0,0x1
-  4003f4:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
-  4003f8:	0057cc63          	blt	a5,t0,400410 <of_hold_reset>
-  4003fc:	001b8b93          	addi	s7,s7,1
-  400400:	018bcc63          	blt	s7,s8,400418 <of_done>
-  400404:	00200513          	li	a0,2
-  400408:	d3dff0ef          	jal	400144 <set_state>
-  40040c:	00c0006f          	j	400418 <of_done>
+00400390 <pu_i_lo>:
+  400390:	00030813          	mv	a6,t1
+  400394:	0280006f          	j	4003bc <pu_advance>
 
-00400410 <of_hold_reset>:
-  400410:	00000b93          	li	s7,0
-  400414:	0040006f          	j	400418 <of_done>
+00400398 <pu_i_hi>:
+  400398:	00831293          	slli	t0,t1,0x8
+  40039c:	00586833          	or	a6,a6,t0
+  4003a0:	01c0006f          	j	4003bc <pu_advance>
 
-00400418 <of_done>:
-  400418:	000f0093          	mv	ra,t5
-  40041c:	00008067          	ret
+004003a4 <pu_f_lo>:
+  4003a4:	00030893          	mv	a7,t1
+  4003a8:	0140006f          	j	4003bc <pu_advance>
+
+004003ac <pu_crc_field>:
+  4003ac:	00700293          	li	t0,7
+  4003b0:	00538463          	beq	t2,t0,4003b8 <pu_crc_lo>
+  4003b4:	00831313          	slli	t1,t1,0x8
+
+004003b8 <pu_crc_lo>:
+  4003b8:	0061e1b3          	or	gp,gp,t1
+
+004003bc <pu_advance>:
+  4003bc:	001c8c93          	addi	s9,s9,1
+
+004003c0 <pu_done>:
+  4003c0:	000f8093          	mv	ra,t6
+  4003c4:	00008067          	ret
+
+004003c8 <pu_reject>:
+  4003c8:	00000c93          	li	s9,0
+  4003cc:	088000ef          	jal	400454 <on_bad_frame>
+  4003d0:	ff1ff06f          	j	4003c0 <pu_done>
+
+004003d4 <pu_marker>:
+  4003d4:	01fcf393          	andi	t2,s9,31
+  4003d8:	00038c63          	beqz	t2,4003f0 <pu_start>
+  4003dc:	00900293          	li	t0,9
+  4003e0:	00539663          	bne	t2,t0,4003ec <pu_short>
+  4003e4:	028000ef          	jal	40040c <on_frame>
+  4003e8:	0080006f          	j	4003f0 <pu_start>
+
+004003ec <pu_short>:
+  4003ec:	068000ef          	jal	400454 <on_bad_frame>
+
+004003f0 <pu_start>:
+  4003f0:	02000c93          	li	s9,32
+  4003f4:	00010737          	lui	a4,0x10
+  4003f8:	fff70713          	addi	a4,a4,-1 # ffff <CRC_INIT>
+  4003fc:	00000193          	li	gp,0
+  400400:	f20002b7          	lui	t0,0xf2000
+  400404:	0002a223          	sw	zero,4(t0) # f2000004 <METER_TIMER+0x4>
+  400408:	fb9ff06f          	j	4003c0 <pu_done>
+
+0040040c <on_frame>:
+  40040c:	00008f13          	mv	t5,ra
+  400410:	000102b7          	lui	t0,0x10
+  400414:	fff28293          	addi	t0,t0,-1 # ffff <CRC_INIT>
+  400418:	0051f2b3          	and	t0,gp,t0
+  40041c:	02571e63          	bne	a4,t0,400458 <of_bad>
+  400420:	0101d313          	srli	t1,gp,0x10
+  400424:	fff00293          	li	t0,-1
+  400428:	02590263          	beq	s2,t0,40044c <of_sequence_ok>
+  40042c:	412303b3          	sub	t2,t1,s2
+  400430:	0ff3f393          	zext.b	t2,t2
+  400434:	02038263          	beqz	t2,400458 <of_bad>
+  400438:	08000293          	li	t0,128
+  40043c:	0053de63          	bge	t2,t0,400458 <of_bad>
+  400440:	00100293          	li	t0,1
+  400444:	00538463          	beq	t2,t0,40044c <of_sequence_ok>
+  400448:	040aea93          	ori	s5,s5,64
+
+0040044c <of_sequence_ok>:
+  40044c:	00030913          	mv	s2,t1
+  400450:	02c0006f          	j	40047c <of_valid>
+
+00400454 <on_bad_frame>:
+  400454:	00008f13          	mv	t5,ra
+
+00400458 <of_bad>:
+  400458:	00200293          	li	t0,2
+  40045c:	005b5463          	bge	s6,t0,400464 <of_bad_saturated>
+  400460:	001b0b13          	addi	s6,s6,1
+
+00400464 <of_bad_saturated>:
+  400464:	145b4e63          	blt	s6,t0,4005c0 <of_done>
+  400468:	00400293          	li	t0,4
+  40046c:	14525a63          	bge	tp,t0,4005c0 <of_done>
+  400470:	040aea93          	ori	s5,s5,64
+  400474:	d1dff0ef          	jal	400190 <enter_fault>
+  400478:	1480006f          	j	4005c0 <of_done>
+
+0040047c <of_valid>:
+  40047c:	f20002b7          	lui	t0,0xf2000
+  400480:	0002a023          	sw	zero,0(t0) # f2000000 <METER_TIMER>
+  400484:	00000113          	li	sp,0
+  400488:	14000293          	li	t0,320
+  40048c:	0302c063          	blt	t0,a6,4004ac <of_fresh_done>
+  400490:	000012b7          	lui	t0,0x1
+  400494:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  400498:	0058ca63          	blt	a7,t0,4004ac <of_fresh_done>
+  40049c:	000012b7          	lui	t0,0x1
+  4004a0:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  4004a4:	0057c463          	blt	a5,t0,4004ac <of_fresh_done>
+  4004a8:	00100113          	li	sp,1
+
+004004ac <of_fresh_done>:
+  4004ac:	00000b13          	li	s6,0
+  4004b0:	00200293          	li	t0,2
+  4004b4:	04520863          	beq	tp,t0,400504 <of_charging>
+  4004b8:	00300293          	li	t0,3
+  4004bc:	0c520863          	beq	tp,t0,40058c <of_hold>
+  4004c0:	00100293          	li	t0,1
+  4004c4:	0e521e63          	bne	tp,t0,4005c0 <of_done>
+  4004c8:	00442283          	lw	t0,4(s0)
+  4004cc:	00f2f293          	andi	t0,t0,15
+  4004d0:	00200313          	li	t1,2
+  4004d4:	0e629663          	bne	t0,t1,4005c0 <of_done>
+  4004d8:	14000293          	li	t0,320
+  4004dc:	0702c063          	blt	t0,a6,40053c <of_overcurrent>
+  4004e0:	000012b7          	lui	t0,0x1
+  4004e4:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  4004e8:	0658c263          	blt	a7,t0,40054c <of_grid_hold>
+  4004ec:	000012b7          	lui	t0,0x1
+  4004f0:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  4004f4:	0457cc63          	blt	a5,t0,40054c <of_grid_hold>
+  4004f8:	00200513          	li	a0,2
+  4004fc:	cb1ff0ef          	jal	4001ac <set_state>
+  400500:	0040006f          	j	400504 <of_charging>
+
+00400504 <of_charging>:
+  400504:	14000293          	li	t0,320
+  400508:	0302ca63          	blt	t0,a6,40053c <of_overcurrent>
+  40050c:	000012b7          	lui	t0,0x1
+  400510:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  400514:	0258cc63          	blt	a7,t0,40054c <of_grid_hold>
+  400518:	000012b7          	lui	t0,0x1
+  40051c:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  400520:	0257c663          	blt	a5,t0,40054c <of_grid_hold>
+  400524:	030782b3          	mul	t0,a5,a6
+  400528:	005989b3          	add	s3,s3,t0
+  40052c:	0ff00293          	li	t0,255
+  400530:	085a0863          	beq	s4,t0,4005c0 <of_done>
+  400534:	001a0a13          	addi	s4,s4,1
+  400538:	0880006f          	j	4005c0 <of_done>
+
+0040053c <of_overcurrent>:
+  40053c:	02000293          	li	t0,32
+  400540:	005aeab3          	or	s5,s5,t0
+  400544:	c4dff0ef          	jal	400190 <enter_fault>
+  400548:	0780006f          	j	4005c0 <of_done>
+
+0040054c <of_grid_hold>:
+  40054c:	08000293          	li	t0,128
+  400550:	005aeab3          	or	s5,s5,t0
+  400554:	00100293          	li	t0,1
+  400558:	80328333          	.insn	4, 0x80328333
+  40055c:	00000293          	li	t0,0
+  400560:	80628333          	.insn	4, 0x80628333
+  400564:	05900293          	li	t0,89
+  400568:	80628333          	.insn	4, 0x80628333
+  40056c:	04d00293          	li	t0,77
+  400570:	80628333          	.insn	4, 0x80628333
+  400574:	00737313          	andi	t1,t1,7
+  400578:	00230c13          	addi	s8,t1,2
+  40057c:	00000b93          	li	s7,0
+  400580:	00300513          	li	a0,3
+  400584:	c29ff0ef          	jal	4001ac <set_state>
+  400588:	0380006f          	j	4005c0 <of_done>
+
+0040058c <of_hold>:
+  40058c:	000012b7          	lui	t0,0x1
+  400590:	35628293          	addi	t0,t0,854 # 1356 <F_LOW>
+  400594:	0258c263          	blt	a7,t0,4005b8 <of_hold_reset>
+  400598:	000012b7          	lui	t0,0x1
+  40059c:	81628293          	addi	t0,t0,-2026 # 816 <V_SAG>
+  4005a0:	0057cc63          	blt	a5,t0,4005b8 <of_hold_reset>
+  4005a4:	001b8b93          	addi	s7,s7,1
+  4005a8:	018bcc63          	blt	s7,s8,4005c0 <of_done>
+  4005ac:	00200513          	li	a0,2
+  4005b0:	bfdff0ef          	jal	4001ac <set_state>
+  4005b4:	00c0006f          	j	4005c0 <of_done>
+
+004005b8 <of_hold_reset>:
+  4005b8:	00000b93          	li	s7,0
+  4005bc:	0040006f          	j	4005c0 <of_done>
+
+004005c0 <of_done>:
+  4005c0:	000f0093          	mv	ra,t5
+  4005c4:	00008067          	ret
 
 Disassembly of section .riscv.attributes:
 

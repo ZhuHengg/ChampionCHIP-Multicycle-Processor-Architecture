@@ -20,16 +20,16 @@ def test_crc16_matches_legacy_chain():
 
 def test_meter_frame_layout():
     f = Meter().frame(2300, 160, 5000)
-    assert f[:6] == bytes.fromhex("FC08A0008813")
-    assert f[6:] == crc16(f[:6], 0xFFFF).to_bytes(2, 'little')
+    assert f[:7] == bytes.fromhex("00FC08A0008813")
+    assert f[7:] == crc16(f[:7], 0xFFFF).to_bytes(2, 'little')
 
 
-def test_meter_chain_uses_previous_crc_field():
+def test_meter_sequence_and_independent_crc():
     m = Meter()
     f1 = m.frame(2300, 160, 5000)
     f2 = m.frame(2300, 160, 4990)
-    first_crc = int.from_bytes(f1[6:], 'little')
-    assert f2[6:] == crc16(f2[:6], first_crc).to_bytes(2, 'little')
+    assert f1[0] == 0 and f2[0] == 1
+    assert f2[7:] == crc16(f2[:7], 0xFFFF).to_bytes(2, 'little')
 
 
 def test_restart_delay_range():
@@ -54,7 +54,7 @@ def test_restart_delay_spread_events():
 
 def test_normal_session():
     c, m = Charger(), Meter()
-    for pins, exp in ((0, 0x00), (1, 0x20), (2, 0x30)):
+    for pins, exp in ((0, 0x00), (1, 0x20), (2, 0x20)):
         c.set_inputs(pins)
         assert c.out == exp
     c.rx_frame(m.frame(2300, 160, 5000))
@@ -65,16 +65,18 @@ def test_normal_session():
     assert c.tx == list(record_bytes(736000, 0x00, 2))
 
 
-def test_cp_c_from_idle_settles_to_charging():
+def test_cp_c_from_idle_waits_for_healthy_meter():
     c = Charger()
     c.set_inputs(2)
+    assert c.state == CONNECTED
+    c.rx_frame(Meter().frame(2300, 160, 5000))
     assert c.state == CHARGING
 
 
 def test_boot_with_stale_inputs():
     c = Charger()
     c.set_inputs(0x02)
-    assert c.out == 0x30
+    assert c.out == 0x20
 
 
 def test_ventilation_refused_and_stops_charging():
@@ -83,6 +85,7 @@ def test_ventilation_refused_and_stops_charging():
     c.set_inputs(3)
     assert c.state == CONNECTED
     c.set_inputs(2)
+    c.rx_frame(Meter().frame(2300, 160, 5000))
     assert c.state == CHARGING
     c.set_inputs(3)
     assert c.state == CONNECTED
@@ -132,10 +135,10 @@ def test_dropped_frame_costs_one_frame():
     c.set_inputs(2)
     c.rx_frame(m.frame(2300, 160, 5000))
     m.frame(2300, 160, 5000)                  # generated, never delivered
-    c.rx_frame(m.frame(2300, 160, 5000))      # rejected: chain skipped
-    assert c.frames == 1
+    c.rx_frame(m.frame(2300, 160, 5000))      # next frame accepted, gap flagged
+    assert c.frames == 2 and c.flags & F_CRC_LOST
     c.rx_frame(m.frame(2300, 160, 5000))      # accepted again
-    assert c.frames == 2
+    assert c.frames == 3
     assert c.state == CHARGING
 
 
@@ -158,7 +161,7 @@ def test_replayed_frame_faults():
     c.rx_frame(f1)
     c.rx_frame(f2)
     c.rx_frame(f1)                            # replay -> rejected
-    c.rx_frame(m.frame(2300, 160, 5000))      # chain broken -> rejected
+    c.rx_frame(f1)                            # second replay -> rejected
     assert c.state == FAULT
     assert c.flags & F_CRC_LOST
 
@@ -215,7 +218,7 @@ def test_grid_hold_restart_exact_frame():
     c.rx_frame(trigger)
     assert c.state == GRID_HOLD
     assert c.flags & F_GRID_HOLD
-    assert c.delay == restart_delay(int.from_bytes(trigger[6:], 'little'))
+    assert c.delay == restart_delay(int.from_bytes(trigger[-2:], 'little'))
 
     c.rx_frame(m.frame(2300, 160, 4940))      # still unhealthy -> hold resets
     assert c.hold == 0

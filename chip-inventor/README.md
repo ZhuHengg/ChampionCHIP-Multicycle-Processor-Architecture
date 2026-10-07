@@ -7,7 +7,16 @@ Sky130 via OpenLane.
 
 **Team:** Zhu Heng  
 **Application:** IEC 61851 control-pilot FSM with autonomous grid support,
-CRC-chained metering, and fleet-staggered restart.
+CRC-checked, sequence-numbered metering, and fleet-staggered restart.
+
+**Meter-data watchdog update:** charging now requires a healthy initial meter
+frame. A 500 ms absence of valid frames latches METER_TIMEOUT and sends one report
+after opening the contactor. See [improvement made.md](improvement%20made.md) for
+configuration, report state code 5, updated hardware, and verification.
+
+**UART protocol v2:** meter frames now use escaped `0x7E` delimiters, sequence
+numbers, an independent CRC, and a 100 ms partial-frame timeout. Senders must
+use the new format; see [emulator/README.md](emulator/README.md).
 
 ---
 
@@ -29,6 +38,7 @@ rtl/                 Verilog modules, one per file
   uart.v               UART controller (Stage 3)
   uart_tx.v            UART transmitter (115200 8-N-1)
   uart_rx.v            UART receiver
+  meter_timer.v        Independent meter-age and UART inter-byte timers
   imem.v               Instruction memory (ROM)
   top.v                Top-level SoC integration
   fetch_registers.v    PC and instruction registers
@@ -120,6 +130,7 @@ Memory map:
 - `0x10010000` — DMEM (32 bytes SRAM)
 - `0xF0000000` — GPIO (DATAOUT +0, DATAIN +4, DATADIR +8)
 - `0xF1000000` — UART (TXDATA +0, RXDATA +4, CONTROL +8)
+- `0xF2000000` — elapsed timers (+0 meter age, +4 UART byte age; word write refreshes selected timer)
 
 ---
 
@@ -197,16 +208,17 @@ while responding to real-time grid conditions (frequency dips, voltage sags).
 
 - **GPIO inputs (P0–P3):** IEC 61851 control-pilot state (3-bit code) and
   emergency-stop trip signal
-- **UART input:** 8-byte energy-meter frames containing voltage (0.1V),
-  current (0.1A), frequency (0.01Hz), and CRC-16 integrity check
+- **UART input:** escaped protocol-v2 frames (11?20 wire bytes) containing a
+  sequence number, voltage (0.1V), current (0.1A), frequency (0.01Hz), and CRC-16
 
 ### System Processing
 
-1. **Control-pilot FSM** — five states (IDLE, CONNECTED, CHARGING, GRID_HOLD,
-   FAULT) driven by GPIO inputs, with stabilisation loop for multi-step
+1. **Control-pilot FSM** — six states (IDLE, CONNECTED, CHARGING, GRID_HOLD,
+   FAULT, METER_TIMEOUT) driven by GPIO inputs, with stabilisation loop for multi-step
    transitions
 2. **CRC-16 frame validation** — hardware `crcb` instruction (Xicrc) verifies
-   each meter frame; CRC chain detects dropped/replayed frames
+   each meter frame including its sequence; sequence checks detect gaps and reject
+   recent duplicate/out-of-order frames, while delimiters recover byte alignment
 3. **Grid health monitoring** — frequency and voltage thresholds trigger
    GRID_HOLD with contactor open
 4. **Staggered restart** — CRC hash of charger ID produces per-charger delay
@@ -236,11 +248,11 @@ Full command lines in `emulator/emu_commands.txt`.
 
 ## 5. Firmware Development
 
-Assembly source: `firmware/src/main.s` (265 instruction words, 26% of IMEM).
+Assembly source: `firmware/src/main.s` (370 instruction words, 36% of IMEM).
 
 **Architecture:** register-only, stackless, polling-based. All state lives in
 CPU registers (32 bytes of DMEM is unused). Main loop: `apply_pins` (GPIO FSM)
-then `poll_uart` (byte-by-byte UART receive with incremental CRC).
+then `check_meter_timeout`, then `poll_uart` (byte-by-byte UART receive with incremental CRC).
 
 **Build pipeline:**
 ```
@@ -263,9 +275,10 @@ budget at 115200 baud.
 ### Golden Model
 
 `testbench/app/golden.py` is a bit-exact Python implementation of the
-firmware's FSM, CRC chain, energy metering, and session record generation.
-All expected values are computed by the model — none are hand-written.
-36 pytest cases cover all model functions.
+firmware's FSM, framed UART parser, sequence checks, energy metering, and session record generation.
+Standard emulator scenario expectations come from the model. Focused UART
+fault-injection tests use independent expected states and accounting values.
+78 Python tests cover the model, scenario expectations, meter watchdog, and rebound evidence.
 
 ### Scenario Coverage
 
@@ -274,19 +287,21 @@ designs (hdl.v, rtl/top.v) = **30 simulation runs**.
 
 | Scenario | Tests |
 |---|---|
-| S1 | Idle — no car, outputs safe |
-| S2 | Normal charge session — connect, charge, unplug, verify record |
-| S3 | Grid hold — frequency dip triggers hold, staggered restart |
-| S4 | Overcurrent fault — I > 32.0 A triggers FAULT |
-| S5 | Emergency stop — safety trip triggers FAULT |
-| S6 | CRC corruption — bad frame, counter increments |
-| S7 | CRC chain break — two consecutive bad frames trigger FAULT |
-| S8 | Unplug during charging — record sent |
-| S9 | Invalid pilot — CP ≥ 4 triggers FAULT |
-| S10 | Replayed frame — chain detects replay |
-| S11 | Stale inputs at boot |
-| S1X | Back-to-back bytes (no gap) — timing stress test |
-| H0–H2 | Harness validation with organiser firmware |
+| H0 | organiser echo via emu model |
+| H1 | harness catches a mismatch |
+| H2 | organiser README example, verbatim (needs IN=0x02 at boot) |
+| S1 | normal session: plug in, charge two frames, unplug |
+| S1X | stress: S1 with back-to-back UART bytes |
+| S2 | grid under-frequency: hold, then CRC-timed restart |
+| S3 | corrupted and missing frames: next valid frame recovers |
+| S4 | meter link lost: two bad frames in a row latch FAULT |
+| S5 | E-stop while charging latches FAULT until released and unplugged |
+| S6 | plug straight into CP C, then unplug while charging |
+| S7 | frame exactly on every limit is billed; I_MAX+1 faults |
+| S8 | ventilation (CP D) refused; CP E latches FAULT |
+| S9 | invalid pilot code 7 latches FAULT with the CP-error flag |
+| S10 | two replayed frames rejected -> FAULT |
+| S11 | stale pins at boot: CP C waits for healthy meter data |
 
 Run: `python testbench/app/run_tests.py`
 
