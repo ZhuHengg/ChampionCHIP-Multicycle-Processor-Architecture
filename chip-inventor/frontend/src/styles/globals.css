@@ -1,0 +1,28 @@
+/* Google Fonts import must precede @import "tailwindcss" — Tailwind's
+   import expands into generated CSS, which would otherwise push this
+   import past other statements and violate the CSS @import-first rule. */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --color-background: #0F172A;
+  --color-card: #1B2336;
+  --color-primary: #1E293B;
+  --color-secondary: #334155;
+  --color-accent: #22C55E;
+  --color-foreground: #F8FAFC;
+  --color-muted: #272F42;
+  --color-muted-foreground: #94A3B8;
+  --color-border: #475569;
+  --color-destructive: #EF4444;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: 'Fira Sans', system-ui, sans-serif;
+}
+
+code, .font-mono {
+  font-family: 'Fira Code', monospace;
+}
