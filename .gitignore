@@ -48,3 +48,6 @@ chip-inventor/firmware/build/*.o
 
 # reference-only clone of rvbl2-riscv-cpu-core (stage3 branch), not part of this repo
 ChampionCHIP-Multicycle/
+
+# Ignore the ChampionCHIP - Stage2 folder
+ChampionCHIP - Stage2/

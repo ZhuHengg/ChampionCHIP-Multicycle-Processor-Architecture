@@ -1,0 +1,37 @@
+VCD info: dumpfile app.vcd opened for output.
+[ok] RISC-V started!
+[ok] Written 0x000000f0 to DIRECTION
+[ok] Written 0x00000001 to INPUT PINS
+[ok] Read 0x00000020 from OUTPUT PINS
+[ok] Written 0x00000002 to INPUT PINS
+[ok] Read 0x00000030 from OUTPUT PINS
+[ok] Written 0x00a008fc to UART RX
+[ok] Written 0xcc771388 to UART RX
+[ok] Read 0x00000030 from OUTPUT PINS
+[ok] Written 0x00a008fc to UART RX
+[ok] Written 0x13eb1338 to UART RX
+[ok] Read 0x00000060 from OUTPUT PINS
+[ok] Written 0x00a008fc to UART RX
+[ok] Written 0x1b60134c to UART RX
+[ok] Read 0x00000060 from OUTPUT PINS
+[ok] Written 0x00a00816 to UART RX
+[ok] Written 0x398f1356 to UART RX
+[ok] Read 0x00000060 from OUTPUT PINS
+[ok] Written 0x00a00816 to UART RX
+[ok] Written 0xd9321356 to UART RX
+[ok] Read 0x00000060 from OUTPUT PINS
+[ok] Written 0x00a00816 to UART RX
+[ok] Written 0x5d4e1356 to UART RX
+[ok] Read 0x00000030 from OUTPUT PINS
+[ok] Written 0x00a008fc to UART RX
+[ok] Written 0x22701388 to UART RX
+[ok] Read 0x00000030 from OUTPUT PINS
+[ok] Written 0x00000001 to INPUT PINS
+[ok] Read 0x00000020 from OUTPUT PINS
+[ok] Written 0x00000000 to INPUT PINS
+[ok] Read 0x00000000 from OUTPUT PINS
+[ok] Read 0x000b3b00 from UART TX
+[ok] Read 0x0280 from UART TX
+[ok] Read 0xcbc4 from UART TX
+SCENARIO RESULT: PASS
+C:\Users\zhchua\Documents\Project (Comp)\ChampionCHIP-Multicycle-Processor-Architecture\chip-inventor\testbench\app\tb_app.v:268: $finish called at 43124950000 (1ps)
