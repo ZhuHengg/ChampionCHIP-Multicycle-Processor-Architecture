@@ -45,3 +45,6 @@ chip-inventor/sim/crc_bench/
 
 # firmware object files: build/firmware.{bin,txt,dmp,elf} ARE committed deliverables
 chip-inventor/firmware/build/*.o
+
+# reference-only clone of rvbl2-riscv-cpu-core (stage3 branch), not part of this repo
+ChampionCHIP-Multicycle/
