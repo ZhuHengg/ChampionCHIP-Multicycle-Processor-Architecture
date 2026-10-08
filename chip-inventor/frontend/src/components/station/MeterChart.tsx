@@ -1,14 +1,8 @@
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+// Meter readings as three small multiples (voltage, current, frequency), each
+// on its own scale with the firmware limit it is checked against. One shared
+// axis would flatten 16 A next to 230 V.
+
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { F_LOW, I_MAX, V_SAG } from '../../data/constants';
 
 export interface MeterFrame {
@@ -19,136 +13,131 @@ export interface MeterFrame {
   index: number;
 }
 
-interface MeterChartProps {
-  frames: MeterFrame[];
+interface Series {
+  key: 'voltage' | 'current' | 'frequency';
+  label: string;
+  unit: string;
+  color: string;
+  limit: number;
+  limitLabel: string;
+  digits: number;
+  pad: number;
 }
 
-interface ChartRow {
-  index: number;
-  voltage: number;
-  current: number;
-  frequency: number;
+const SERIES: Series[] = [
+  { key: 'voltage', label: 'Voltage', unit: 'V', color: '#6EA8FF', limit: V_SAG / 10, limitLabel: 'sag limit', digits: 1, pad: 15 },
+  { key: 'current', label: 'Current', unit: 'A', color: '#F2B134', limit: I_MAX / 10, limitLabel: 'max', digits: 1, pad: 4 },
+  { key: 'frequency', label: 'Frequency', unit: 'Hz', color: '#3CCF5A', limit: F_LOW / 100, limitLabel: 'low limit', digits: 2, pad: 0.3 },
+];
+
+interface Row {
+  n: number;
+  voltage: number | null;
+  current: number | null;
+  frequency: number | null;
   valid: boolean;
 }
 
-const V_SAG_V = V_SAG / 10;
-const F_LOW_HZ = F_LOW / 100;
-const I_MAX_A = I_MAX / 10;
-
-// Recharts' own `dot` render-prop type differs across its internal
-// overloads (plain function vs. DotType), and fighting that union with
-// explicit types causes a spurious overload-mismatch error. The props
-// we actually need (cx, cy, payload) are duck-typed here instead.
-interface InvalidDotProps {
+interface DotProps {
   cx?: number;
   cy?: number;
-  payload?: ChartRow;
+  payload?: Row;
+  color: string;
 }
 
-function InvalidDot(props: InvalidDotProps) {
-  const { cx, cy, payload } = props;
-  if (cx == null || cy == null || !payload || payload.valid) {
-    return null;
-  }
-  const s = 5;
+function FrameDot({ cx, cy, payload, color }: DotProps) {
+  if (cx == null || cy == null || !payload) return null;
+  if (payload.valid) return <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#0F1729" strokeWidth={1.5} />;
+  const s = 4.5;
   return (
-    <g stroke="#FF5A5F" strokeWidth={2}>
+    <g stroke="#FF5A5F" strokeWidth={2} aria-label="rejected frame">
       <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} />
       <line x1={cx - s} y1={cy + s} x2={cx + s} y2={cy - s} />
     </g>
   );
 }
 
-function MeterChart({ frames }: MeterChartProps) {
-  const data: ChartRow[] = frames.map((f) => ({
-    index: f.index,
+function SmallChart({ data, s }: { data: Row[]; s: Series }) {
+  const values = data.map((r) => r[s.key]).filter((v): v is number => v != null);
+  const lo = Math.min(s.limit, ...values) - s.pad;
+  const hi = Math.max(s.limit, ...values) + s.pad;
+  const latest = values[values.length - 1];
+  return (
+    <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <span className="text-xs font-medium text-[var(--color-mute)]">{s.label}</span>
+        <span className="tabular font-display text-lg font-bold" style={{ color: s.color }}>
+          {latest != null ? latest.toFixed(s.digits) : '—'}
+          <span className="ml-1 text-xs font-medium text-[var(--color-mute)]">{s.unit}</span>
+        </span>
+      </div>
+      <div className="h-32">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+            <CartesianGrid stroke="#1F2B47" vertical={false} />
+            <XAxis dataKey="n" tick={{ fill: '#94A3B8', fontSize: 11 }} stroke="#1F2B47" tickLine={false} allowDecimals={false} />
+            <YAxis
+              domain={[lo, hi]}
+              tick={{ fill: '#94A3B8', fontSize: 11 }}
+              stroke="#1F2B47"
+              tickLine={false}
+              tickFormatter={(v: number) => v.toFixed(s.digits === 2 ? 1 : 0)}
+              width={48}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: '#16203A', border: '1px solid #1F2B47', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: '#CBD5E1' }}
+              labelFormatter={(n) => `Frame ${n}`}
+              formatter={(v) => [`${Number(v).toFixed(s.digits)} ${s.unit}`, s.label]}
+            />
+            <ReferenceLine
+              y={s.limit}
+              stroke="#FF5A5F"
+              strokeDasharray="4 4"
+              label={{ value: `${s.limitLabel} ${s.limit.toFixed(s.digits)}`, position: 'insideBottomRight', fill: '#FF8A8D', fontSize: 10 }}
+            />
+            <Line
+              type="monotone"
+              dataKey={s.key}
+              stroke={s.color}
+              strokeWidth={2}
+              connectNulls
+              isAnimationActive={false}
+              dot={((p: Omit<DotProps, 'color'>) => <FrameDot key={`${s.key}-${p.payload?.n}`} {...p} color={s.color} />) as unknown as boolean}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+export default function MeterChart({ frames }: { frames: MeterFrame[] }) {
+  if (frames.length === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-[var(--color-line)] text-sm text-[var(--color-mute)]">
+        No meter frames received yet — step forward to see readings arrive.
+      </div>
+    );
+  }
+  const data: Row[] = frames.map((f) => ({
+    n: f.index + 1,
     voltage: f.v / 10,
     current: f.i / 10,
     frequency: f.f / 100,
     valid: f.valid,
   }));
-
   return (
-    <div style={{ width: '100%', height: 200 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#272F42" strokeDasharray="3 3" />
-          <XAxis dataKey="index" tick={{ fill: '#94A3B8', fontSize: 11 }} stroke="#475569" />
-          <YAxis
-            yAxisId="left"
-            tick={{ fill: '#94A3B8', fontSize: 11 }}
-            stroke="#475569"
-            width={36}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            tick={{ fill: '#94A3B8', fontSize: 11 }}
-            stroke="#475569"
-            width={36}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#1B2336',
-              border: '1px solid #475569',
-              borderRadius: 8,
-              fontFamily: "'Fira Code', monospace",
-              fontSize: 12,
-            }}
-            labelStyle={{ color: '#F8FAFC' }}
-          />
-          <ReferenceLine
-            yAxisId="left"
-            y={V_SAG_V}
-            stroke="#FF5A5F"
-            strokeDasharray="5 5"
-            label={{ value: 'V_SAG', position: 'insideTopLeft', fill: '#FF5A5F', fontSize: 10 }}
-          />
-          <ReferenceLine
-            yAxisId="right"
-            y={F_LOW_HZ}
-            stroke="#FF5A5F"
-            strokeDasharray="5 5"
-            label={{ value: 'F_LOW', position: 'insideBottomLeft', fill: '#FF5A5F', fontSize: 10 }}
-          />
-          <ReferenceLine
-            yAxisId="left"
-            y={I_MAX_A}
-            stroke="#FF5A5F"
-            strokeDasharray="5 5"
-            label={{ value: 'I_MAX', position: 'insideTopRight', fill: '#FF5A5F', fontSize: 10 }}
-          />
-          <Bar yAxisId="left" dataKey="current" name="Current (A)" fill="#F2B134" barSize={12} />
-          <Line
-            yAxisId="left"
-            type="monotone"
-            dataKey="voltage"
-            name="Voltage (V)"
-            stroke="#6EA8FF"
-            strokeWidth={2}
-            dot={((props: InvalidDotProps) => {
-              const key = `v-dot-${props.payload?.index ?? props.cx}`;
-              return <InvalidDot key={key} {...props} />;
-            }) as unknown as boolean}
-            activeDot={{ r: 4 }}
-          />
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="frequency"
-            name="Frequency (Hz)"
-            stroke="#22C55E"
-            strokeWidth={2}
-            dot={((props: InvalidDotProps) => {
-              const key = `f-dot-${props.payload?.index ?? props.cx}`;
-              return <InvalidDot key={key} {...props} />;
-            }) as unknown as boolean}
-            activeDot={{ r: 4 }}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
+    <div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {SERIES.map((s) => (
+          <SmallChart key={s.key} data={data} s={s} />
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-[var(--color-mute)]">
+        Dots are frames that passed the CRC check; <span className="text-[#FF8A8D]">×</span> marks a rejected frame. Dashed red lines are the
+        limits the firmware compares each reading against.
+      </p>
     </div>
   );
 }
-
-export default MeterChart;

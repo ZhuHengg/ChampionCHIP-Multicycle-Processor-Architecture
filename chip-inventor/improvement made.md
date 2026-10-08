@@ -12,10 +12,24 @@ layout and other build tracks are preserved. These changes apply to the active
 `chip-inventor/hdl.v` and `chip-inventor/rtl/top.v` application build (FIRMWARE=5).
 The `legacy/` and `v2-chip-inventor-synth/` tracks have not been migrated.
 
-The frontend added by upstream still visualizes the original eight-byte,
-chained-CRC protocol. It has not been migrated to the new UART framing or
-meter-timeout state; use `emulator/meter_protocol.py` for protocol-v2 frames.
-Hardware/FPGA validation and frontend migration remain separate work.
+## Frontend migration — 8 October 2026
+
+The frontend's data layer (`frontend/src/data/{charger,meter,scenarios}.ts`)
+and the components that read frame bytes directly (`CRCChainViz.tsx`,
+`FrameInspector.tsx`, `StationView.tsx`, `StateIndicator.tsx`,
+`ScenarioPicker.tsx`) have been migrated to match this integration:
+protocol-v2 framing (`data/meterProtocol.ts`, a port of
+`emulator/meter_protocol.py`), the 9-byte sequence-numbered frame body in
+place of the old 8-byte chained-CRC frame, and the new `METER_TIMEOUT`
+state with a `tick()` scenario step for time-driven watchdog demos. A new
+`S12` scenario (not in `scenarios.py`, which covers the watchdog in
+`test_watchdog.py` instead) demonstrates the 500 ms silence-to-fault path
+for the viewer. Verified against `test_watchdog.py` and `test_resync.py`
+cases (startup timeout, silence-after-charging latch, refresh-on-valid-
+frame, dropped-byte recovery, noise/empty-marker tolerance) ported
+ad hoc into TypeScript and run with `tsx` — all passed; `tsc --noEmit` and
+`vite build` both pass clean. Hardware/FPGA validation remains separate
+work.
 
 Firmware was rebuilt to 370 instructions. All 78 Python tests passed in this
 checkout. The merged firmware and both flattened RTL designs have the same

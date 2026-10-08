@@ -1,18 +1,20 @@
-// Phase 4: byte-level view of a single meter frame.
+// Phase 4: byte-level view of a single meter frame (protocol v2).
 //
-// Frame layout (data/meter.ts Meter.frame): bytes[0:2]=voltage (u16 LE,
-// scale /10 -> V, see scenarios.ts nominal() using 2300 for 230.0V),
-// bytes[2:4]=current (u16 LE, scale /10 -> A, 160 -> 16.0A),
-// bytes[4:6]=frequency (u16 LE, scale /100 -> Hz, 5000 -> 50.00Hz),
-// bytes[6:8]=CRC-16 (u16 LE, bytesToU16LE, charger.ts `bytesToU16LE(frame, 6)`).
+// Frame layout (data/meter.ts Meter.frame / golden.py frame_body):
+// byte[0]=sequence, bytes[1:3]=voltage (u16 LE, scale /10 -> V, see
+// scenarios.ts nominal() using 2300 for 230.0V), bytes[3:5]=current
+// (u16 LE, scale /10 -> A, 160 -> 16.0A), bytes[5:7]=frequency (u16 LE,
+// scale /100 -> Hz, 5000 -> 50.00Hz), bytes[7:9]=CRC-16 (u16 LE, charger.ts
+// `frame[7] | frame[8] << 8`). Unlike the original protocol, this frame's
+// CRC is independent (seed always 0xFFFF) -- there is no chain seed to
+// pass in; continuity instead comes from comparing `sequence` against the
+// previous frame's (see CRCChainViz).
 
 import { Check, X } from 'lucide-react';
 import { crc16 } from '../../data/crc';
-import { bytesToU16LE } from '../../data/binutil';
 
 interface FrameInspectorProps {
   frame: Uint8Array;
-  seed: number;
   index: number;
   onFlipByte?: (byteIndex: number) => void;
 }
@@ -22,10 +24,11 @@ function formatHex(value: number, width = 4): string {
 }
 
 const FIELD_BYTES: Array<{ label: string; range: [number, number] }> = [
-  { label: 'Voltage', range: [0, 2] },
-  { label: 'Current', range: [2, 4] },
-  { label: 'Frequency', range: [4, 6] },
-  { label: 'CRC', range: [6, 8] },
+  { label: 'Sequence', range: [0, 1] },
+  { label: 'Voltage', range: [1, 3] },
+  { label: 'Current', range: [3, 5] },
+  { label: 'Frequency', range: [5, 7] },
+  { label: 'CRC', range: [7, 9] },
 ];
 
 function byteFieldLabel(byteIndex: number): string {
@@ -33,14 +36,15 @@ function byteFieldLabel(byteIndex: number): string {
   return field ? field.label : '';
 }
 
-function FrameInspector({ frame, seed, index, onFlipByte }: FrameInspectorProps) {
-  const crcField = bytesToU16LE(frame, 6);
-  const expectedCrc = crc16(frame.subarray(0, 6), seed);
+function FrameInspector({ frame, index, onFlipByte }: FrameInspectorProps) {
+  const sequence = frame[0];
+  const crcField = frame[7] | (frame[8] << 8);
+  const expectedCrc = crc16(frame.subarray(0, 7));
   const valid = expectedCrc === crcField;
 
-  const voltageRaw = bytesToU16LE(frame, 0);
-  const currentRaw = bytesToU16LE(frame, 2);
-  const frequencyRaw = bytesToU16LE(frame, 4);
+  const voltageRaw = frame[1] | (frame[2] << 8);
+  const currentRaw = frame[3] | (frame[4] << 8);
+  const frequencyRaw = frame[5] | (frame[6] << 8);
 
   return (
     <div>
@@ -51,7 +55,7 @@ function FrameInspector({ frame, seed, index, onFlipByte }: FrameInspectorProps)
       {/* Byte boxes */}
       <div className="mb-4 flex flex-wrap gap-1.5">
         {Array.from(frame).map((byte, i) => {
-          const isCorruptCandidate = i === 0;
+          const isCorruptCandidate = i === 1; // voltage low byte, mirrors meter.ts corrupt()
           return (
             <button
               key={i}
@@ -59,7 +63,7 @@ function FrameInspector({ frame, seed, index, onFlipByte }: FrameInspectorProps)
               onClick={() => onFlipByte?.(i)}
               disabled={!onFlipByte}
               title={`byte[${i}] (${byteFieldLabel(i)})${isCorruptCandidate ? ' — click to flip bit 0' : ''}`}
-              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded font-mono text-sm transition-colors duration-150 bg-[#272F42] hover:bg-[#334155] disabled:cursor-default ${
+              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded font-mono text-sm transition-colors duration-150 bg-[#1F2B47] hover:bg-[#334155] disabled:cursor-default ${
                 isCorruptCandidate ? 'ring-1 ring-[#475569]' : ''
               }`}
             >
@@ -70,7 +74,11 @@ function FrameInspector({ frame, seed, index, onFlipByte }: FrameInspectorProps)
       </div>
 
       {/* Decoded fields */}
-      <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
+      <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-5">
+        <div>
+          <dt className="text-xs text-[#94A3B8]">Sequence</dt>
+          <dd className="font-mono text-[#F8FAFC]">{sequence}</dd>
+        </div>
         <div>
           <dt className="text-xs text-[#94A3B8]">Voltage</dt>
           <dd className="font-mono text-[#F8FAFC]">
@@ -95,11 +103,10 @@ function FrameInspector({ frame, seed, index, onFlipByte }: FrameInspectorProps)
         </div>
       </dl>
 
-      {/* Seed / expected / verdict */}
+      {/* Expected / verdict -- each frame's CRC is independent, seeded at
+          0xFFFF, so there is no chain seed to show (contrast the original
+          protocol, where the previous frame's CRC fed the next). */}
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="text-[#94A3B8]">
-          Seed <span className="font-mono text-[#F8FAFC]">{formatHex(seed)}</span>
-        </span>
         <span className="text-[#94A3B8]">
           Expected <span className="font-mono text-[#F8FAFC]">{formatHex(expectedCrc)}</span>
         </span>

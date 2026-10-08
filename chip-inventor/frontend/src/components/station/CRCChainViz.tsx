@@ -1,21 +1,24 @@
-// Phase 4: interactive CRC chain visualization across meter frames.
+// Phase 4: interactive per-frame CRC + sequence visualization across meter
+// frames (protocol v2, see data/meterProtocol.ts).
 //
-// Byte layout per data/meter.ts Meter.frame(): [v_lo, v_hi, i_lo, i_hi,
-// f_lo, f_hi, crc_lo, crc_hi] -- i.e. bytes[0:6] are the payload and
-// bytes[6:8] are the frame's own CRC-16, little-endian (bytesToU16LE),
-// NOT big-endian -- confirmed against data/binutil.ts bytesToU16LE and
-// data/charger.ts Charger._onFrame (`bytesToU16LE(frame, 6)`). Each
-// frame's CRC is seeded by the previous frame's CRC value (chain seed
-// starts at 0xFFFF), matching Meter.chain / Charger.seed.
+// Byte layout per data/meter.ts Meter.frame() / golden.py frame_body():
+// byte[0] = sequence, bytes[1:3] = voltage, bytes[3:5] = current,
+// bytes[5:7] = frequency, bytes[7:9] = CRC-16, little-endian
+// (confirmed against data/charger.ts Charger._onFrame: `frame[7] |
+// frame[8] << 8`, CRC over `frame.subarray(0, 7)`). Unlike the original
+// protocol, each frame's CRC is independent (seed always 0xFFFF) -- the
+// chain concept is gone. Continuity is instead checked via the sequence
+// byte: Charger.lastSequence must advance by exactly 1, and a gap/replay
+// is flagged or rejected (see charger.ts _onFrame).
 //
-// This component recomputes the chain client-side from `original`/
-// `current` bytes so a user can flip byte 0 bit 0 on any frame and watch
-// validity cascade downstream, without touching the Charger model.
+// This component recomputes each frame's CRC and sequence delta
+// client-side from `original`/`current` bytes so a user can flip byte 1
+// bit 0 (voltage, mirrors data/meter.ts corrupt()) on any frame and watch
+// validity change, without touching the Charger model.
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Check, X, RotateCcw } from 'lucide-react';
 import { crc16 } from '../../data/crc';
-import { bytesToU16LE } from '../../data/binutil';
 
 export interface CRCChainFrame {
   original: Uint8Array;
@@ -25,7 +28,8 @@ export interface CRCChainFrame {
 interface ChainNode {
   index: number;
   bytes: Uint8Array;
-  seedIn: number;
+  sequence: number;
+  sequenceOk: boolean;
   crcField: number;
   expectedCrc: number;
   valid: boolean;
@@ -34,17 +38,17 @@ interface ChainNode {
 
 interface CRCChainVizProps {
   frames: CRCChainFrame[];
-  onCorrupt?: (index: number) => void;
+  corrupted: ReadonlySet<number>;
+  onToggleCorrupt: (index: number) => void;
+  onReset: () => void;
   selectedIndex?: number | null;
   onSelect?: (index: number) => void;
 }
 
-const SEED = 0xFFFF;
-
-/** Flip bit 0 of byte 0 -- mirrors data/meter.ts corrupt(). */
-function flipByte0Bit0(bytes: Uint8Array): Uint8Array {
+/** Flip bit 0 of the voltage's low byte -- mirrors data/meter.ts corrupt(). */
+function flipVoltageBit0(bytes: Uint8Array): Uint8Array {
   const out = new Uint8Array(bytes);
-  out[0] = out[0] ^ 1;
+  out[1] = out[1] ^ 1;
   return out;
 }
 
@@ -52,67 +56,62 @@ function formatHex(value: number): string {
   return `0x${value.toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
-function CRCChainViz({ frames, onCorrupt, selectedIndex, onSelect }: CRCChainVizProps) {
-  const [corrupted, setCorrupted] = useState<Set<number>>(new Set());
-
+function CRCChainViz({ frames, corrupted, onToggleCorrupt, onReset, selectedIndex, onSelect }: CRCChainVizProps) {
   const nodes = useMemo<ChainNode[]>(() => {
-    let seed = SEED;
+    let lastSequence: number | null = null;
     return frames.map((f, index) => {
-      const bytes = corrupted.has(index) ? flipByte0Bit0(f.current) : f.current;
-      const crcField = bytesToU16LE(bytes, 6);
-      const expectedCrc = crc16(bytes.subarray(0, 6), seed);
+      const bytes = corrupted.has(index) ? flipVoltageBit0(f.current) : f.current;
+      const sequence = bytes[0];
+      const crcField = bytes[7] | (bytes[8] << 8);
+      const expectedCrc = crc16(bytes.subarray(0, 7));
       const valid = expectedCrc === crcField;
-      const seedIn = seed;
-      seed = crcField; // chain always advances, valid or not (charger.ts rule 1)
-      return { index, bytes, seedIn, crcField, expectedCrc, valid, corrupted: corrupted.has(index) };
+      // Mirrors charger.ts _onFrame: delta of 1 continues, 0 or >=128 is a
+      // replay (rejected), anything else is a forward gap (flagged, not
+      // rejected). Only evaluated when the frame's own CRC is valid, same
+      // as the model (a corrupt frame never reaches the sequence check).
+      const delta = lastSequence === null ? 1 : (sequence - lastSequence) & 0xFF;
+      const sequenceOk = !valid || lastSequence === null || (delta !== 0 && delta < 128);
+      if (valid) lastSequence = sequence;
+      return { index, bytes, sequence, sequenceOk, crcField, expectedCrc, valid, corrupted: corrupted.has(index) };
     });
   }, [frames, corrupted]);
 
-  const toggleCorrupt = (index: number) => {
-    setCorrupted((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-    onCorrupt?.(index);
-  };
-
-  const resetAll = () => setCorrupted(new Set());
-
   if (frames.length === 0) {
     return (
-      <div className="text-sm text-[#94A3B8]">No meter frames in this scenario yet.</div>
+      <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-[var(--color-line)] text-sm text-[var(--color-mute)]">
+        This scenario sends no meter frames.
+      </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-sm font-medium text-[#F8FAFC]">CRC Chain</h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm text-[var(--color-ink-2)]">
+          Click a frame to flip one bit of its voltage. Its CRC no longer matches, and the chip rejects it.
+        </p>
         <button
           type="button"
-          onClick={resetAll}
+          onClick={onReset}
           disabled={corrupted.size === 0}
-          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-border)]/40 bg-[var(--color-card)]/70 px-3 py-1 text-xs font-medium text-[var(--color-foreground)] transition-colors duration-150 hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 text-xs font-medium text-[var(--color-ink)] transition-colors duration-150 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ok)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RotateCcw size={14} aria-hidden="true" />
-          Reset All
+          Reset
         </button>
       </div>
 
       <div className="overflow-x-auto pb-2">
         <div className="flex items-center" style={{ minWidth: 'max-content' }}>
-          {/* Seed node */}
+          {/* Start node: each frame's CRC is now independent (no chain
+              seed), so this marks the start of the sequence-number run
+              rather than a shared CRC seed. */}
           <div
             className="flex h-[55px] w-[130px] shrink-0 flex-col items-center justify-center rounded-lg border px-2 text-center"
-            style={{ borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#1B2336' }}
+            style={{ borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#0F1729' }}
           >
-            <span className="font-sans text-[11px] text-[#94A3B8]">Seed</span>
-            <span className="font-mono text-sm text-[#F8FAFC]">0xFFFF</span>
+            <span className="font-sans text-[11px] text-[#94A3B8]">Start</span>
+            <span className="font-mono text-sm text-[#F8FAFC]">seq --</span>
           </div>
 
           {nodes.map((node) => (
@@ -121,7 +120,7 @@ function CRCChainViz({ frames, onCorrupt, selectedIndex, onSelect }: CRCChainViz
               node={node}
               isSelected={selectedIndex === node.index}
               onClickNode={() => onSelect?.(node.index)}
-              onToggleCorrupt={() => toggleCorrupt(node.index)}
+              onToggleCorrupt={() => onToggleCorrupt(node.index)}
             />
           ))}
         </div>
@@ -142,14 +141,14 @@ function ChainEdgeAndNode({
   onToggleCorrupt: () => void;
 }) {
   const borderColor = node.valid ? 'rgba(34,197,94,0.5)' : 'rgba(255,90,95,0.5)';
-  const bg = node.valid ? '#1B2336' : 'rgba(255,90,95,0.1)';
+  const bg = node.valid ? '#0F1729' : 'rgba(255,90,95,0.1)';
 
   return (
     <div className="flex shrink-0 items-center">
-      {/* Arrow with seed label */}
+      {/* Arrow with this frame's sequence byte */}
       <div className="flex w-12 flex-col items-center justify-center">
         <span className="mb-0.5 whitespace-nowrap font-mono text-[10px] text-[#94A3B8]">
-          {formatHex(node.seedIn)}
+          seq {node.sequence}
         </span>
         <svg width="40" height="12" viewBox="0 0 40 12" aria-hidden="true">
           <path d="M0 6 H32" stroke="#475569" strokeWidth="1.5" fill="none" />
@@ -167,7 +166,7 @@ function ChainEdgeAndNode({
           isSelected ? 'ring-2 ring-[#6EA8FF]' : ''
         }`}
         style={{ borderColor, backgroundColor: bg }}
-        title="Click to toggle byte-0 bit-0 corruption"
+        title="Click to toggle voltage bit-0 corruption"
       >
         <span
           role="button"
@@ -189,7 +188,11 @@ function ChainEdgeAndNode({
         </span>
         <span className="font-mono text-sm text-[#F8FAFC]">{formatHex(node.crcField)}</span>
         {node.valid ? (
-          <Check size={14} color="#22C55E" aria-label="valid" />
+          node.sequenceOk ? (
+            <Check size={14} color="#22C55E" aria-label="valid" />
+          ) : (
+            <X size={14} color="#F2B134" aria-label="sequence gap or replay" />
+          )
         ) : (
           <X size={14} color="#FF5A5F" aria-label="invalid" />
         )}

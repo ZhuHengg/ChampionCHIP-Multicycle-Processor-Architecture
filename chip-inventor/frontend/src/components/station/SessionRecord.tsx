@@ -49,7 +49,7 @@ function SessionRecord({ record }: SessionRecordProps) {
   const valid = expectedCrc === crcField;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#1B2336]/80 p-4 backdrop-blur-sm">
+    <div className="rounded-xl border border-white/10 bg-[var(--color-panel-2)] p-4">
       <h3 className="mb-3 font-mono text-sm font-medium text-[#F8FAFC]">Session Record</h3>
 
       {/* Byte boxes */}
@@ -58,7 +58,7 @@ function SessionRecord({ record }: SessionRecordProps) {
           <div
             key={i}
             title={`byte[${i}] (${byteFieldLabel(i)})`}
-            className="flex h-8 w-8 items-center justify-center rounded bg-[#272F42] font-mono text-sm text-[#F8FAFC]"
+            className="flex h-8 w-8 items-center justify-center rounded bg-[#1F2B47] font-mono text-sm text-[#F8FAFC]"
           >
             {byte.toString(16).toUpperCase().padStart(2, '0')}
           </div>

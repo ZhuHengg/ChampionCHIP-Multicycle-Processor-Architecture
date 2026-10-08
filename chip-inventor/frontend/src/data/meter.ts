@@ -1,27 +1,28 @@
 // Ported 1:1 from chip-inventor/testbench/app/golden.py: Meter class and
-// corrupt().
+// corrupt() (protocol v2, see improvement made.md "resilient UART frame
+// recovery"). Meter.frame() returns the unescaped 9-byte body (sequence,
+// V, I, F, CRC-16); encodeFrame() in meterProtocol.ts wraps it on the wire.
 
-import { crc16 } from './crc';
-import { concatBytes, u16ToBytesLE } from './binutil';
+import { frameBody } from './meterProtocol';
 
-/**
- * The station energy meter. Advances its CRC chain on every frame it
- * produces, whether or not the charger accepts it (spec SS7.4).
- */
+/** Produces unescaped protocol-v2 bodies; encodeFrame produces wire bytes. */
 export class Meter {
-  chain = 0xFFFF;
+  sequence: number;
+
+  constructor(sequence = 0) {
+    this.sequence = sequence;
+  }
 
   frame(v: number, i: number, f: number): Uint8Array {
-    const payload = concatBytes(u16ToBytesLE(v), u16ToBytesLE(i), u16ToBytesLE(f));
-    const crc = crc16(payload, this.chain);
-    this.chain = crc;
-    return concatBytes(payload, u16ToBytesLE(crc));
+    const body = frameBody(this.sequence, v, i, f);
+    this.sequence = (this.sequence + 1) & 0xFF;
+    return body;
   }
 }
 
-/** Flip bit 0 of byte 0, leaving the CRC field intact. */
+/** Corrupt voltage, retaining the CRC and sequence for rejection tests. */
 export function corrupt(frame: Uint8Array): Uint8Array {
   const out = new Uint8Array(frame);
-  out[0] = out[0] ^ 1;
+  out[1] = out[1] ^ 1;
   return out;
 }
