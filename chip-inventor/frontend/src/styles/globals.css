@@ -2,57 +2,73 @@
    import expands into generated CSS, which would otherwise push this
    import past other statements and violate the CSS @import-first rule.
    Offline, the stacks below fall back to system fonts. */
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-display: 'Manrope', 'Segoe UI', system-ui, sans-serif;
-  --font-sans: 'Fira Sans', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'Fira Code', ui-monospace, 'Cascadia Code', monospace;
+  --font-sans: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
 
-  /* Surfaces */
-  --color-page: #070D1A;
-  --color-panel: #0F1729;
-  --color-panel-2: #16203A;
-  --color-line: #1F2B47;
-  --color-ink: #F1F5F9;
-  --color-ink-2: #CBD5E1;
-  --color-mute: #94A3B8;
+  /* Warm paper surfaces */
+  --color-page: #EFECE4;
+  --color-panel: rgba(255, 255, 255, 0.66);
+  --color-panel-2: #F6F4EF;
+  --color-line: #E4DFD4;
+  --color-line-strong: #CFC9BC;
+  --color-ink: #1E1E1E;
+  --color-ink-2: #4A4945;
+  --color-mute: #6E6C66;
+
+  /* The one dark card and the one accent */
+  --color-dark: #2A2A2C;
+  --color-dark-2: #3A3A3D;
+  --color-accent: #F2C230;
+  --color-accent-soft: #FBEBB0;
 
   /* Diorama backdrops (from the clay-render references) */
   --color-navy: #0A2A66;
-  --color-navy-deep: #061C47;
   --color-charcoal: #232427;
-  --color-charcoal-deep: #17181A;
 
-  /* Status */
-  --color-ok: #3CCF5A;
-  --color-info: #6EA8FF;
-  --color-warn: #F2B134;
-  --color-bad: #FF5A5F;
-  --color-timeout: #FF8A3D;
+  /* Status, tuned for text on light surfaces */
+  --color-ok: #2E9E48;
+  --color-info: #3B6FD8;
+  --color-warn: #B57F00;
+  --color-bad: #D93F44;
+  --color-timeout: #D9661F;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background-color: var(--color-page);
+  min-height: 100vh;
+  background:
+    radial-gradient(70% 55% at 100% 0%, #FAEDBE 0%, rgba(250, 237, 190, 0) 70%),
+    radial-gradient(60% 50% at 100% 100%, #F8E7A6 0%, rgba(248, 231, 166, 0) 70%),
+    radial-gradient(50% 40% at 0% 100%, #F4F1EA 0%, rgba(244, 241, 234, 0) 70%),
+    var(--color-page);
+  background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+/* Frosted bento card used across both pages. */
+@utility card {
+  border-radius: 28px;
+  background-color: var(--color-panel);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 24px 48px -32px rgba(70, 58, 20, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+/* Diagonal hatch, for "waiting" segments (reference: "Project time"). */
+@utility hatch {
+  background-image: repeating-linear-gradient(-55deg, rgba(30, 30, 30, 0.16) 0 1.5px, transparent 1.5px 9px);
 }
 
 /* Numbers in tiles and tables should not jitter as they change. */

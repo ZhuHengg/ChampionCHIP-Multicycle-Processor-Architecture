@@ -94,7 +94,7 @@ function CRCChainViz({ frames, corrupted, onToggleCorrupt, onReset, selectedInde
           type="button"
           onClick={onReset}
           disabled={corrupted.size === 0}
-          className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 text-xs font-medium text-[var(--color-ink)] transition-colors duration-150 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ok)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 text-xs font-medium text-[var(--color-ink)] transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ok)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RotateCcw size={14} aria-hidden="true" />
           Reset
@@ -108,10 +108,10 @@ function CRCChainViz({ frames, corrupted, onToggleCorrupt, onReset, selectedInde
               rather than a shared CRC seed. */}
           <div
             className="flex h-[55px] w-[130px] shrink-0 flex-col items-center justify-center rounded-lg border px-2 text-center"
-            style={{ borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#0F1729' }}
+            style={{ borderColor: '#ECE8DF', backgroundColor: '#FFFFFF' }}
           >
-            <span className="font-sans text-[11px] text-[#94A3B8]">Start</span>
-            <span className="font-mono text-sm text-[#F8FAFC]">seq --</span>
+            <span className="font-sans text-[11px] text-[#6E6C66]">Start</span>
+            <span className="font-mono text-sm text-[#1E1E1E]">seq --</span>
           </div>
 
           {nodes.map((node) => (
@@ -140,19 +140,19 @@ function ChainEdgeAndNode({
   onClickNode: () => void;
   onToggleCorrupt: () => void;
 }) {
-  const borderColor = node.valid ? 'rgba(34,197,94,0.5)' : 'rgba(255,90,95,0.5)';
-  const bg = node.valid ? '#0F1729' : 'rgba(255,90,95,0.1)';
+  const borderColor = node.valid ? 'rgba(46,158,72,0.45)' : 'rgba(224,72,77,0.5)';
+  const bg = node.valid ? '#FFFFFF' : 'rgba(224,72,77,0.08)';
 
   return (
     <div className="flex shrink-0 items-center">
       {/* Arrow with this frame's sequence byte */}
       <div className="flex w-12 flex-col items-center justify-center">
-        <span className="mb-0.5 whitespace-nowrap font-mono text-[10px] text-[#94A3B8]">
+        <span className="mb-0.5 whitespace-nowrap font-mono text-[10px] text-[#6E6C66]">
           seq {node.sequence}
         </span>
         <svg width="40" height="12" viewBox="0 0 40 12" aria-hidden="true">
-          <path d="M0 6 H32" stroke="#475569" strokeWidth="1.5" fill="none" />
-          <path d="M32 2 L40 6 L32 10 Z" fill="#475569" />
+          <path d="M0 6 H32" stroke="#B9B4A8" strokeWidth="1.5" fill="none" />
+          <path d="M32 2 L40 6 L32 10 Z" fill="#B9B4A8" />
         </svg>
       </div>
 
@@ -162,8 +162,8 @@ function ChainEdgeAndNode({
       <button
         type="button"
         onClick={onToggleCorrupt}
-        className={`relative flex h-[55px] w-[130px] cursor-pointer flex-col items-center justify-center rounded-lg border px-2 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22C55E] ${
-          isSelected ? 'ring-2 ring-[#6EA8FF]' : ''
+        className={`relative flex h-[55px] w-[130px] cursor-pointer flex-col items-center justify-center rounded-lg border px-2 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2E9E48] ${
+          isSelected ? 'ring-2 ring-[#3B6FD8]' : ''
         }`}
         style={{ borderColor, backgroundColor: bg }}
         title="Click to toggle voltage bit-0 corruption"
@@ -181,20 +181,20 @@ function ChainEdgeAndNode({
               onClickNode();
             }
           }}
-          className="cursor-pointer font-sans text-[11px] text-[#94A3B8] underline decoration-dotted underline-offset-2 hover:text-[#F8FAFC]"
+          className="cursor-pointer font-sans text-[11px] text-[#6E6C66] underline decoration-dotted underline-offset-2 hover:text-[#1E1E1E]"
           title="Inspect this frame"
         >
           Frame {node.index + 1}
         </span>
-        <span className="font-mono text-sm text-[#F8FAFC]">{formatHex(node.crcField)}</span>
+        <span className="font-mono text-sm text-[#1E1E1E]">{formatHex(node.crcField)}</span>
         {node.valid ? (
           node.sequenceOk ? (
-            <Check size={14} color="#22C55E" aria-label="valid" />
+            <Check size={14} color="#2E9E48" aria-label="valid" />
           ) : (
-            <X size={14} color="#F2B134" aria-label="sequence gap or replay" />
+            <X size={14} color="#D99A06" aria-label="sequence gap or replay" />
           )
         ) : (
-          <X size={14} color="#FF5A5F" aria-label="invalid" />
+          <X size={14} color="#E0484D" aria-label="invalid" />
         )}
         {node.corrupted && (
           <svg
@@ -204,7 +204,7 @@ function ChainEdgeAndNode({
             viewBox="0 0 130 55"
             aria-hidden="true"
           >
-            <line x1="6" y1="49" x2="124" y2="6" stroke="#FF5A5F" strokeWidth="2" />
+            <line x1="6" y1="49" x2="124" y2="6" stroke="#E0484D" strokeWidth="2" />
           </svg>
         )}
       </button>

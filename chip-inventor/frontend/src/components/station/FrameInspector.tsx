@@ -48,7 +48,7 @@ function FrameInspector({ frame, index, onFlipByte }: FrameInspectorProps) {
 
   return (
     <div>
-      <h4 className="mb-2 font-mono text-sm font-medium text-[#F8FAFC]">
+      <h4 className="mb-2 font-mono text-sm font-medium text-[#1E1E1E]">
         Frame {index + 1} — byte inspector
       </h4>
 
@@ -63,8 +63,8 @@ function FrameInspector({ frame, index, onFlipByte }: FrameInspectorProps) {
               onClick={() => onFlipByte?.(i)}
               disabled={!onFlipByte}
               title={`byte[${i}] (${byteFieldLabel(i)})${isCorruptCandidate ? ' — click to flip bit 0' : ''}`}
-              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded font-mono text-sm transition-colors duration-150 bg-[#1F2B47] hover:bg-[#334155] disabled:cursor-default ${
-                isCorruptCandidate ? 'ring-1 ring-[#475569]' : ''
+              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded font-mono text-sm transition-colors duration-150 bg-[#ECE8DF] hover:bg-[#DDD8CC] disabled:cursor-default ${
+                isCorruptCandidate ? 'ring-1 ring-[#B9B4A8]' : ''
               }`}
             >
               {byte.toString(16).toUpperCase().padStart(2, '0')}
@@ -76,30 +76,30 @@ function FrameInspector({ frame, index, onFlipByte }: FrameInspectorProps) {
       {/* Decoded fields */}
       <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-5">
         <div>
-          <dt className="text-xs text-[#94A3B8]">Sequence</dt>
-          <dd className="font-mono text-[#F8FAFC]">{sequence}</dd>
+          <dt className="text-xs text-[#6E6C66]">Sequence</dt>
+          <dd className="font-mono text-[#1E1E1E]">{sequence}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">Voltage</dt>
-          <dd className="font-mono text-[#F8FAFC]">
+          <dt className="text-xs text-[#6E6C66]">Voltage</dt>
+          <dd className="font-mono text-[#1E1E1E]">
             {voltageRaw} → {(voltageRaw / 10).toFixed(1)} V
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">Current</dt>
-          <dd className="font-mono text-[#F8FAFC]">
+          <dt className="text-xs text-[#6E6C66]">Current</dt>
+          <dd className="font-mono text-[#1E1E1E]">
             {currentRaw} → {(currentRaw / 10).toFixed(1)} A
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">Frequency</dt>
-          <dd className="font-mono text-[#F8FAFC]">
+          <dt className="text-xs text-[#6E6C66]">Frequency</dt>
+          <dd className="font-mono text-[#1E1E1E]">
             {frequencyRaw} → {(frequencyRaw / 100).toFixed(2)} Hz
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">CRC</dt>
-          <dd className="font-mono text-[#F8FAFC]">{formatHex(crcField)}</dd>
+          <dt className="text-xs text-[#6E6C66]">CRC</dt>
+          <dd className="font-mono text-[#1E1E1E]">{formatHex(crcField)}</dd>
         </div>
       </dl>
 
@@ -107,15 +107,15 @@ function FrameInspector({ frame, index, onFlipByte }: FrameInspectorProps) {
           0xFFFF, so there is no chain seed to show (contrast the original
           protocol, where the previous frame's CRC fed the next). */}
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="text-[#94A3B8]">
-          Expected <span className="font-mono text-[#F8FAFC]">{formatHex(expectedCrc)}</span>
+        <span className="text-[#6E6C66]">
+          Expected <span className="font-mono text-[#1E1E1E]">{formatHex(expectedCrc)}</span>
         </span>
         {valid ? (
-          <span className="flex items-center gap-1 rounded bg-[#22C55E]/10 px-2 py-1 font-medium text-[#22C55E]">
+          <span className="flex items-center gap-1 rounded bg-[#2E9E48]/10 px-2 py-1 font-medium text-[#2E9E48]">
             <Check size={14} aria-hidden="true" /> match
           </span>
         ) : (
-          <span className="flex items-center gap-1 rounded bg-[#FF5A5F]/10 px-2 py-1 font-medium text-[#FF5A5F]">
+          <span className="flex items-center gap-1 rounded bg-[#E0484D]/10 px-2 py-1 font-medium text-[#E0484D]">
             <X size={14} aria-hidden="true" /> mismatch
           </span>
         )}

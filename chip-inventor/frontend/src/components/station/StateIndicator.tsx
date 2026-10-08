@@ -68,7 +68,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
     <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Charger state machine, currently ${STATE_LABEL[currentState]}`}>
       <defs>
         <marker id="fsm-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L8,4 L0,8 Z" fill="#475569" />
+          <path d="M0,0 L8,4 L0,8 Z" fill="#B9B4A8" />
         </marker>
         <marker id="fsm-arrow-active" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L8,4 L0,8 Z" fill={activeColor} />
@@ -76,8 +76,8 @@ export default function StateIndicator({ currentState, previousState }: StateInd
       </defs>
 
       {/* Latched zone */}
-      <rect x={322} y={160} width={370} height={84} rx={14} fill="none" stroke="#2A3656" strokeDasharray="5 5" />
-      <text x={682} y={238} textAnchor="end" fontSize={11} fill="#94A3B8">
+      <rect x={322} y={160} width={370} height={84} rx={14} fill="none" stroke="#CFC9BC" strokeDasharray="5 5" />
+      <text x={682} y={238} textAnchor="end" fontSize={11} fill="#6E6C66">
         latched · from any active state
       </text>
 
@@ -88,14 +88,14 @@ export default function StateIndicator({ currentState, previousState }: StateInd
             <path
               d={e.d}
               fill="none"
-              stroke={on ? activeColor : '#3A4766'}
+              stroke={on ? activeColor : '#CFC9BC'}
               strokeWidth={on ? 2.5 : 1.4}
               strokeDasharray={e.dashed && !on ? '4 4' : undefined}
               markerEnd={on ? 'url(#fsm-arrow-active)' : 'url(#fsm-arrow)'}
               style={{ transition: 'stroke 300ms, stroke-width 300ms' }}
             />
             {e.label && (
-              <text x={e.lx} y={e.ly} textAnchor="middle" fontSize={11} fill={on ? activeColor : '#94A3B8'}>
+              <text x={e.lx} y={e.ly} textAnchor="middle" fontSize={11} fill={on ? activeColor : '#6E6C66'}>
                 {e.label}
               </text>
             )}
@@ -116,7 +116,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
               width={NW}
               height={NH}
               rx={10}
-              fill={current ? color : '#0F1729'}
+              fill={current ? color : '#FFFFFF'}
               stroke={color}
               strokeOpacity={current ? 1 : 0.45}
               strokeWidth={1.5}
@@ -129,7 +129,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
               dominantBaseline="central"
               fontSize={13}
               fontWeight={current ? 700 : 500}
-              fill={current ? '#0B1220' : color}
+              fill={current ? '#FFFFFF' : color}
               fontFamily="Manrope, system-ui, sans-serif"
             >
               {STATE_LABEL[s]}

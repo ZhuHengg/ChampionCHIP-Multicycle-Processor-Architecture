@@ -39,7 +39,7 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar activeTab={route.tab} onTabChange={(tab) => go({ tab, scenario: route.scenario })} />
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 md:px-8 md:py-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8 md:px-8 md:py-12">
         {route.tab === 'station' ? (
           <StationView
             key={`${route.scenario}/${route.step ?? ''}`}
@@ -51,7 +51,7 @@ function App() {
           <GridView onOpenStation={(id) => go({ tab: 'station', scenario: id })} />
         )}
       </main>
-      <footer className="border-t border-[var(--color-line)] py-6 text-center text-xs text-[var(--color-mute)]">
+      <footer className="mx-auto max-w-3xl px-4 pb-10 text-center text-xs leading-relaxed text-[var(--color-mute)]">
         Values are produced by a TypeScript port of the RVBL-2 firmware's Python golden model (testbench/app/golden.py), which the RTL is verified
         against. The page only displays them.
       </footer>

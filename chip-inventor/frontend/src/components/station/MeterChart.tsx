@@ -25,9 +25,9 @@ interface Series {
 }
 
 const SERIES: Series[] = [
-  { key: 'voltage', label: 'Voltage', unit: 'V', color: '#6EA8FF', limit: V_SAG / 10, limitLabel: 'sag limit', digits: 1, pad: 15 },
-  { key: 'current', label: 'Current', unit: 'A', color: '#F2B134', limit: I_MAX / 10, limitLabel: 'max', digits: 1, pad: 4 },
-  { key: 'frequency', label: 'Frequency', unit: 'Hz', color: '#3CCF5A', limit: F_LOW / 100, limitLabel: 'low limit', digits: 2, pad: 0.3 },
+  { key: 'voltage', label: 'Voltage', unit: 'V', color: '#3B6FD8', limit: V_SAG / 10, limitLabel: 'sag limit', digits: 1, pad: 15 },
+  { key: 'current', label: 'Current', unit: 'A', color: '#D99A06', limit: I_MAX / 10, limitLabel: 'max', digits: 1, pad: 4 },
+  { key: 'frequency', label: 'Frequency', unit: 'Hz', color: '#2E9E48', limit: F_LOW / 100, limitLabel: 'low limit', digits: 2, pad: 0.3 },
 ];
 
 interface Row {
@@ -47,10 +47,10 @@ interface DotProps {
 
 function FrameDot({ cx, cy, payload, color }: DotProps) {
   if (cx == null || cy == null || !payload) return null;
-  if (payload.valid) return <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#0F1729" strokeWidth={1.5} />;
+  if (payload.valid) return <circle cx={cx} cy={cy} r={3.5} fill={color} stroke="#FFFFFF" strokeWidth={1.5} />;
   const s = 4.5;
   return (
-    <g stroke="#FF5A5F" strokeWidth={2} aria-label="rejected frame">
+    <g stroke="#E0484D" strokeWidth={2} aria-label="rejected frame">
       <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} />
       <line x1={cx - s} y1={cy + s} x2={cx + s} y2={cy - s} />
     </g>
@@ -74,27 +74,27 @@ function SmallChart({ data, s }: { data: Row[]; s: Series }) {
       <div className="h-32">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#1F2B47" vertical={false} />
-            <XAxis dataKey="n" tick={{ fill: '#94A3B8', fontSize: 11 }} stroke="#1F2B47" tickLine={false} allowDecimals={false} />
+            <CartesianGrid stroke="#ECE8DF" vertical={false} />
+            <XAxis dataKey="n" tick={{ fill: '#6E6C66', fontSize: 11 }} stroke="#ECE8DF" tickLine={false} allowDecimals={false} />
             <YAxis
               domain={[lo, hi]}
-              tick={{ fill: '#94A3B8', fontSize: 11 }}
-              stroke="#1F2B47"
+              tick={{ fill: '#6E6C66', fontSize: 11 }}
+              stroke="#ECE8DF"
               tickLine={false}
               tickFormatter={(v: number) => v.toFixed(s.digits === 2 ? 1 : 0)}
               width={48}
             />
             <Tooltip
-              contentStyle={{ backgroundColor: '#16203A', border: '1px solid #1F2B47', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: '#CBD5E1' }}
+              contentStyle={{ backgroundColor: '#FFFFFF', border: '1px solid #ECE8DF', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: '#4A4945' }}
               labelFormatter={(n) => `Frame ${n}`}
               formatter={(v) => [`${Number(v).toFixed(s.digits)} ${s.unit}`, s.label]}
             />
             <ReferenceLine
               y={s.limit}
-              stroke="#FF5A5F"
+              stroke="#E0484D"
               strokeDasharray="4 4"
-              label={{ value: `${s.limitLabel} ${s.limit.toFixed(s.digits)}`, position: 'insideBottomRight', fill: '#FF8A8D', fontSize: 10 }}
+              label={{ value: `${s.limitLabel} ${s.limit.toFixed(s.digits)}`, position: 'insideBottomRight', fill: '#E0484D', fontSize: 10 }}
             />
             <Line
               type="monotone"
@@ -135,7 +135,7 @@ export default function MeterChart({ frames }: { frames: MeterFrame[] }) {
         ))}
       </div>
       <p className="mt-3 text-xs text-[var(--color-mute)]">
-        Dots are frames that passed the CRC check; <span className="text-[#FF8A8D]">×</span> marks a rejected frame. Dashed red lines are the
+        Dots are frames that passed the CRC check; <span className="text-[#E0484D]">×</span> marks a rejected frame. Dashed red lines are the
         limits the firmware compares each reading against.
       </p>
     </div>

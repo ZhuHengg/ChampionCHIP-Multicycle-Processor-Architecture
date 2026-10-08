@@ -35,12 +35,12 @@ export const STATE_NAMES: Record<ChargerState, string> = {
 };
 
 export const STATE_COLORS: Record<ChargerState, string> = {
-  [ChargerState.IDLE]: '#7C8A83',
-  [ChargerState.CONNECTED]: '#6EA8FF',
-  [ChargerState.CHARGING]: '#22C55E',
-  [ChargerState.GRID_HOLD]: '#F2B134',
-  [ChargerState.FAULT]: '#FF5A5F',
-  [ChargerState.METER_TIMEOUT]: '#FF8A3D',
+  [ChargerState.IDLE]: '#8A877F',
+  [ChargerState.CONNECTED]: '#3B6FD8',
+  [ChargerState.CHARGING]: '#2E9E48',
+  [ChargerState.GRID_HOLD]: '#C98F00',
+  [ChargerState.FAULT]: '#D93F44',
+  [ChargerState.METER_TIMEOUT]: '#D9661F',
 };
 
 // DATAOUT per state (spec SS7.3/7.6; METER_TIMEOUT shares FAULT's pattern).

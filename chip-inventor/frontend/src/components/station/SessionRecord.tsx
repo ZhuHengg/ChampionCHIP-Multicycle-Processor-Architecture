@@ -49,8 +49,8 @@ function SessionRecord({ record }: SessionRecordProps) {
   const valid = expectedCrc === crcField;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[var(--color-panel-2)] p-4">
-      <h3 className="mb-3 font-mono text-sm font-medium text-[#F8FAFC]">Session Record</h3>
+    <div className="rounded-xl border border-[#ECE8DF] bg-[var(--color-panel-2)] p-4">
+      <h3 className="mb-3 font-mono text-sm font-medium text-[#1E1E1E]">Session Record</h3>
 
       {/* Byte boxes */}
       <div className="mb-4 flex flex-wrap gap-1.5">
@@ -58,7 +58,7 @@ function SessionRecord({ record }: SessionRecordProps) {
           <div
             key={i}
             title={`byte[${i}] (${byteFieldLabel(i)})`}
-            className="flex h-8 w-8 items-center justify-center rounded bg-[#1F2B47] font-mono text-sm text-[#F8FAFC]"
+            className="flex h-8 w-8 items-center justify-center rounded bg-[#ECE8DF] font-mono text-sm text-[#1E1E1E]"
           >
             {byte.toString(16).toUpperCase().padStart(2, '0')}
           </div>
@@ -68,20 +68,20 @@ function SessionRecord({ record }: SessionRecordProps) {
       {/* Decoded fields */}
       <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-4">
         <div>
-          <dt className="text-xs text-[#94A3B8]">Energy</dt>
-          <dd className="font-mono text-[#F8FAFC]">{energy}</dd>
+          <dt className="text-xs text-[#6E6C66]">Energy</dt>
+          <dd className="font-mono text-[#1E1E1E]">{energy}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">Status</dt>
-          <dd className="font-mono text-[#F8FAFC]">{formatHex(status, 2)}</dd>
+          <dt className="text-xs text-[#6E6C66]">Status</dt>
+          <dd className="font-mono text-[#1E1E1E]">{formatHex(status, 2)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">Frames</dt>
-          <dd className="font-mono text-[#F8FAFC]">{frames}</dd>
+          <dt className="text-xs text-[#6E6C66]">Frames</dt>
+          <dd className="font-mono text-[#1E1E1E]">{frames}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#94A3B8]">CRC-16</dt>
-          <dd className="font-mono text-[#F8FAFC]">{formatHex(crcField)}</dd>
+          <dt className="text-xs text-[#6E6C66]">CRC-16</dt>
+          <dd className="font-mono text-[#1E1E1E]">{formatHex(crcField)}</dd>
         </div>
       </dl>
 
@@ -90,13 +90,13 @@ function SessionRecord({ record }: SessionRecordProps) {
         {FLAGS.map(({ bit, label }) => {
           const on = (status & bit) !== 0;
           return (
-            <div key={bit} className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
+            <div key={bit} className="flex items-center gap-1.5 text-xs text-[#6E6C66]">
               {on ? (
-                <CheckSquare size={14} color="#F2B134" aria-hidden="true" />
+                <CheckSquare size={14} color="#D99A06" aria-hidden="true" />
               ) : (
-                <Square size={14} color="#475569" aria-hidden="true" />
+                <Square size={14} color="#B9B4A8" aria-hidden="true" />
               )}
-              <span className={on ? 'text-[#F8FAFC]' : ''}>{label}</span>
+              <span className={on ? 'text-[#1E1E1E]' : ''}>{label}</span>
             </div>
           );
         })}
@@ -104,12 +104,12 @@ function SessionRecord({ record }: SessionRecordProps) {
 
       {/* Verdict */}
       {valid ? (
-        <div className="flex items-center gap-2 rounded-lg border border-[#22C55E]/30 bg-[#22C55E]/10 px-3 py-2 text-sm font-medium text-[#22C55E]">
+        <div className="flex items-center gap-2 rounded-lg border border-[#2E9E48]/30 bg-[#2E9E48]/10 px-3 py-2 text-sm font-medium text-[#2E9E48]">
           <Check size={16} aria-hidden="true" />
           CRC-16 verified
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-lg border border-[#FF5A5F]/30 bg-[#FF5A5F]/10 px-3 py-2 text-sm font-medium text-[#FF5A5F]">
+        <div className="flex items-center gap-2 rounded-lg border border-[#E0484D]/30 bg-[#E0484D]/10 px-3 py-2 text-sm font-medium text-[#E0484D]">
           <X size={16} aria-hidden="true" />
           CRC-16 mismatch
         </div>
