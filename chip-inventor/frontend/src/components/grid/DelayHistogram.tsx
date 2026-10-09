@@ -20,9 +20,9 @@ export default function DelayHistogram() {
 
   return (
     <div className="card flex h-full flex-col p-6">
-      <h3 className="font-display text-xl font-medium text-[var(--color-ink)]">The hash spreads chargers evenly</h3>
+      <h3 className="font-display text-xl font-medium text-[var(--color-ink)]">Hash spreads them evenly</h3>
       <p className="mt-1 mb-4 text-sm text-[var(--color-mute)]">
-        Restart delay for 10,000 charger IDs: about 1,250 in each of the 8 slots, no clustering.
+        10,000 charger IDs, about 1,250 per slot.
       </p>
       <div className="min-h-[220px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
@@ -33,7 +33,7 @@ export default function DelayHistogram() {
               axisLine={false}
               tickLine={false}
               tick={{ fill: CHART.tick, fontSize: 11 }}
-              label={{ value: 'Restart delay (healthy frames)', position: 'insideBottom', offset: -8, fill: CHART.tick, fontSize: 11 }}
+              label={{ value: 'Restart delay (frames)', position: 'insideBottom', offset: -8, fill: CHART.tick, fontSize: 11 }}
             />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: CHART.tick, fontSize: 11 }} width={48} />
             <Tooltip contentStyle={CHART.tooltip} labelStyle={{ color: CHART.ink2 }} labelFormatter={(d) => `Delay ${d} frames`} cursor={{ fill: 'rgba(0,0,0,0.035)' }} />

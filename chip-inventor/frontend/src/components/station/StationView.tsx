@@ -332,7 +332,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
             <h2 id="evidence-label" className="font-display text-xl font-medium text-[var(--color-ink)]">
               Check the evidence
             </h2>
-            <p className="mt-1 text-sm text-[var(--color-mute)]">Optional. The bytes, charts and state machine behind what you just watched.</p>
+            <p className="mt-1 text-sm text-[var(--color-mute)]">Optional. The bytes behind the story.</p>
           </div>
           <div role="tablist" aria-label="Evidence" className="flex flex-wrap gap-2">
             {TABS.map((t) => {
@@ -413,8 +413,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
                 )}
                 {chainFrames.length > 0 && (
                   <p className="text-xs text-[var(--color-mute)]">
-                    Both results are computed by re-running this scenario through the charger model. Corrupted frames are never billed; two bad frames in a row
-                    latch a fault.
+                    Re-run through the charger model. Bad frames are never billed; two in a row latch a fault.
                   </p>
                 )}
                 {inspected !== null && chainFrames[inspected] && (
@@ -435,13 +434,12 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
               (recordStep?.raw.record ? (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-[var(--color-ink-2)]">
-                    Sent at step {recordIndex + 1} of {steps.length}. A dispute can be settled from these 8 bytes alone: the CRC-16 proves they were not altered
-                    after the chip sealed them.
+                    Sent at step {recordIndex + 1}. CRC-16 sealed: any edit is detectable.
                   </p>
                   <SessionRecord record={recordStep.raw.record} />
                 </div>
               ) : (
-                <p className="text-sm text-[var(--color-mute)]">This scenario ends without reading a session record.</p>
+                <p className="text-sm text-[var(--color-mute)]">No session record in this scenario.</p>
               ))}
           </div>
         )}

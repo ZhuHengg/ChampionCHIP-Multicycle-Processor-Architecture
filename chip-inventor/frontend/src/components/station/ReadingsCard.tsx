@@ -52,7 +52,7 @@ export default function ReadingsCard({ steps, index }: { steps: PlayStep[]; inde
         <div>
           <h2 className="font-display text-xl font-medium text-[var(--color-ink)]">Meter readings</h2>
           <p className="mt-1 text-sm text-[var(--color-mute)]">
-            {arrived.length} of {bars.length} frames received
+            {arrived.length}/{bars.length} frames
           </p>
         </div>
         <div className="flex items-end gap-3">
@@ -112,7 +112,7 @@ export default function ReadingsCard({ steps, index }: { steps: PlayStep[]; inde
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-[var(--color-bad)]" /> rejected
         </span>
-        <span className="ml-auto">height: power, zoomed · label: sequence #</span>
+        <span className="ml-auto">height zoomed · label = seq #</span>
       </div>
     </div>
   );

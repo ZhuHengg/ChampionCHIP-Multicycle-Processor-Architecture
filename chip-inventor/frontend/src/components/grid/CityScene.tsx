@@ -2,6 +2,8 @@
 // as the station diorama. 40 charger posts stand in for the 1,000-charger
 // fleet; each post's restart wave is its real CRC-hashed delay
 // (restartDelay(TRIGGER_CRC, id)), so the lamps light in the true order.
+// The 'surge' and 'rebound' phases show the fixed-delay fleet instead: every
+// lamp at once, then the grid alarm again.
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -106,7 +108,7 @@ function FitCamera() {
 }
 
 function lampColor(phase: Phase, postWave: number, wave: number): string {
-  if (phase === 'dip') return RED;
+  if (phase === 'dip' || phase === 'rebound') return RED;
   if (phase === 'hold') return AMBER;
   if (phase === 'stagger') return postWave <= wave ? GREEN : AMBER;
   return GREEN;
@@ -115,7 +117,9 @@ function lampColor(phase: Phase, postWave: number, wave: number): string {
 function ChargerPost({ post, phase, wave, reducedMotion }: { post: Post; phase: Phase; wave: number; reducedMotion: boolean }) {
   const mat = useRef<THREE.MeshStandardMaterial>(null);
   const target = useMemo(() => new THREE.Color(), []);
-  const justLit = phase === 'stagger' && post.wave === wave;
+  // Without RVBL-2 every lamp flares on the same frame.
+  const justLit = (phase === 'stagger' && post.wave === wave) || phase === 'surge';
+  const alarm = phase === 'dip' || phase === 'rebound';
 
   useFrame(({ clock }, delta) => {
     const m = mat.current;
@@ -124,7 +128,7 @@ function ChargerPost({ post, phase, wave, reducedMotion }: { post: Post; phase: 
     const k = reducedMotion ? 1 : Math.min(1, delta * 8);
     m.color.lerp(target, k);
     m.emissive.lerp(target, k);
-    const flash = phase === 'dip' && !reducedMotion ? 0.6 + 0.6 * Math.sin(clock.getElapsedTime() * 9) : 0;
+    const flash = alarm && !reducedMotion ? 0.6 + 0.6 * Math.sin(clock.getElapsedTime() * 9) : 0;
     m.emissiveIntensity = THREE.MathUtils.lerp(m.emissiveIntensity, (justLit ? 3.4 : 1.8) + flash, k);
   });
 
@@ -155,7 +159,7 @@ function Substation({ phase, reducedMotion }: { phase: Phase; reducedMotion: boo
   const lamp = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(({ clock }) => {
     if (!lamp.current) return;
-    const alert = phase === 'dip';
+    const alert = phase === 'dip' || phase === 'surge' || phase === 'rebound';
     lamp.current.emissive.set(alert ? RED : GREEN);
     lamp.current.color.set(alert ? RED : GREEN);
     lamp.current.emissiveIntensity = alert && !reducedMotion ? 1.2 + Math.sin(clock.getElapsedTime() * 9) : 1.6;
@@ -197,7 +201,7 @@ function Substation({ phase, reducedMotion }: { phase: Phase; reducedMotion: boo
 }
 
 function Feeders({ phase }: { phase: Phase }) {
-  const color = phase === 'dip' ? RED : phase === 'hold' ? AMBER : '#9FB3D9';
+  const color = phase === 'dip' || phase === 'surge' || phase === 'rebound' ? RED : phase === 'hold' ? AMBER : '#9FB3D9';
   return (
     <>
       {LOTS.map((lot, i) => {
