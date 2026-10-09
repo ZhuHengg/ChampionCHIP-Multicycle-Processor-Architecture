@@ -1,0 +1,2416 @@
+{
+ "source": "RTL simulation of chip-inventor/hdl.v under testbench/app/tb_app.v",
+ "generated": "2026-10-09",
+ "scenarios": {
+  "S1": {
+   "title": "normal session: plug in, charge two frames, unplug",
+   "command": "./emu -d 0xF0 -i 0x00 -o 0x00 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FC017E -t4 0x138800A0 -t4 0x7E7E8BC8 -o 0x30 -i 0x01 -o 0x20 -i 0x00 -o 0x00 -r4 0x000B3B00 -r2 0x0200 -r2 0xD05C",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 0,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 0,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 1,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 2,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 2,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 3,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 3,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 3,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733182,
+     "text": "-t4 0x08FC017E",
+     "step": 4,
+     "line": "[ok] Written 0x08fc017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 4,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222536,
+     "text": "-t4 0x7E7E8BC8",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e8bc8 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 4,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 5,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 5,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 6,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 6,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 736000,
+     "text": "-r4 0x000B3B00",
+     "step": 7,
+     "line": "[ok] Read 0x000b3b00 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 512,
+     "text": "-r2 0x0200",
+     "step": 7,
+     "line": "[ok] Read 0x0200 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 53340,
+     "text": "-r2 0xD05C",
+     "step": 7,
+     "line": "[ok] Read 0xd05c from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S1X": {
+   "title": "stress: S1 with back-to-back UART bytes",
+   "command": "./emu -d 0xF0 -i 0x00 -o 0x00 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -t4 0x08FC017E -t4 0x138800A0 -t4 0x7E7E8BC8 -o 0x30 -i 0x01 -o 0x20 -i 0x00 -o 0x00 -r4 0x000B3B00 -r2 0x0200 -r2 0xD05C",
+   "setup": null,
+   "stream": true,
+   "steps": [
+    "pins",
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 0,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 0,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 1,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 2,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 2,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 3,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 3,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733182,
+     "text": "-t4 0x08FC017E",
+     "step": 4,
+     "line": "[ok] Written 0x08fc017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 4,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222536,
+     "text": "-t4 0x7E7E8BC8",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e8bc8 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 4,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 5,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 5,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 6,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 6,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 736000,
+     "text": "-r4 0x000B3B00",
+     "step": 7,
+     "line": "[ok] Read 0x000b3b00 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 512,
+     "text": "-r2 0x0200",
+     "step": 7,
+     "line": "[ok] Read 0x0200 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 53340,
+     "text": "-r2 0xD05C",
+     "step": 7,
+     "line": "[ok] Read 0xd05c from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S2": {
+   "title": "grid under-frequency: hold, then CRC-timed restart",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FC017E -t4 0x133800A0 -t4 0x7E7E95C5 -o 0x60 -t4 0x08FC027E -t4 0x134C00A0 -t4 0x7E7E89DA -o 0x60 -t4 0x0816037E -t4 0x135600A0 -t4 0x7E7ED039 -o 0x60 -t4 0x0816047E -t4 0x135600A0 -t4 0x7EC95D7D -o 0x60 -t4 0x0816057E -t4 0x135600A0 -t4 0x7E7E711C -o 0x60 -t4 0x0816067E -t4 0x135600A0 -t4 0x7E7EA99E -o 0x60 -t4 0x0816077E -t4 0x135600A0 -t4 0x7E7E11FF -o 0x60 -t4 0x0816087E -t4 0x135600A0 -t4 0x7E7E9B16 -o 0x60 -t4 0x0816097E -t4 0x135600A0 -t4 0x7E7E2377 -o 0x60 -t4 0x08160A7E -t4 0x135600A0 -t4 0x7E7EFBF5 -o 0x60 -t4 0x08160B7E -t4 0x135600A0 -t4 0x7E7E4394 -o 0x30 -t4 0x08FC0C7E -t4 0x138800A0 -t4 0x7E7E61C2 -o 0x30 -i 0x01 -o 0x20 -i 0x00 -o 0x00 -r4 0x000B3B00 -r2 0x0280 -r2 0xCBC4",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 2,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 2,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 2,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733182,
+     "text": "-t4 0x08FC017E",
+     "step": 3,
+     "line": "[ok] Written 0x08fc017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 322437280,
+     "text": "-t4 0x133800A0",
+     "step": 3,
+     "line": "[ok] Written 0x133800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122225093,
+     "text": "-t4 0x7E7E95C5",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e95c5 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 3,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733438,
+     "text": "-t4 0x08FC027E",
+     "step": 4,
+     "line": "[ok] Written 0x08fc027e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 323748000,
+     "text": "-t4 0x134C00A0",
+     "step": 4,
+     "line": "[ok] Written 0x134c00a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222042,
+     "text": "-t4 0x7E7E89DA",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e89da to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 4,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135660414,
+     "text": "-t4 0x0816037E",
+     "step": 5,
+     "line": "[ok] Written 0x0816037e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 5,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122240057,
+     "text": "-t4 0x7E7ED039",
+     "step": 5,
+     "line": "[ok] Written 0x7e7ed039 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 5,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135660670,
+     "text": "-t4 0x0816047E",
+     "step": 6,
+     "line": "[ok] Written 0x0816047e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 6,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2127125885,
+     "text": "-t4 0x7EC95D7D",
+     "step": 6,
+     "line": "[ok] Written 0x7ec95d7d to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 6,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135660926,
+     "text": "-t4 0x0816057E",
+     "step": 7,
+     "line": "[ok] Written 0x0816057e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 7,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122215708,
+     "text": "-t4 0x7E7E711C",
+     "step": 7,
+     "line": "[ok] Written 0x7e7e711c to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 7,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135661182,
+     "text": "-t4 0x0816067E",
+     "step": 8,
+     "line": "[ok] Written 0x0816067e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 8,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122230174,
+     "text": "-t4 0x7E7EA99E",
+     "step": 8,
+     "line": "[ok] Written 0x7e7ea99e to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 8,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135661438,
+     "text": "-t4 0x0816077E",
+     "step": 9,
+     "line": "[ok] Written 0x0816077e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 9,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122191359,
+     "text": "-t4 0x7E7E11FF",
+     "step": 9,
+     "line": "[ok] Written 0x7e7e11ff to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 9,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135661694,
+     "text": "-t4 0x0816087E",
+     "step": 10,
+     "line": "[ok] Written 0x0816087e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 10,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122226454,
+     "text": "-t4 0x7E7E9B16",
+     "step": 10,
+     "line": "[ok] Written 0x7e7e9b16 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 10,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135661950,
+     "text": "-t4 0x0816097E",
+     "step": 11,
+     "line": "[ok] Written 0x0816097e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 11,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122195831,
+     "text": "-t4 0x7E7E2377",
+     "step": 11,
+     "line": "[ok] Written 0x7e7e2377 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 11,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135662206,
+     "text": "-t4 0x08160A7E",
+     "step": 12,
+     "line": "[ok] Written 0x08160a7e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 12,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122251253,
+     "text": "-t4 0x7E7EFBF5",
+     "step": 12,
+     "line": "[ok] Written 0x7e7efbf5 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 96,
+     "text": "-o 0x60",
+     "step": 12,
+     "line": "[ok] Read 0x00000060 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135662462,
+     "text": "-t4 0x08160B7E",
+     "step": 13,
+     "line": "[ok] Written 0x08160b7e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403360,
+     "text": "-t4 0x135600A0",
+     "step": 13,
+     "line": "[ok] Written 0x135600a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122204052,
+     "text": "-t4 0x7E7E4394",
+     "step": 13,
+     "line": "[ok] Written 0x7e7e4394 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 13,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150735998,
+     "text": "-t4 0x08FC0C7E",
+     "step": 14,
+     "line": "[ok] Written 0x08fc0c7e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 14,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122211778,
+     "text": "-t4 0x7E7E61C2",
+     "step": 14,
+     "line": "[ok] Written 0x7e7e61c2 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 14,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 15,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 15,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 16,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 16,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 736000,
+     "text": "-r4 0x000B3B00",
+     "step": 17,
+     "line": "[ok] Read 0x000b3b00 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 640,
+     "text": "-r2 0x0280",
+     "step": 17,
+     "line": "[ok] Read 0x0280 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 52164,
+     "text": "-r2 0xCBC4",
+     "step": 17,
+     "line": "[ok] Read 0xcbc4 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S3": {
+   "title": "corrupted and missing frames: next valid frame recovers",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FD017E -t4 0x138800A0 -t4 0x7E7E8BC8 -o 0x30 -t4 0x08FC027E -t4 0x138800A0 -t4 0x7E7E534A -o 0x30 -t4 0x08FC047E -t4 0x138800A0 -t4 0x7E7EF26F -o 0x30 -t4 0x08FC057E -t4 0x138800A0 -t4 0x7E7E4A0E -o 0x30 -i 0x00 -o 0x00 -r4 0x00167600 -r2 0x0440 -r2 0xAF65",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 2,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 2,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 2,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150798718,
+     "text": "-t4 0x08FD017E",
+     "step": 3,
+     "line": "[ok] Written 0x08fd017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 3,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222536,
+     "text": "-t4 0x7E7E8BC8",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e8bc8 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 3,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733438,
+     "text": "-t4 0x08FC027E",
+     "step": 4,
+     "line": "[ok] Written 0x08fc027e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 4,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122208074,
+     "text": "-t4 0x7E7E534A",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e534a to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 4,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733950,
+     "text": "-t4 0x08FC047E",
+     "step": 5,
+     "line": "[ok] Written 0x08fc047e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 5,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122248815,
+     "text": "-t4 0x7E7EF26F",
+     "step": 5,
+     "line": "[ok] Written 0x7e7ef26f to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 5,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150734206,
+     "text": "-t4 0x08FC057E",
+     "step": 6,
+     "line": "[ok] Written 0x08fc057e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 6,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122205710,
+     "text": "-t4 0x7E7E4A0E",
+     "step": 6,
+     "line": "[ok] Written 0x7e7e4a0e to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 6,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 7,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 7,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 1472000,
+     "text": "-r4 0x00167600",
+     "step": 8,
+     "line": "[ok] Read 0x00167600 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 1088,
+     "text": "-r2 0x0440",
+     "step": 8,
+     "line": "[ok] Read 0x0440 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 44901,
+     "text": "-r2 0xAF65",
+     "step": 8,
+     "line": "[ok] Read 0xaf65 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S4": {
+   "title": "meter link lost: two bad frames in a row latch FAULT",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FD017E -t4 0x138800A0 -t4 0x7E7E8BC8 -o 0x30 -t4 0x08FD027E -t4 0x138800A0 -t4 0x7E7E534A -o 0x80 -i 0x00 -o 0x00 -r4 0x00059D80 -r2 0x0144 -r2 0xB0AC",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 2,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 2,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 2,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150798718,
+     "text": "-t4 0x08FD017E",
+     "step": 3,
+     "line": "[ok] Written 0x08fd017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 3,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222536,
+     "text": "-t4 0x7E7E8BC8",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e8bc8 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 3,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150798974,
+     "text": "-t4 0x08FD027E",
+     "step": 4,
+     "line": "[ok] Written 0x08fd027e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 4,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122208074,
+     "text": "-t4 0x7E7E534A",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e534a to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 4,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 5,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 5,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 368000,
+     "text": "-r4 0x00059D80",
+     "step": 6,
+     "line": "[ok] Read 0x00059d80 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 324,
+     "text": "-r2 0x0144",
+     "step": 6,
+     "line": "[ok] Read 0x0144 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 45228,
+     "text": "-r2 0xB0AC",
+     "step": 6,
+     "line": "[ok] Read 0xb0ac from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S5": {
+   "title": "E-stop while charging latches FAULT until released and unplugged",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -i 0x0A -o 0x80 -i 0x02 -o 0x80 -i 0x08 -o 0x80 -i 0x00 -o 0x00 -r4 0x00059D80 -r2 0x010C -r2 0x34C9",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "pins",
+    "pins",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 2,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 2,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 2,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 10,
+     "text": "-i 0x0A",
+     "step": 3,
+     "line": "[ok] Written 0x0000000a to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 3,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 4,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 4,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 8,
+     "text": "-i 0x08",
+     "step": 5,
+     "line": "[ok] Written 0x00000008 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 5,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 6,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 6,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 368000,
+     "text": "-r4 0x00059D80",
+     "step": 7,
+     "line": "[ok] Read 0x00059d80 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 268,
+     "text": "-r2 0x010C",
+     "step": 7,
+     "line": "[ok] Read 0x010c from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 13513,
+     "text": "-r2 0x34C9",
+     "step": 7,
+     "line": "[ok] Read 0x34c9 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S6": {
+   "title": "plug straight into CP C, then unplug while charging",
+   "command": "./emu -d 0xF0 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -i 0x00 -o 0x00 -r4 0x00059D80 -r2 0x0100 -r2 0x71A4",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 0,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 1,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 1,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 1,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 1,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 2,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 2,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 368000,
+     "text": "-r4 0x00059D80",
+     "step": 3,
+     "line": "[ok] Read 0x00059d80 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 256,
+     "text": "-r2 0x0100",
+     "step": 3,
+     "line": "[ok] Read 0x0100 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 29092,
+     "text": "-r2 0x71A4",
+     "step": 3,
+     "line": "[ok] Read 0x71a4 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S7": {
+   "title": "frame exactly on every limit is billed; I_MAX+1 faults",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x0816007E -t4 0x13560140 -t4 0x7E7EBB61 -o 0x30 -t4 0x08FC017E -t4 0x13880141 -t4 0x7E7E4EA6 -o 0x80 -i 0x00 -o 0x00 -r4 0x000A1B80 -r2 0x0124 -r2 0x803D",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 135659646,
+     "text": "-t4 0x0816007E",
+     "step": 2,
+     "line": "[ok] Written 0x0816007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 324403520,
+     "text": "-t4 0x13560140",
+     "step": 2,
+     "line": "[ok] Written 0x13560140 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122234721,
+     "text": "-t4 0x7E7EBB61",
+     "step": 2,
+     "line": "[ok] Written 0x7e7ebb61 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733182,
+     "text": "-t4 0x08FC017E",
+     "step": 3,
+     "line": "[ok] Written 0x08fc017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680321,
+     "text": "-t4 0x13880141",
+     "step": 3,
+     "line": "[ok] Written 0x13880141 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122206886,
+     "text": "-t4 0x7E7E4EA6",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e4ea6 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 3,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 4,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 4,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 662400,
+     "text": "-r4 0x000A1B80",
+     "step": 5,
+     "line": "[ok] Read 0x000a1b80 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 292,
+     "text": "-r2 0x0124",
+     "step": 5,
+     "line": "[ok] Read 0x0124 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 32829,
+     "text": "-r2 0x803D",
+     "step": 5,
+     "line": "[ok] Read 0x803d from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S8": {
+   "title": "ventilation (CP D) refused; CP E latches FAULT",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x03 -o 0x20 -i 0x02 -o 0x20 -i 0x03 -o 0x20 -i 0x04 -o 0x80 -i 0x00 -o 0x00 -r4 0x00000000 -r2 0x0014 -r2 0xC1A7",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "pins",
+    "pins",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 3,
+     "text": "-i 0x03",
+     "step": 1,
+     "line": "[ok] Written 0x00000003 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 2,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 2,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 3,
+     "text": "-i 0x03",
+     "step": 3,
+     "line": "[ok] Written 0x00000003 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 3,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 4,
+     "text": "-i 0x04",
+     "step": 4,
+     "line": "[ok] Written 0x00000004 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 4,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 5,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 5,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 0,
+     "text": "-r4 0x00000000",
+     "step": 6,
+     "line": "[ok] Read 0x00000000 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 20,
+     "text": "-r2 0x0014",
+     "step": 6,
+     "line": "[ok] Read 0x0014 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 49575,
+     "text": "-r2 0xC1A7",
+     "step": 6,
+     "line": "[ok] Read 0xc1a7 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S9": {
+   "title": "invalid pilot code 7 latches FAULT with the CP-error flag",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x07 -o 0x80 -i 0x00 -o 0x00 -r4 0x00000000 -r2 0x0014 -r2 0xC1A7",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 7,
+     "text": "-i 0x07",
+     "step": 1,
+     "line": "[ok] Written 0x00000007 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 1,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 2,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 2,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 0,
+     "text": "-r4 0x00000000",
+     "step": 3,
+     "line": "[ok] Read 0x00000000 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 20,
+     "text": "-r2 0x0014",
+     "step": 3,
+     "line": "[ok] Read 0x0014 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 49575,
+     "text": "-r2 0xC1A7",
+     "step": 3,
+     "line": "[ok] Read 0xc1a7 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S10": {
+   "title": "two replayed frames rejected -> FAULT",
+   "command": "./emu -d 0xF0 -i 0x01 -o 0x20 -i 0x02 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FC017E -t4 0x138800A0 -t4 0x7E7E8BC8 -o 0x30 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x80 -i 0x00 -o 0x00 -r4 0x000B3B00 -r2 0x0244 -r2 0x1154",
+   "setup": null,
+   "stream": false,
+   "steps": [
+    "pins",
+    "pins",
+    "frame",
+    "frame",
+    "frame",
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 1,
+     "text": "-i 0x01",
+     "step": 0,
+     "line": "[ok] Written 0x00000001 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 0,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 2,
+     "text": "-i 0x02",
+     "step": 1,
+     "line": "[ok] Written 0x00000002 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": 1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 2,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 2,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 2,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 2,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150733182,
+     "text": "-t4 0x08FC017E",
+     "step": 3,
+     "line": "[ok] Written 0x08fc017e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 3,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122222536,
+     "text": "-t4 0x7E7E8BC8",
+     "step": 3,
+     "line": "[ok] Written 0x7e7e8bc8 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 3,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 4,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 4,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 4,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 4,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 5,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 5,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 5,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 128,
+     "text": "-o 0x80",
+     "step": 5,
+     "line": "[ok] Read 0x00000080 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 6,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 6,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 736000,
+     "text": "-r4 0x000B3B00",
+     "step": 7,
+     "line": "[ok] Read 0x000b3b00 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 580,
+     "text": "-r2 0x0244",
+     "step": 7,
+     "line": "[ok] Read 0x0244 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 4436,
+     "text": "-r2 0x1154",
+     "step": 7,
+     "line": "[ok] Read 0x1154 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  },
+  "S11": {
+   "title": "stale pins at boot: CP C waits for healthy meter data",
+   "command": "./emu -d 0xF0 -o 0x20 -t4 0x08FC007E -t4 0x138800A0 -t4 0x7E7E33A9 -o 0x30 -i 0x00 -o 0x00 -r4 0x00059D80 -r2 0x0100 -r2 0x71A4",
+   "setup": "./emu -d 0xF0 -i 0x02 -o 0x20",
+   "stream": false,
+   "steps": [
+    "frame",
+    "pins",
+    "record"
+   ],
+   "reset": "[ok] RISC-V started!",
+   "ops": [
+    {
+     "kind": "d",
+     "n": null,
+     "value": 240,
+     "text": "-d 0xF0",
+     "step": -1,
+     "line": "[ok] Written 0x000000f0 to DIRECTION"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 32,
+     "text": "-o 0x20",
+     "step": -1,
+     "line": "[ok] Read 0x00000020 from OUTPUT PINS"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 150732926,
+     "text": "-t4 0x08FC007E",
+     "step": 0,
+     "line": "[ok] Written 0x08fc007e to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 327680160,
+     "text": "-t4 0x138800A0",
+     "step": 0,
+     "line": "[ok] Written 0x138800a0 to UART RX"
+    },
+    {
+     "kind": "t",
+     "n": 4,
+     "value": 2122199977,
+     "text": "-t4 0x7E7E33A9",
+     "step": 0,
+     "line": "[ok] Written 0x7e7e33a9 to UART RX"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 48,
+     "text": "-o 0x30",
+     "step": 0,
+     "line": "[ok] Read 0x00000030 from OUTPUT PINS"
+    },
+    {
+     "kind": "i",
+     "n": null,
+     "value": 0,
+     "text": "-i 0x00",
+     "step": 1,
+     "line": "[ok] Written 0x00000000 to INPUT PINS"
+    },
+    {
+     "kind": "o",
+     "n": null,
+     "value": 0,
+     "text": "-o 0x00",
+     "step": 1,
+     "line": "[ok] Read 0x00000000 from OUTPUT PINS"
+    },
+    {
+     "kind": "r",
+     "n": 4,
+     "value": 368000,
+     "text": "-r4 0x00059D80",
+     "step": 2,
+     "line": "[ok] Read 0x00059d80 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 256,
+     "text": "-r2 0x0100",
+     "step": 2,
+     "line": "[ok] Read 0x0100 from UART TX"
+    },
+    {
+     "kind": "r",
+     "n": 2,
+     "value": 29092,
+     "text": "-r2 0x71A4",
+     "step": 2,
+     "line": "[ok] Read 0x71a4 from UART TX"
+    }
+   ],
+   "result": "PASS"
+  }
+ }
+}

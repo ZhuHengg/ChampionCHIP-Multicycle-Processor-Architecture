@@ -14,11 +14,13 @@ interface FleetHandoffProps {
   peakStagMw: number;
   chargers: number;
   onSkip: () => void;
+  /** Playback paused: freeze the handoff countdown with the timeline. */
+  paused: boolean;
 }
 
 const FADE = 'absolute inset-0 transition-opacity duration-700 ease-out';
 
-export default function FleetHandoff({ interlude, peakSyncMw, peakStagMw, chargers, onSkip }: FleetHandoffProps) {
+export default function FleetHandoff({ interlude, peakSyncMw, peakStagMw, chargers, onSkip, paused }: FleetHandoffProps) {
   // Keep the last beat on screen while the card fades out.
   const [beat, setBeat] = useState<Exclude<Interlude, null>>('verdict');
   if (interlude && interlude !== beat) setBeat(interlude);
@@ -101,7 +103,7 @@ export default function FleetHandoff({ interlude, peakSyncMw, peakStagMw, charge
             </p>
             {/* Countdown to the replay */}
             <div className="fade-rise mt-8 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-[var(--color-ink)]/10" style={{ animationDelay: '420ms' }}>
-              <div className="handoff-progress h-full rounded-full bg-[var(--color-accent)]" style={{ animationDuration: `${HANDOFF_MS}ms` }} />
+              <div className="handoff-progress h-full rounded-full bg-[var(--color-accent)]" style={{ animationDuration: `${HANDOFF_MS}ms`, animationPlayState: paused ? 'paused' : 'running' }} />
             </div>
             <p className="fade-rise mt-2 text-xs text-[var(--color-mute)]" style={{ animationDelay: '420ms' }}>
               Replaying the event

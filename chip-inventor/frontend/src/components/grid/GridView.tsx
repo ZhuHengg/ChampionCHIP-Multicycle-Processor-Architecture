@@ -176,7 +176,7 @@ export default function GridView({ onOpenStation }: GridViewProps) {
   };
 
   const currentMs = phases[tl.phaseIndex].ms;
-  const fillKey = `${tl.mode}-${tl.phaseIndex}-${tl.attempt}-${tl.wave}-${tl.rebootFailed}-${runId}`;
+  const fillKey = `${tl.mode}-${tl.phaseIndex}-${tl.attempt}-${tl.wave}-${tl.rebootFailed}-${tl.interlude ?? ''}-${runId}`;
   let fill: CurrentFill;
   if (ended && !tl.playing) fill = { from: 1, to: 1, ms: 0, key: fillKey };
   else if (tl.phase === 'stagger') fill = { from: tl.wave / STAGGER_WAVES, to: (tl.wave + 1) / STAGGER_WAVES, ms: WAVE_MS, key: fillKey };
@@ -184,7 +184,8 @@ export default function GridView({ onOpenStation }: GridViewProps) {
     const split = REBOOT_TRY_MS / currentMs;
     fill = tl.rebootFailed ? { from: split, to: 1, ms: currentMs - REBOOT_TRY_MS, key: fillKey } : { from: 0, to: split, ms: REBOOT_TRY_MS, key: fillKey };
   } else fill = { from: 0, to: 1, ms: currentMs, key: fillKey };
-  fill.paused = !tl.playing;
+  // The phase clock stands still while the fleet interlude is on screen.
+  fill.paused = !tl.playing || tl.interlude !== null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -207,7 +208,6 @@ export default function GridView({ onOpenStation }: GridViewProps) {
         {/* City diorama */}
         <section aria-label="City simulation" className="relative overflow-hidden rounded-[28px] xl:col-span-12" style={{ boxShadow: '0 30px 60px -36px rgba(70,58,20,0.38)' }}>
           <SceneBackdrop mood={caption.mood} />
-          <FleetHandoff interlude={tl.interlude} peakSyncMw={peakSync} peakStagMw={peakStag} chargers={N_CHARGERS} onSkip={tl.skipInterlude} />
           <span
             className={`absolute top-5 left-5 z-10 rounded-full px-3 py-1.5 text-xs font-semibold ${
               tl.mode === 'without' ? 'bg-[var(--color-bad)] text-white' : 'bg-[var(--color-accent)] text-[var(--color-ink)]'
@@ -219,6 +219,8 @@ export default function GridView({ onOpenStation }: GridViewProps) {
             <div className="absolute inset-0" aria-hidden="true">
               <CityScene phase={tl.phase} wave={tl.wave} icon={caption.icon} attempt={tl.attempt} rebootFailed={tl.rebootFailed} stepMw={stepMw} mood={caption.mood} />
             </div>
+            {/* Between fleets: verdict, then handoff. Covers the scene only, so the player bar stays usable. */}
+            <FleetHandoff interlude={tl.interlude} peakSyncMw={peakSync} peakStagMw={peakStag} chargers={N_CHARGERS} onSkip={tl.skipInterlude} paused={!tl.playing} />
             {/* Caption floats in the empty corner below the plinth, so the town gets the full scene height. */}
             <div className="pointer-events-none absolute bottom-0 left-0 z-10 max-w-[min(36rem,92%)] px-6 pb-5" aria-live="polite">
               {/* Keyed so each new caption fades in rather than swapping in place. */}
