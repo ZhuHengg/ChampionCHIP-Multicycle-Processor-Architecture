@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import GripperLogo from './GripperLogo';
 
 export type NavTab = 'station' | 'grid';
 
@@ -15,16 +15,10 @@ const TABS: { id: NavTab; label: string; short: string }[] = [
 function Navbar({ activeTab, onTabChange }: NavbarProps) {
   return (
     <nav className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3 px-4 pt-5 md:px-8 md:pt-7">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="rounded-full border border-[var(--color-ink)]/70 px-4 py-1.5 font-display text-lg font-medium tracking-tight text-[var(--color-ink)] md:text-xl">
-          RVBL-2
-        </span>
-        <span className="hidden text-sm leading-tight text-[var(--color-mute)] lg:block">
-          ChampionCHIP
-          <br />
-          grid-aware EV charger
-        </span>
-      </div>
+      <span className="flex min-w-0 items-center gap-2 font-display text-xl font-medium tracking-tight text-[var(--color-ink)] md:text-2xl">
+        <GripperLogo className="h-6 w-6 shrink-0 md:h-7 md:w-7" />
+        Gripper
+      </span>
 
       <div className="flex items-center gap-1 rounded-full bg-white/60 p-1 backdrop-blur-sm" role="tablist" aria-label="Demo sections">
         {TABS.map((tab) => {
@@ -45,11 +39,6 @@ function Navbar({ activeTab, onTabChange }: NavbarProps) {
             </button>
           );
         })}
-      </div>
-
-      <div className="hidden items-center gap-2 rounded-full bg-white/60 px-4 py-2.5 text-sm text-[var(--color-ink-2)] backdrop-blur-sm lg:flex">
-        <ShieldCheck className="h-4 w-4 text-[var(--color-ok)]" aria-hidden="true" />
-        Same results as the firmware's golden model
       </div>
     </nav>
   );
