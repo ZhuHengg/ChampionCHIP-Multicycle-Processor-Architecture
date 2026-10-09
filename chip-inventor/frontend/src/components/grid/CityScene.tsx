@@ -9,10 +9,10 @@
 // reboot up close. Nothing snaps -- colours, lights and the camera all ease.
 // Reduced motion snaps every value and freezes traffic and spinners.
 
-import { Suspense, useEffect, useMemo, useRef } from 'react';
-import type { MutableRefObject } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject, RefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Environment, Html, Lightformer, Line, RoundedBox } from '@react-three/drei';
+import { ContactShadows, Environment, Lightformer, Line, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { Line2 } from 'three-stdlib';
@@ -138,7 +138,7 @@ function useFacadeMaterials(w: number, d: number, h: number, color: string, cell
   }, [w, d, h, color, cell]);
 }
 
-function BuildingBlock({ b, env, reducedMotion }: { b: Building; env: EnvRef; reducedMotion: boolean }) {
+function BuildingBlock({ b, env }: { b: Building; env: EnvRef }) {
   const mats = useFacadeMaterials(b.w, b.d, b.h, b.color, b.cell);
   const sign = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(() => {
@@ -146,7 +146,6 @@ function BuildingBlock({ b, env, reducedMotion }: { b: Building; env: EnvRef; re
     mats[0].emissiveIntensity = mats[4].emissiveIntensity = 0.9 * lit;
     if (sign.current) sign.current.emissiveIntensity = 1.6 * lit;
   });
-  void reducedMotion;
   return (
     <group position={[b.x, 0, b.z]}>
       <mesh position={[0, b.h / 2, 0]} material={mats} castShadow receiveShadow>
@@ -371,7 +370,7 @@ function ChargerPost({ post, state, geo, reducedMotion, surge }: { post: Post; s
         <group position={[0, 0, carZ]} rotation={[0, post.side === 1 ? Math.PI : 0, 0]}>
           <Car geo={geo} color={post.car} />
           {/* Charge port glow on the nose, where the cable lands */}
-          <mesh position={[0.16, 0.2, 0.48]}>
+          <mesh position={[0, 0.2, 0.48]}>
             <boxGeometry args={[0.08, 0.05, 0.02]} />
             <meshStandardMaterial ref={port} color="#2A2D33" emissive="#3CCF5A" emissiveIntensity={0} toneMapped={false} />
           </mesh>
@@ -380,8 +379,8 @@ function ChargerPost({ post, state, geo, reducedMotion, surge }: { post: Post; s
       {post.car && (
         <mesh
           geometry={geo.cable}
-          position={[0.1, 0.24, post.side * 0.2]}
-          rotation={[Math.PI / 2 - post.side * 0.35, 0, 0]}
+          position={[0, 0.24, post.side * 0.2]}
+          rotation={[post.side * (Math.PI / 2 + 0.35), 0, 0]}
           scale={[1, 0.36, 1]}
           castShadow
         >
@@ -638,7 +637,7 @@ function Sparks({ at, trigger, reducedMotion }: { at: Vec3; trigger: number; red
     (p.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
   });
   return (
-    <points ref={points} visible={false}>
+    <points ref={points} visible={false} frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[state.pos, 3]} />
       </bufferGeometry>
@@ -781,7 +780,7 @@ function CameraRig({ shot, follow, reducedMotion }: { shot: ReturnType<typeof sh
   const zoomMul = useRef(1);
   const goal = useMemo(() => new THREE.Vector3(), []);
   // Fit the whole plinth (plus building height) in overview.
-  const baseZoom = Math.min(size.width / 33, size.height / 21);
+  const baseZoom = Math.min(size.width / 31, size.height / 19.5);
 
   useEffect(() => {
     camera.position.copy(target.current).add(CAM_OFFSET);
@@ -855,35 +854,55 @@ function Director({ env, phase, rebootFailed, reducedMotion }: { env: EnvRef; ph
 }
 
 // ---------------------------------------------------------------------------
-// HTML overlays: district badges and the substation readout.
+// HTML overlays: district badges and the substation readout. They live in a
+// plain DOM layer over the canvas; Projector pins each one to its 3D anchor
+// every frame. (One layer of our own instead of drei <Html> per badge: fewer
+// React roots, and none of them can go missing under StrictMode remounts.)
 
-function DistrictBadge({ name, at, online, total, label, color, show }: { name: string; at: Vec3; online: number; total: number; label: string; color: string; show: boolean }) {
+const READOUT_AT: Vec3 = [SUBSTATION[0] - 2.6, 1.0, SUBSTATION[1]];
+const ANCHORS: Vec3[] = [...DISTRICTS.map((d) => d.badge), READOUT_AT];
+
+function Projector({ els }: { els: RefObject<(HTMLDivElement | null)[]> }) {
+  const { camera, size } = useThree();
+  const v = useMemo(() => new THREE.Vector3(), []);
+  useFrame(() => {
+    ANCHORS.forEach((at, i) => {
+      const el = els.current?.[i];
+      if (!el) return;
+      v.set(...at).project(camera);
+      const x = ((v.x + 1) / 2) * size.width;
+      const y = ((1 - v.y) / 2) * size.height;
+      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)`;
+    });
+  });
+  return null;
+}
+
+function DistrictBadge({ name, online, total, label, color }: { name: string; online: number; total: number; label: string; color: string }) {
   const mw = (online * CHARGERS_PER_POST * KW) / 1000;
   return (
-    <Html position={at} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', opacity: show ? 1 : 0, transition: 'opacity 400ms ease' }}>
-      <div className="w-[150px] rounded-2xl bg-[#14161A]/80 px-3 py-2 text-white shadow-lg ring-1 ring-white/10 backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-[12px] font-semibold">{name}</span>
-          <span className="h-2 w-2 shrink-0 rounded-full transition-colors duration-500" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
-        </div>
-        <div className="mt-0.5 text-[11px] transition-colors duration-500" style={{ color }}>
-          {label}
-        </div>
-        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
-          <div className="h-full rounded-full transition-[width,background-color] duration-500" style={{ width: `${(online / total) * 100}%`, backgroundColor: color }} />
-        </div>
-        <div className="tabular mt-1 flex justify-between font-mono text-[10px] text-white/60">
-          <span>
-            {online * CHARGERS_PER_POST}/{total * CHARGERS_PER_POST}
-          </span>
-          <span>{mw.toFixed(2)} MW</span>
-        </div>
+    <div className="w-[150px] rounded-2xl bg-[#14161A]/80 px-3 py-2 text-white shadow-lg ring-1 ring-white/10 backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[12px] font-semibold">{name}</span>
+        <span className="h-2 w-2 shrink-0 rounded-full transition-colors duration-500" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />
       </div>
-    </Html>
+      <div className="mt-0.5 text-[11px] transition-colors duration-500" style={{ color }}>
+        {label}
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
+        <div className="h-full rounded-full transition-[width,background-color] duration-500" style={{ width: `${(online / total) * 100}%`, backgroundColor: color }} />
+      </div>
+      <div className="tabular mt-1 flex justify-between font-mono text-[10px] text-white/60">
+        <span>
+          {online * CHARGERS_PER_POST}/{total * CHARGERS_PER_POST}
+        </span>
+        <span>{mw.toFixed(2)} MW</span>
+      </div>
+    </div>
   );
 }
 
-function GridReadout({ phase, rebootFailed, stepMw, show }: { phase: Phase; rebootFailed: boolean; stepMw: number; show: boolean }) {
+function GridReadout({ phase, rebootFailed, stepMw }: { phase: Phase; rebootFailed: boolean; stepMw: number }) {
   const low = phase === 'dip' || phase === 'rebound' || (phase === 'reboot' && rebootFailed);
   const spike = phase === 'surge' || (phase === 'stagger' && stepMw > 0);
   const hz = `${(F_LOW / 100).toFixed(2)} Hz`;
@@ -900,16 +919,38 @@ function GridReadout({ phase, rebootFailed, stepMw, show }: { phase: Phase; rebo
     color = '#6EA8FF';
   }
   return (
-    <Html position={[SUBSTATION[0], 3.1, SUBSTATION[1]]} center zIndexRange={[20, 0]} style={{ pointerEvents: 'none', opacity: show ? 1 : 0, transition: 'opacity 400ms ease' }}>
-      <div className="flex items-center gap-2 rounded-full bg-[#14161A]/85 px-3 py-1.5 whitespace-nowrap text-white shadow-lg ring-1 ring-white/10 backdrop-blur-sm">
-        <span className="text-[11px] text-white/60">Substation</span>
-        <span className="tabular font-mono text-[12px] font-semibold transition-colors duration-500" style={{ color }}>
-          {text}
-        </span>
-      </div>
-    </Html>
+    <div className="flex items-center gap-2 rounded-full bg-[#14161A]/85 px-3 py-1.5 whitespace-nowrap text-white shadow-lg ring-1 ring-white/10 backdrop-blur-sm">
+      <span className="text-[11px] text-white/60">Substation</span>
+      <span className="tabular font-mono text-[12px] font-semibold transition-colors duration-500" style={{ color }}>
+        {text}
+      </span>
+    </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// One table from timeline to per-post and per-district state, shared by the
+// 3D scene and the DOM overlay so they can never disagree.
+
+function cityModel(posts: Post[], phase: Phase, wave: number, rebootFailed: boolean) {
+  const states = posts.map((p) => postState(phase, wave, rebootFailed, p));
+  const districts = DISTRICTS.map((d, i) => {
+    const mine = states.filter((_, k) => posts[k].district === i);
+    const online = mine.filter((st) => st === 'charging').length;
+    const mixed = online > 0 && online < mine.length;
+    const label = mixed ? `Restarting · ${online}/${mine.length} posts` : STATE_LABEL[mine[0]];
+    const color = mixed ? '#F2B134' : STATE_COLOR[mine[0]];
+    let look: FeederLook = { color: '#9FB3D9', flow: 1.2, flicker: false };
+    if (phase === 'surge') look = { color: RED, flow: 4.5, flicker: false };
+    else if (mine[0] === 'alarm' || mine[0] === 'failed') look = { color: RED, flow: 0, flicker: true };
+    else if (mine[0] === 'rebooting') look = { color: '#6EA8FF', flow: 0.4, flicker: false };
+    else if (online === 0) look = { color: '#7C8798', flow: 0, flicker: false };
+    else if (mixed) look = { color: '#F2C26A', flow: 1.2 * (online / mine.length), flicker: false };
+    return { ...d, online, total: mine.length, label, color, look };
+  });
+  return { states, districts };
+}
+type CityModel = ReturnType<typeof cityModel>;
 
 // ---------------------------------------------------------------------------
 
@@ -982,7 +1023,7 @@ function Ground() {
             <meshStandardMaterial color="#565A61" roughness={0.9} />
           </mesh>
           {/* Bay lines */}
-          {Array.from({ length: isl.district === 1 ? 10 : 6 }, (_, c) => isl.x - 2.625 + c * 1.05).map((bx) => (
+          {Array.from({ length: isl.district === 1 ? 9 : 6 }, (_, c) => isl.x - 2.625 + c * 1.05).map((bx) => (
             <mesh key={bx} position={[bx, 0.008, isl.z]} rotation={[-Math.PI / 2, 0, 0]}>
               <planeGeometry args={[0.035, 2.6]} />
               <meshBasicMaterial color="#C9CDD2" transparent opacity={0.5} />
@@ -998,33 +1039,27 @@ function Ground() {
   );
 }
 
-function Scene({ phase, wave, icon, attempt, rebootFailed, stepMw }: CitySceneProps) {
+interface SceneProps extends CitySceneProps {
+  posts: Post[];
+  model: CityModel;
+  overlay: RefObject<(HTMLDivElement | null)[]>;
+}
+
+function Scene({ phase, icon, attempt, rebootFailed, posts, model, overlay }: SceneProps) {
   const reducedMotion = usePrefersReducedMotion();
   const geo = useSharedGeometry();
   const roof = useRoofGeometry();
-  const posts = useMemo(buildPosts, []);
   const env = useRef<CityEnv>({ light: 1, stress: 0 });
   const follow = useRef<THREE.Group>(null);
-  const { size } = useThree();
-  const wide = size.width >= 640;
+  const { states, districts } = model;
   const shot = shotFor(phase, attempt);
-
-  const states = posts.map((p) => postState(phase, wave, rebootFailed, p));
-  const districts = DISTRICTS.map((d, i) => {
-    const mine = states.filter((_, k) => posts[k].district === i);
-    const online = mine.filter((s) => s === 'charging').length;
-    const lead: PostState = online === mine.length ? 'charging' : online > 0 ? 'charging' : mine[0];
-    const mixed = online > 0 && online < mine.length;
-    const label = mixed ? `Restarting · ${online}/${mine.length} posts` : STATE_LABEL[mine[0]];
-    const color = mixed ? '#F2B134' : STATE_COLOR[lead];
-    let look: FeederLook = { color: '#9FB3D9', flow: 1.2, flicker: false };
-    if (phase === 'surge') look = { color: RED, flow: 4.5, flicker: false };
-    else if (mine[0] === 'alarm' || mine[0] === 'failed') look = { color: RED, flow: 0, flicker: true };
-    else if (mine[0] === 'rebooting') look = { color: '#6EA8FF', flow: 0.4, flicker: false };
-    else if (online === 0) look = { color: '#7C8798', flow: 0, flicker: false };
-    else if (mixed) look = { color: '#F2C26A', flow: 1.2 * (online / mine.length), flicker: false };
-    return { ...d, online, total: mine.length, label, color, look };
-  });
+  // Mount traffic after the one-shot contact shadows have baked, so moving
+  // cars never leave a frozen shadow behind on the road.
+  const [trafficOn, setTrafficOn] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setTrafficOn(true), 600);
+    return () => clearTimeout(id);
+  }, []);
 
   const feeders = useMemo(
     () =>
@@ -1075,7 +1110,7 @@ function Scene({ phase, wave, icon, attempt, rebootFailed, stepMw }: CityScenePr
 
       <Ground />
       {BUILDINGS.map((b, i) => (
-        <BuildingBlock key={i} b={b} env={env} reducedMotion={reducedMotion} />
+        <BuildingBlock key={i} b={b} env={env} />
       ))}
       {HOUSE_ROWS.flatMap((row) => HOUSE_XS.map((hx) => <House key={`${hx},${row.z}`} x={hx} z={row.z} side={row.side} env={env} roof={roof} />))}
       {TREES.map(([x, z], i) => (
@@ -1104,17 +1139,14 @@ function Scene({ phase, wave, icon, attempt, rebootFailed, stepMw }: CityScenePr
       {posts.map((p, i) => (
         <ChargerPost key={i} post={p} state={states[i]} geo={geo} reducedMotion={reducedMotion} surge={phase === 'surge'} />
       ))}
-      <Traffic geo={geo} reducedMotion={reducedMotion} />
+      {trafficOn && <Traffic geo={geo} reducedMotion={reducedMotion} />}
       <Sparks at={[SUBSTATION[0] - 0.6, 1.2, SUBSTATION[1]]} trigger={sparkKey} reducedMotion={reducedMotion} />
       <Sparks at={failAt} trigger={failKey} reducedMotion={reducedMotion} />
 
       <ContactShadows position={[0, 0.012, 0]} scale={28} blur={2.4} far={4} opacity={0.4} resolution={1024} frames={1} />
       <ContactShadows position={[0, -0.52, 0]} scale={32} blur={3} far={2} opacity={0.55} resolution={256} frames={1} />
 
-      {districts.map((d, i) => (
-        <DistrictBadge key={i} name={d.name} at={d.badge} online={d.online} total={d.total} label={d.label} color={d.color} show={wide} />
-      ))}
-      <GridReadout phase={phase} rebootFailed={rebootFailed} stepMw={stepMw} show={wide} />
+      <Projector els={overlay} />
 
       {/* The story icon rides above whatever the camera is looking at */}
       <group ref={follow}>
@@ -1125,7 +1157,12 @@ function Scene({ phase, wave, icon, attempt, rebootFailed, stepMw }: CityScenePr
 }
 
 export default function CityScene(props: CitySceneProps) {
+  const { phase, wave, rebootFailed, stepMw } = props;
+  const posts = useMemo(() => buildPosts(), []);
+  const model = cityModel(posts, phase, wave, rebootFailed);
+  const overlay = useRef<(HTMLDivElement | null)[]>([]);
   return (
+    <div className="relative h-full w-full">
     <Canvas
       orthographic
       shadows="soft"
@@ -1135,8 +1172,20 @@ export default function CityScene(props: CitySceneProps) {
       style={{ background: 'transparent' }}
     >
       <Suspense fallback={null}>
-        <Scene {...props} />
+        <Scene {...props} posts={posts} model={model} overlay={overlay} />
       </Suspense>
     </Canvas>
+      {/* Badges are detail for wide screens; on phones the caption carries the story. */}
+      <div className="pointer-events-none absolute inset-0 hidden overflow-hidden sm:block">
+        {model.districts.map((d, i) => (
+          <div key={d.name} ref={(el) => void (overlay.current[i] = el)} className="absolute top-0 left-0 will-change-transform">
+            <DistrictBadge name={d.name} online={d.online} total={d.total} label={d.label} color={d.color} />
+          </div>
+        ))}
+        <div ref={(el) => void (overlay.current[DISTRICTS.length] = el)} className="absolute top-0 left-0 will-change-transform">
+          <GridReadout phase={phase} rebootFailed={rebootFailed} stepMw={stepMw} />
+        </div>
+      </div>
+    </div>
   );
 }

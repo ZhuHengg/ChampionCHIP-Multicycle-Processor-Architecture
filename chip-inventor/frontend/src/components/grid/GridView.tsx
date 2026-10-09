@@ -4,13 +4,13 @@
 
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, MessageSquareOff, Pause, Play, TrendingDown, Zap } from 'lucide-react';
+import { ArrowRight, MessageSquareOff, Pause, Play, RotateCcw, TrendingDown, Zap } from 'lucide-react';
 import { delayHistogram, rebound } from '../../data/rebound';
 import { F_LOW, HOLD_BASE } from '../../data/constants';
 import CityScene from './CityScene';
 import ComparisonCard from './ComparisonCard';
 import DelayHistogram from './DelayHistogram';
-import { PHASES, STAGGER_WAVES, useGridTimeline } from './GridTimeline';
+import { MAX_ATTEMPTS, PHASES, STAGGER_WAVES, useGridTimeline } from './GridTimeline';
 import type { Mode, Phase } from './GridTimeline';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import type { IconKind } from '../station/stationStory';
@@ -26,6 +26,7 @@ const PHASE_PILL: Record<Phase, string> = {
   recovered: 'border border-[var(--color-line-strong)] text-[var(--color-ink-2)]',
   surge: 'bg-[var(--color-bad)] text-white',
   rebound: 'border-2 border-[var(--color-bad)] text-[var(--color-bad)]',
+  reboot: 'bg-[var(--color-dark)] text-[#FF8A8D]',
 };
 
 const MODES: { mode: Mode; label: string }[] = [
@@ -87,22 +88,40 @@ export default function GridView({ onOpenStation }: GridViewProps) {
       normal: { icon: 'bolt', title: `${N_CHARGERS.toLocaleString()} chargers, ${fleetMw.toFixed(1)} MW`, sub: 'No central controller.', backdrop: 'navy' },
       dip: { icon: 'alert', title: `Grid drops below ${(F_LOW / 100).toFixed(2)} Hz`, sub: 'Every charger sees it in the same frame.', backdrop: 'charcoal' },
       hold: { icon: 'pause', title: 'All pause', sub: `${fleetMw.toFixed(1)} MW off the grid. That part is good.`, backdrop: 'charcoal' },
-      surge: { icon: 'alert', title: 'All restart at once', sub: `${peakSync.toFixed(2)} MW lands in a single frame.`, backdrop: 'charcoal' },
+      surge: {
+        icon: 'alert',
+        title: tl.attempt > 1 ? `Retry ${tl.attempt}: all restart at once` : 'All restart at once',
+        sub: `${peakSync.toFixed(2)} MW lands in a single frame.`,
+        backdrop: 'charcoal',
+      },
       rebound: { icon: 'syncBroken', title: 'Grid dips again', sub: 'A step that large can pull frequency back down, and the cycle repeats.', backdrop: 'charcoal' },
+      reboot: tl.rebootFailed
+        ? {
+            icon: 'syncBroken',
+            title: `Reboot failed · attempt ${tl.attempt}`,
+            sub: tl.attempt < MAX_ATTEMPTS ? 'Same fixed delay, same spike. Back to "All paused" to try again.' : 'It never settles: every retry lands on the same frame.',
+            backdrop: 'charcoal',
+          }
+        : { icon: 'sync', title: `Rebooting · attempt ${tl.attempt}`, sub: 'Every charger counts the same fixed delay again.', backdrop: 'charcoal' },
       stagger: { icon: 'sync', title: `Wave ${tl.wave + 1} of ${STAGGER_WAVES}`, sub: `${waveCounts[tl.wave]} chargers reconnect.`, backdrop: 'navy' },
       recovered: { icon: 'check', title: 'Back to normal', sub: `Peak step ${peakStag.toFixed(2)} MW, not ${peakSync.toFixed(2)}.`, backdrop: 'navy' },
     };
     return byPhase[tl.phase];
-  }, [tl.phase, tl.wave, waveCounts, peakStag, peakSync]);
+  }, [tl.phase, tl.wave, tl.attempt, tl.rebootFailed, waveCounts, peakStag, peakSync]);
+
+  let stepMw = 0;
+  if (tl.phase === 'surge') stepMw = peakSync;
+  else if (tl.phase === 'stagger') stepMw = stag[HOLD_BASE + tl.wave] ?? 0;
 
   let highlightFrame: number | undefined;
   if (tl.phase === 'stagger') highlightFrame = HOLD_BASE + tl.wave;
-  else if (tl.phase === 'surge' || tl.phase === 'rebound' || tl.phase === 'recovered') highlightFrame = sync.length - 1;
+  else if (tl.phase === 'surge' || tl.phase === 'rebound' || tl.phase === 'reboot' || tl.phase === 'recovered') highlightFrame = sync.length - 1;
   else highlightFrame = -1;
 
   const pillText = (p: Phase, current: boolean, ms: number) => {
     if (p === 'stagger') return current ? `wave ${tl.wave + 1}/${STAGGER_WAVES}` : `${STAGGER_WAVES} waves`;
     if (p === 'surge') return `${peakSync.toFixed(1)} MW in 1 frame`;
+    if (p === 'reboot') return current ? `attempt ${tl.attempt}/${MAX_ATTEMPTS}` : 'back to paused';
     return `${(ms / 1000).toFixed(1)} s`;
   };
 
@@ -175,6 +194,7 @@ export default function GridView({ onOpenStation }: GridViewProps) {
                         future ? 'opacity-35' : ''
                       } ${current ? 'shadow-[0_0_0_3px_var(--color-page),0_0_0_5px_var(--color-ink)]' : ''}`}
                     >
+                      {p.phase === 'reboot' && <RotateCcw size={13} className="mr-1.5 shrink-0" aria-hidden="true" />}
                       {pillText(p.phase, current, p.ms)}
                     </span>
                   </button>
@@ -187,7 +207,7 @@ export default function GridView({ onOpenStation }: GridViewProps) {
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         {/* City diorama */}
-        <section aria-label="City simulation" className="relative overflow-hidden rounded-[28px] xl:col-span-7" style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}>
+        <section aria-label="City simulation" className="relative overflow-hidden rounded-[28px] xl:col-span-12" style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}>
           <div
             className="absolute inset-0 transition-opacity duration-700"
             style={{ background: 'radial-gradient(120% 90% at 50% 30%, #12408F 0%, #0A2A66 45%, #061C47 100%)', opacity: caption.backdrop === 'navy' ? 1 : 0 }}
@@ -203,16 +223,21 @@ export default function GridView({ onOpenStation }: GridViewProps) {
           >
             {tl.mode === 'without' ? 'Without RVBL-2' : 'With RVBL-2'}
           </span>
-          <div className="relative h-[360px] sm:h-[420px]" aria-hidden="true">
-            <CityScene phase={tl.phase} wave={tl.wave} icon={caption.icon} />
+          <div className="relative h-[400px] sm:h-[520px] xl:h-[620px]" aria-hidden="true">
+            <CityScene phase={tl.phase} wave={tl.wave} icon={caption.icon} attempt={tl.attempt} rebootFailed={tl.rebootFailed} stepMw={stepMw} />
           </div>
           <div className="relative px-6 pb-6" aria-live="polite">
-            <p className="font-display text-2xl font-semibold text-white md:text-3xl">{caption.title}</p>
-            <p className="mt-1.5 min-h-5 text-sm text-white/65">{caption.sub}</p>
+            {/* Keyed so each new caption fades in rather than swapping in place. */}
+            <p key={caption.title} className="fade-rise font-display text-2xl font-semibold text-white md:text-3xl">
+              {caption.title}
+            </p>
+            <p key={`sub:${caption.sub}`} className="fade-rise mt-1.5 min-h-5 text-sm text-white/65">
+              {caption.sub}
+            </p>
           </div>
         </section>
 
-        <div className="xl:col-span-5">
+        <div className="xl:col-span-7">
           <ComparisonCard mode={tl.mode} sync={sync} stag={stag} highlightFrame={highlightFrame} onPick={tl.pickMode} />
         </div>
 
@@ -252,7 +277,7 @@ export default function GridView({ onOpenStation }: GridViewProps) {
           </button>
         </section>
 
-        <div className="xl:col-span-7">
+        <div className="xl:col-span-12">
           <DelayHistogram />
         </div>
       </div>

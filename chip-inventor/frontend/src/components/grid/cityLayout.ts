@@ -34,7 +34,7 @@ export interface District {
 export const DISTRICTS: District[] = [
   {
     name: 'Office park',
-    badge: [-4.0, 2.2, -3.3],
+    badge: [-6.4, 2.0, -2.0],
     focus: [-4.6, 0.4, -4.2],
     pad: [-6.75, -3.3],
     route: [[-7.6, -4.4]],
