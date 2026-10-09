@@ -2,7 +2,9 @@
 //   headline (what this scenario proves) + three live numbers
 //   -> the charging bay with its playback timeline (one chapter per state),
 //      the chip's decisions as a terminal log
-//   -> meter readings and the scenario library
+//   -> the state machine beside the log
+//   -> the scenario library and meter readings
+//   -> how ./emu drives the chip (RTL simulation output)
 //   -> evidence, closed until asked for.
 // All values come from the scenario step snapshots (data/scenarios.ts); this
 // file only arranges and narrates them.
@@ -14,6 +16,7 @@ import ChargingScene from './ChargingScene';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import ScenarioPicker from './ScenarioPicker';
 import ChipLog from './ChipLog';
+import EmuPanel from './EmuPanel';
 import PlaybackBar from './PlaybackBar';
 import ReadingsCard from './ReadingsCard';
 import StateIndicator from './StateIndicator';
@@ -59,11 +62,10 @@ function Stat({ icon, value, unit, label, alert }: { icon: ReactNode; value: str
   );
 }
 
-type Tab = 'meter' | 'integrity' | 'fsm' | 'record';
+type Tab = 'meter' | 'integrity' | 'record';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'meter', label: 'Meter charts' },
   { id: 'integrity', label: 'Corrupt a frame' },
-  { id: 'fsm', label: 'State machine' },
   { id: 'record', label: 'Session record' },
 ];
 
@@ -323,14 +325,29 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
           </div>
         </section>
 
-        <div className="md:col-span-2 xl:col-span-6 xl:col-start-4 xl:row-start-2">
-          <ReadingsCard steps={steps} index={index} />
-        </div>
+        {/* State machine, always visible under the bay */}
+        <section aria-labelledby="fsm-label" className="card p-6 md:col-span-2 xl:col-span-9 xl:col-start-1 xl:row-start-2">
+          <h2 id="fsm-label" className="font-display text-xl font-medium text-[var(--color-ink)]">
+            State machine
+          </h2>
+          <div className="mx-auto mt-4 max-w-4xl">
+            <StateIndicator currentState={step.stateAfter} previousState={previousState} />
+          </div>
+        </section>
+      </div>
 
-        <div className="md:col-span-2 xl:col-span-3 xl:col-start-1 xl:row-start-2">
+      {/* Scenario library and meter readings */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+        <div className="xl:col-span-4">
           <ScenarioPicker key={scenario.id} scenarios={SCENARIOS} activeId={scenarioId} onSelect={selectScenario} />
         </div>
+        <div className="xl:col-span-8">
+          <ReadingsCard steps={steps} index={index} />
+        </div>
       </div>
+
+      {/* The organisers' emulator driving the chip, synced to playback */}
+      <EmuPanel scenarioId={scenario.id} steps={steps} index={index} onJump={jump} />
 
       {/* Evidence, closed by default */}
       <section aria-labelledby="evidence-label" className="card p-6 md:p-8">
@@ -428,12 +445,6 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
                     <FrameInspector frame={corrupted.has(inspected) ? corrupt(chainFrames[inspected].current) : chainFrames[inspected].current} index={inspected} />
                   </div>
                 )}
-              </div>
-            )}
-
-            {tab === 'fsm' && (
-              <div className="mx-auto max-w-4xl">
-                <StateIndicator currentState={step.stateAfter} previousState={previousState} />
               </div>
             )}
 

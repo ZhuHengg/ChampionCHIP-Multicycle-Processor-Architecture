@@ -14,7 +14,7 @@ const TABS: { id: NavTab; label: string; short: string }[] = [
 
 function Navbar({ activeTab, onTabChange }: NavbarProps) {
   return (
-    <nav className="mx-auto flex w-full max-w-[1440px] items-center justify-between gap-3 px-4 pt-5 md:px-8 md:pt-7">
+    <nav className="flex w-full items-center justify-between gap-3 px-4 pt-5 md:px-8 md:pt-7 xl:px-12 2xl:px-16">
       <span className="flex min-w-0 items-center gap-2 font-display text-xl font-medium tracking-tight text-[var(--color-ink)] md:text-2xl">
         <GripperLogo className="h-6 w-6 shrink-0 md:h-7 md:w-7" />
         Gripper

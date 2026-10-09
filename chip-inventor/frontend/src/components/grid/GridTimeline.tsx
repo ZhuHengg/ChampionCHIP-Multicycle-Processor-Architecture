@@ -6,7 +6,9 @@
 // The fixed-delay fleet never settles: after the rebound every charger tries
 // to reboot, the grid trips on the same synchronised spike, and the story
 // loops back to "All paused". It plays MAX_ATTEMPTS loops before autoplay
-// hands over to the RVBL-2 fleet.
+// hands over to the RVBL-2 fleet through a two-beat interlude: a "verdict"
+// card over the failed town, then a "handoff" card while the town resets
+// behind it. The mode switches at the start of the handoff.
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -14,10 +16,14 @@ export type Mode = 'without' | 'with';
 export type Phase = 'normal' | 'dip' | 'hold' | 'stagger' | 'recovered' | 'surge' | 'rebound' | 'reboot';
 
 export const STAGGER_WAVES = 8;
-const WAVE_MS = 650;
+export const WAVE_MS = 650;
 /** Reboot phase: spinners run this long before the attempt fails. */
-const REBOOT_TRY_MS = 1700;
+export const REBOOT_TRY_MS = 1700;
 export const MAX_ATTEMPTS = 2;
+const VERDICT_MS = 3200;
+export const HANDOFF_MS = 2400;
+
+export type Interlude = 'verdict' | 'handoff' | null;
 
 export const PHASES: Record<Mode, { phase: Phase; label: string; ms: number }[]> = {
   without: [
@@ -49,6 +55,10 @@ export interface GridTimeline {
   attempt: number;
   /** Reboot phase only: the attempt has failed. */
   rebootFailed: boolean;
+  /** Overlay beat between the two fleets, or null while a fleet plays. */
+  interlude: Interlude;
+  /** Jump straight past the interlude into the RVBL-2 fleet. */
+  skipInterlude: () => void;
   playing: boolean;
   toggle: () => void;
   jump: (phaseIndex: number) => void;
@@ -61,12 +71,36 @@ export function useGridTimeline(autoPlay: boolean): GridTimeline {
   const [wave, setWave] = useState(0);
   const [attempt, setAttempt] = useState(1);
   const [rebootFailed, setRebootFailed] = useState(false);
+  const [interlude, setInterlude] = useState<Interlude>(null);
   const [playing, setPlaying] = useState(autoPlay);
   const phases = PHASES[mode];
   const phase = phases[phaseIndex].phase;
 
+  const startWith = useCallback(() => {
+    setMode('with');
+    setPhaseIndex(0);
+    setWave(0);
+    setAttempt(1);
+    setRebootFailed(false);
+  }, []);
+
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || !interlude) return;
+    const id = setTimeout(
+      () => {
+        if (interlude === 'verdict') {
+          // Reset the town to the RVBL-2 fleet behind the handoff card.
+          startWith();
+          setInterlude('handoff');
+        } else setInterlude(null);
+      },
+      interlude === 'verdict' ? VERDICT_MS : HANDOFF_MS,
+    );
+    return () => clearTimeout(id);
+  }, [playing, interlude, startWith]);
+
+  useEffect(() => {
+    if (!playing || interlude) return;
     const inWaves = phase === 'stagger';
     const trying = phase === 'reboot' && !rebootFailed;
     let ms = phases[phaseIndex].ms;
@@ -82,6 +116,9 @@ export function useGridTimeline(autoPlay: boolean): GridTimeline {
         setRebootFailed(false);
         setAttempt((a) => a + 1);
         setPhaseIndex(HOLD_INDEX);
+      } else if (phase === 'reboot') {
+        // The fixed-delay fleet has run out of retries: show the verdict.
+        setInterlude('verdict');
       } else if (phaseIndex === phases.length - 1) {
         // End of this fleet's story: play the other one.
         setWave(0);
@@ -95,12 +132,13 @@ export function useGridTimeline(autoPlay: boolean): GridTimeline {
       }
     }, ms);
     return () => clearTimeout(id);
-  }, [playing, phase, phaseIndex, phases, wave, attempt, rebootFailed]);
+  }, [playing, interlude, phase, phaseIndex, phases, wave, attempt, rebootFailed]);
 
   const toggle = useCallback(() => setPlaying((p) => !p), []);
   const jump = useCallback(
     (i: number) => {
       setPlaying(false);
+      setInterlude(null);
       const p = PHASES[mode][i].phase;
       setWave(p === 'stagger' ? STAGGER_WAVES - 1 : 0);
       // A paused jump shows the phase's end state, like the last wave.
@@ -110,6 +148,7 @@ export function useGridTimeline(autoPlay: boolean): GridTimeline {
     [mode],
   );
   const pickMode = useCallback((m: Mode) => {
+    setInterlude(null);
     setMode(m);
     setWave(0);
     setAttempt(1);
@@ -118,5 +157,11 @@ export function useGridTimeline(autoPlay: boolean): GridTimeline {
     setPlaying(true);
   }, []);
 
-  return { mode, phaseIndex, phase, wave, attempt, rebootFailed, playing, toggle, jump, pickMode };
+  const skipInterlude = useCallback(() => {
+    if (interlude === 'verdict') startWith();
+    setInterlude(null);
+    setPlaying(true);
+  }, [interlude, startWith]);
+
+  return { mode, phaseIndex, phase, wave, attempt, rebootFailed, interlude, skipInterlude, playing, toggle, jump, pickMode };
 }

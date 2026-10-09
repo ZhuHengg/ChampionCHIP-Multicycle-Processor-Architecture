@@ -2,15 +2,20 @@
 // fixed restart delay (everyone reconnects at once), then with RVBL-2's
 // CRC-hashed delay. The comparison card puts both on one scale.
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ArrowRight, MessageSquareOff, Pause, Play, RotateCcw, TrendingDown, Zap } from 'lucide-react';
+import { ArrowRight, MessageSquareOff, Pause, Play, RotateCcw, SkipBack, SkipForward, TrendingDown, Zap } from 'lucide-react';
 import { delayHistogram, rebound } from '../../data/rebound';
 import { F_LOW, HOLD_BASE } from '../../data/constants';
 import CityScene from './CityScene';
+import SceneBackdrop, { MOOD_TEXT } from '../SceneBackdrop';
+import type { Mood } from '../SceneBackdrop';
 import ComparisonCard from './ComparisonCard';
+import FleetHandoff from './FleetHandoff';
 import DelayHistogram from './DelayHistogram';
-import { MAX_ATTEMPTS, PHASES, STAGGER_WAVES, useGridTimeline } from './GridTimeline';
+import { MAX_ATTEMPTS, PHASES, REBOOT_TRY_MS, STAGGER_WAVES, WAVE_MS, useGridTimeline } from './GridTimeline';
+import TimelineTrack, { PlayerButton } from '../TimelineTrack';
+import type { CurrentFill } from '../TimelineTrack';
 import type { Mode, Phase } from './GridTimeline';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import type { IconKind } from '../station/stationStory';
@@ -18,15 +23,16 @@ import type { IconKind } from '../station/stationStory';
 const N_CHARGERS = 1000;
 const KW = 7;
 
-const PHASE_PILL: Record<Phase, string> = {
-  normal: 'bg-[var(--color-dark)] text-white',
-  dip: 'bg-[var(--color-bad)] text-white',
-  hold: 'hatch border border-[var(--color-line-strong)] bg-white/40 text-[var(--color-ink)]',
-  stagger: 'bg-[var(--color-accent)] text-[var(--color-ink)]',
-  recovered: 'border border-[var(--color-line-strong)] text-[var(--color-ink-2)]',
-  surge: 'bg-[var(--color-bad)] text-white',
-  rebound: 'border-2 border-[var(--color-bad)] text-[var(--color-bad)]',
-  reboot: 'bg-[var(--color-dark)] text-[#FF8A8D]',
+// Chapter colours for the dark player bar.
+const PHASE_COLOR: Record<Phase, string> = {
+  normal: '#D6D3CB',
+  dip: '#FF5A5F',
+  hold: '#F2B134',
+  stagger: '#F2C230',
+  recovered: '#3CCF5A',
+  surge: '#FF5A5F',
+  rebound: '#FF8A3D',
+  reboot: '#B9A3FF',
 };
 
 const MODES: { mode: Mode; label: string }[] = [
@@ -59,13 +65,57 @@ interface Caption {
   icon: IconKind;
   title: string;
   sub: string;
-  backdrop: 'navy' | 'charcoal';
+  /** calm while running, alert under grid stress, night for the blackout. */
+  mood: Mood;
 }
 
 export default function GridView({ onOpenStation }: GridViewProps) {
   const reducedMotion = usePrefersReducedMotion();
   const tl = useGridTimeline(!reducedMotion);
   const phases = PHASES[tl.mode];
+  // The current chapter fills on the same clock as the timeline hook. Resuming
+  // restarts the phase timer there, so `runId` restarts the fill with it; a
+  // jump shows the phase's end state, so `ended` shows it full.
+  const [runId, setRunId] = useState(0);
+  const [ended, setEnded] = useState(false);
+  const { toggle: tlToggle, jump: tlJump, pickMode: tlPickMode, playing } = tl;
+  const toggle = useCallback(() => {
+    if (!playing) {
+      setRunId((r) => r + 1);
+      setEnded(false);
+    }
+    tlToggle();
+  }, [playing, tlToggle]);
+  const jumpTo = useCallback(
+    (i: number) => {
+      setEnded(true);
+      tlJump(i);
+    },
+    [tlJump],
+  );
+  const pickMode = useCallback(
+    (m: Mode) => {
+      setEnded(false);
+      tlPickMode(m);
+    },
+    [tlPickMode],
+  );
+
+  // Space toggles playback, arrow keys step through phases, when focus is not in a control.
+  const lastPhase = phases.length - 1;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest('button, input, select, textarea, [role="tab"]') || t.isContentEditable)) return;
+      if (e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      } else if (e.key === 'ArrowRight') jumpTo(Math.min(tl.phaseIndex + 1, lastPhase));
+      else if (e.key === 'ArrowLeft') jumpTo(Math.max(tl.phaseIndex - 1, 0));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [toggle, jumpTo, tl.phaseIndex, lastPhase]);
 
   const { sync, stag, peakSync, peakStag, reduction, waveCounts } = useMemo(() => {
     const { sync, stag } = rebound(N_CHARGERS, KW);
@@ -85,26 +135,26 @@ export default function GridView({ onOpenStation }: GridViewProps) {
   const caption = useMemo((): Caption => {
     const fleetMw = (N_CHARGERS * KW) / 1000;
     const byPhase: Record<Phase, Caption> = {
-      normal: { icon: 'bolt', title: `${N_CHARGERS.toLocaleString()} chargers, ${fleetMw.toFixed(1)} MW`, sub: 'No central controller.', backdrop: 'navy' },
-      dip: { icon: 'alert', title: `Grid drops below ${(F_LOW / 100).toFixed(2)} Hz`, sub: 'Every charger sees it in the same frame.', backdrop: 'charcoal' },
-      hold: { icon: 'pause', title: 'All pause', sub: `${fleetMw.toFixed(1)} MW off the grid. That part is good.`, backdrop: 'charcoal' },
+      normal: { icon: 'bolt', title: `${N_CHARGERS.toLocaleString()} chargers, ${fleetMw.toFixed(1)} MW`, sub: 'No central controller.', mood: 'calm' },
+      dip: { icon: 'alert', title: `Grid drops below ${(F_LOW / 100).toFixed(2)} Hz`, sub: 'Every charger sees it in the same frame.', mood: 'alert' },
+      hold: { icon: 'pause', title: 'All pause', sub: `${fleetMw.toFixed(1)} MW off the grid. That part is good.`, mood: 'alert' },
       surge: {
         icon: 'alert',
         title: tl.attempt > 1 ? `Retry ${tl.attempt}: all restart at once` : 'All restart at once',
         sub: `${peakSync.toFixed(2)} MW lands in a single frame.`,
-        backdrop: 'charcoal',
+        mood: 'alert',
       },
-      rebound: { icon: 'syncBroken', title: 'Grid dips again', sub: 'A step that large can pull frequency back down, and the cycle repeats.', backdrop: 'charcoal' },
+      rebound: { icon: 'syncBroken', title: 'Grid dips again', sub: 'A step that large can pull frequency back down, and the cycle repeats.', mood: 'alert' },
       reboot: tl.rebootFailed
         ? {
             icon: 'syncBroken',
             title: `Reboot failed · attempt ${tl.attempt}`,
             sub: tl.attempt < MAX_ATTEMPTS ? 'Same fixed delay, same spike. Back to "All paused" to try again.' : 'It never settles: every retry lands on the same frame.',
-            backdrop: 'charcoal',
+            mood: 'night',
           }
-        : { icon: 'sync', title: `Rebooting · attempt ${tl.attempt}`, sub: 'Every charger counts the same fixed delay again.', backdrop: 'charcoal' },
-      stagger: { icon: 'sync', title: `Wave ${tl.wave + 1} of ${STAGGER_WAVES}`, sub: `${waveCounts[tl.wave]} chargers reconnect.`, backdrop: 'navy' },
-      recovered: { icon: 'check', title: 'Back to normal', sub: `Peak step ${peakStag.toFixed(2)} MW, not ${peakSync.toFixed(2)}.`, backdrop: 'navy' },
+        : { icon: 'sync', title: `Rebooting · attempt ${tl.attempt}`, sub: 'Every charger counts the same fixed delay again.', mood: 'alert' },
+      stagger: { icon: 'sync', title: `Wave ${tl.wave + 1} of ${STAGGER_WAVES}`, sub: `${waveCounts[tl.wave]} chargers reconnect.`, mood: 'calm' },
+      recovered: { icon: 'check', title: 'Back to normal', sub: `Peak step ${peakStag.toFixed(2)} MW, not ${peakSync.toFixed(2)}.`, mood: 'calm' },
     };
     return byPhase[tl.phase];
   }, [tl.phase, tl.wave, tl.attempt, tl.rebootFailed, waveCounts, peakStag, peakSync]);
@@ -125,6 +175,17 @@ export default function GridView({ onOpenStation }: GridViewProps) {
     return `${(ms / 1000).toFixed(1)} s`;
   };
 
+  const currentMs = phases[tl.phaseIndex].ms;
+  const fillKey = `${tl.mode}-${tl.phaseIndex}-${tl.attempt}-${tl.wave}-${tl.rebootFailed}-${runId}`;
+  let fill: CurrentFill;
+  if (ended && !tl.playing) fill = { from: 1, to: 1, ms: 0, key: fillKey };
+  else if (tl.phase === 'stagger') fill = { from: tl.wave / STAGGER_WAVES, to: (tl.wave + 1) / STAGGER_WAVES, ms: WAVE_MS, key: fillKey };
+  else if (tl.phase === 'reboot') {
+    const split = REBOOT_TRY_MS / currentMs;
+    fill = tl.rebootFailed ? { from: split, to: 1, ms: currentMs - REBOOT_TRY_MS, key: fillKey } : { from: 0, to: split, ms: REBOOT_TRY_MS, key: fillKey };
+  } else fill = { from: 0, to: 1, ms: currentMs, key: fillKey };
+  fill.paused = !tl.playing;
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
@@ -142,80 +203,11 @@ export default function GridView({ onOpenStation }: GridViewProps) {
         </div>
       </header>
 
-      {/* Which fleet, and where in the event: doubles as the playback control */}
-      <section aria-label="Grid event" className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={tl.toggle}
-            aria-label={tl.playing ? 'Pause' : 'Play'}
-            className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[var(--color-dark)] text-white transition-colors duration-200 hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ink)] focus-visible:ring-offset-2"
-          >
-            {tl.playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
-          </button>
-          <div role="radiogroup" aria-label="Restart strategy" className="flex rounded-full border border-white bg-white/60 p-1 shadow-sm backdrop-blur">
-            {MODES.map((m) => {
-              const on = tl.mode === m.mode;
-              return (
-                <button
-                  key={m.mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => tl.pickMode(m.mode)}
-                  className={`min-h-10 cursor-pointer rounded-full px-4 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ink)] ${
-                    on ? (m.mode === 'without' ? 'bg-[var(--color-bad)] text-white' : 'bg-[var(--color-dark)] text-white') : 'text-[var(--color-ink-2)] hover:text-[var(--color-ink)]'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="-mx-1 overflow-x-auto px-1 pt-1 pb-2">
-          <ol className="flex min-w-[560px] items-end gap-1.5">
-            {phases.map((p, i) => {
-              const current = i === tl.phaseIndex;
-              const future = i > tl.phaseIndex;
-              return (
-                <li key={p.phase} className="basis-0" style={{ flexGrow: p.ms }}>
-                  <button
-                    type="button"
-                    onClick={() => tl.jump(i)}
-                    aria-current={current ? 'step' : undefined}
-                    className="group block w-full cursor-pointer text-left focus-visible:outline-none"
-                  >
-                    <span className={`mb-2 block truncate pl-1 text-sm ${current ? 'font-semibold text-[var(--color-ink)]' : 'text-[var(--color-mute)] group-hover:text-[var(--color-ink)]'}`}>
-                      {p.label}
-                    </span>
-                    <span
-                      className={`flex h-12 items-center truncate rounded-full px-4 font-mono text-xs transition-opacity duration-300 group-focus-visible:ring-2 group-focus-visible:ring-[var(--color-ink)] ${PHASE_PILL[p.phase]} ${
-                        future ? 'opacity-35' : ''
-                      } ${current ? 'shadow-[0_0_0_3px_var(--color-page),0_0_0_5px_var(--color-ink)]' : ''}`}
-                    >
-                      {p.phase === 'reboot' && <RotateCcw size={13} className="mr-1.5 shrink-0" aria-hidden="true" />}
-                      {pillText(p.phase, current, p.ms)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      </section>
-
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
         {/* City diorama */}
-        <section aria-label="City simulation" className="relative overflow-hidden rounded-[28px] xl:col-span-12" style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}>
-          <div
-            className="absolute inset-0 transition-opacity duration-700"
-            style={{ background: 'radial-gradient(120% 90% at 50% 30%, #12408F 0%, #0A2A66 45%, #061C47 100%)', opacity: caption.backdrop === 'navy' ? 1 : 0 }}
-          />
-          <div
-            className="absolute inset-0 transition-opacity duration-700"
-            style={{ background: 'radial-gradient(120% 90% at 50% 30%, #34363B 0%, #232427 45%, #141517 100%)', opacity: caption.backdrop === 'charcoal' ? 1 : 0 }}
-          />
+        <section aria-label="City simulation" className="relative overflow-hidden rounded-[28px] xl:col-span-12" style={{ boxShadow: '0 30px 60px -36px rgba(70,58,20,0.38)' }}>
+          <SceneBackdrop mood={caption.mood} />
+          <FleetHandoff interlude={tl.interlude} peakSyncMw={peakSync} peakStagMw={peakStag} chargers={N_CHARGERS} onSkip={tl.skipInterlude} />
           <span
             className={`absolute top-5 left-5 z-10 rounded-full px-3 py-1.5 text-xs font-semibold ${
               tl.mode === 'without' ? 'bg-[var(--color-bad)] text-white' : 'bg-[var(--color-accent)] text-[var(--color-ink)]'
@@ -223,22 +215,89 @@ export default function GridView({ onOpenStation }: GridViewProps) {
           >
             {tl.mode === 'without' ? 'Without RVBL-2' : 'With RVBL-2'}
           </span>
-          <div className="relative h-[400px] sm:h-[520px] xl:h-[620px]" aria-hidden="true">
-            <CityScene phase={tl.phase} wave={tl.wave} icon={caption.icon} attempt={tl.attempt} rebootFailed={tl.rebootFailed} stepMw={stepMw} />
+          <div className="relative h-[480px] sm:h-[620px] xl:h-[720px]">
+            <div className="absolute inset-0" aria-hidden="true">
+              <CityScene phase={tl.phase} wave={tl.wave} icon={caption.icon} attempt={tl.attempt} rebootFailed={tl.rebootFailed} stepMw={stepMw} mood={caption.mood} />
+            </div>
+            {/* Caption floats in the empty corner below the plinth, so the town gets the full scene height. */}
+            <div className="pointer-events-none absolute bottom-0 left-0 z-10 max-w-[min(36rem,92%)] px-6 pb-5" aria-live="polite">
+              {/* Keyed so each new caption fades in rather than swapping in place. */}
+              <p key={caption.title} className={`fade-rise font-display text-2xl font-semibold transition-colors duration-700 md:text-3xl ${MOOD_TEXT[caption.mood].title}`}>
+                {caption.title}
+              </p>
+              <p key={`sub:${caption.sub}`} className={`fade-rise mt-1.5 min-h-5 text-sm transition-colors duration-700 ${MOOD_TEXT[caption.mood].sub}`}>
+                {caption.sub}
+              </p>
+            </div>
           </div>
-          <div className="relative px-6 pb-6" aria-live="polite">
-            {/* Keyed so each new caption fades in rather than swapping in place. */}
-            <p key={caption.title} className="fade-rise font-display text-2xl font-semibold text-white md:text-3xl">
-              {caption.title}
-            </p>
-            <p key={`sub:${caption.sub}`} className="fade-rise mt-1.5 min-h-5 text-sm text-white/65">
-              {caption.sub}
-            </p>
+
+          {/* Player bar: which fleet, and where in the event */}
+          <div className="relative z-10 bg-[#1E1F22]/92 px-6 pt-5 pb-5 backdrop-blur-sm">
+            <div className="flex flex-col gap-3">
+              <TimelineTrack
+                chapters={phases.map((p) => ({ key: p.phase, label: p.label, weight: p.ms, color: PHASE_COLOR[p.phase] }))}
+                current={tl.phaseIndex}
+                fill={fill}
+                onPick={(c) => jumpTo(c)}
+                hoverLabel={(c) => `${phases[c].label} · ${pillText(phases[c].phase, c === tl.phaseIndex, phases[c].ms)}`}
+                ariaLabel="Grid event phase"
+                ariaValueNow={tl.phaseIndex + 1}
+                ariaValueMax={phases.length}
+                ariaValueText={`${phases[tl.phaseIndex].label}, phase ${tl.phaseIndex + 1} of ${phases.length}`}
+              />
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <PlayerButton label={tl.playing ? 'Pause' : 'Play'} onClick={toggle} primary>
+                  {tl.playing ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
+                </PlayerButton>
+                <PlayerButton label="Previous phase" onClick={() => jumpTo(Math.max(0, tl.phaseIndex - 1))} disabled={tl.phaseIndex === 0}>
+                  <SkipBack size={16} />
+                </PlayerButton>
+                <PlayerButton label="Next phase" onClick={() => jumpTo(Math.min(lastPhase, tl.phaseIndex + 1))} disabled={tl.phaseIndex === lastPhase}>
+                  <SkipForward size={16} />
+                </PlayerButton>
+                <PlayerButton label="Restart" onClick={() => jumpTo(0)}>
+                  <RotateCcw size={16} />
+                </PlayerButton>
+
+                <span className="ml-2 font-mono text-sm text-white tabular">
+                  {String(tl.phaseIndex + 1).padStart(2, '0')}
+                  <span className="text-white/45"> / {String(phases.length).padStart(2, '0')}</span>
+                </span>
+                <span className="truncate font-mono text-xs text-white/55">{pillText(tl.phase, true, currentMs)}</span>
+
+                <div className="ml-auto flex items-center gap-3">
+                  <span className="hidden text-xs text-white/45 md:inline">Space · ← →</span>
+                  <div role="radiogroup" aria-label="Restart strategy" className="flex rounded-full bg-white/10 p-1">
+                    {MODES.map((m) => {
+                      const on = tl.mode === m.mode;
+                      return (
+                        <button
+                          key={m.mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => pickMode(m.mode)}
+                          className={`min-h-9 cursor-pointer rounded-full px-4 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+                            on
+                              ? m.mode === 'without'
+                                ? 'bg-[var(--color-bad)] text-white'
+                                : 'bg-[var(--color-accent)] text-[var(--color-ink)]'
+                              : 'text-white/70 hover:text-white'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
         <div className="xl:col-span-7">
-          <ComparisonCard mode={tl.mode} sync={sync} stag={stag} highlightFrame={highlightFrame} onPick={tl.pickMode} />
+          <ComparisonCard mode={tl.mode} sync={sync} stag={stag} highlightFrame={highlightFrame} onPick={pickMode} />
         </div>
 
         <section aria-labelledby="why-label" className="rounded-[28px] bg-[var(--color-dark)] p-6 text-white md:p-8 xl:col-span-5">

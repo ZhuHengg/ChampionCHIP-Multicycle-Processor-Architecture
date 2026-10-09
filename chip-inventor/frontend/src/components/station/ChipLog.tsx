@@ -76,20 +76,18 @@ export default function ChipLog({ steps, scenarioId, index, playing, onJump }: C
                 }`}
               >
                 <span className="flex items-baseline gap-2">
-                  <span className="shrink-0 text-white/35">[{String(i + 1).padStart(2, '0')}]</span>
-                  <span className="w-12 shrink-0" style={{ color: node }}>
-                    {tagOf(step)}
-                  </span>
-                  <span className={`min-w-0 ${current ? 'font-semibold text-white' : 'text-white/70'}`}>{step.title}</span>
+                  <span className="text-white/35">[{String(i + 1).padStart(2, '0')}]</span>
+                  <span style={{ color: node }}>{tagOf(step)}</span>
                 </span>
-                <span className={`block truncate pl-[5.5rem] ${current ? 'text-white/55' : 'text-white/30'}`}>{step.detail}</span>
+                <span className={`block ${current ? 'font-semibold text-white' : 'text-white/70'}`}>{step.title}</span>
+                <span className={`block truncate ${current ? 'text-white/55' : 'text-white/30'}`}>{step.detail}</span>
                 {current && step.verdict && (
-                  <span className="block pl-[5.5rem]" style={{ color: TONE_COLOR[step.verdict.tone] }}>
+                  <span className="block" style={{ color: TONE_COLOR[step.verdict.tone] }}>
                     {bad ? '✗' : '✓'} {step.verdict.text}
                   </span>
                 )}
                 {current && changed && (
-                  <span className="block pl-[5.5rem]">
+                  <span className="block">
                     <span style={{ color: ON_DARK[step.stateBefore] }}>{STATE_LABEL[step.stateBefore]}</span>
                     <span className="text-white/40"> → </span>
                     <span style={{ color: ON_DARK[step.stateAfter] }}>{STATE_LABEL[step.stateAfter]}</span>

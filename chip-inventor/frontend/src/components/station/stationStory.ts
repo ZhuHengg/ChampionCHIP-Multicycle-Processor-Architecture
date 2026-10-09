@@ -65,7 +65,7 @@ export const SCENARIO_META: Record<string, ScenarioMeta> = {
   S9: { name: 'Invalid pilot code', group: 'Safety', proves: 'A garbage pilot code latches a fault with the CP-error flag.' },
 };
 
-const CP_NAME: Record<number, string> = {
+export const CP_NAME: Record<number, string> = {
   0: 'A · no vehicle',
   1: 'B · vehicle connected',
   2: 'C · vehicle requests charge',

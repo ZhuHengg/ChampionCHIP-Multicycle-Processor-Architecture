@@ -102,6 +102,56 @@ body {
   animation: caret-blink 1s steps(1) infinite;
 }
 
+/* TimelineTrack: current chapter filling on a clock. */
+@keyframes chapter-fill {
+  from {
+    width: var(--from);
+  }
+  to {
+    width: var(--to);
+  }
+}
+
+.chapter-fill {
+  animation-name: chapter-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+/* Fleet handoff: badge pops in with a little overshoot; the bar counts down. */
+@keyframes handoff-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.handoff-pop {
+  animation: handoff-pop 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes handoff-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.handoff-progress {
+  transform-origin: left;
+  animation: handoff-progress linear both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

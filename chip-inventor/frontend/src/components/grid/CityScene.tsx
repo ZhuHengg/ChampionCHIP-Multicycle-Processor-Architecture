@@ -17,6 +17,8 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { Line2 } from 'three-stdlib';
 import StatusIcon3D from '../station/StatusIcon3D';
+import CitySky from './CitySky';
+import type { Mood } from '../SceneBackdrop';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import type { IconKind } from '../station/stationStory';
 import type { Phase } from './GridTimeline';
@@ -51,6 +53,8 @@ export interface CitySceneProps {
   rebootFailed: boolean;
   /** MW reconnecting on the current frame, for the substation readout. */
   stepMw: number;
+  /** Backdrop mood, so the sky (sun, clouds, stars) matches the card. */
+  mood: Mood;
 }
 
 const PLINTH = '#6A6F77';
@@ -780,7 +784,7 @@ function CameraRig({ shot, follow, reducedMotion }: { shot: ReturnType<typeof sh
   const zoomMul = useRef(1);
   const goal = useMemo(() => new THREE.Vector3(), []);
   // Fit the whole plinth (plus building height) in overview.
-  const baseZoom = Math.min(size.width / 31, size.height / 19.5);
+  const baseZoom = Math.min(size.width / 28, size.height / 18.5);
 
   useEffect(() => {
     camera.position.copy(target.current).add(CAM_OFFSET);
@@ -791,10 +795,10 @@ function CameraRig({ shot, follow, reducedMotion }: { shot: ReturnType<typeof sh
     let mul = 1;
     if (shot.kind === 'substation') {
       goal.set(SUBSTATION[0] + 1.2, 0.6, SUBSTATION[1] + 0.6);
-      mul = 1.9;
+      mul = 1.6;
     } else if (shot.kind === 'district') {
       goal.set(...DISTRICTS[shot.index].focus);
-      mul = 2.1;
+      mul = 1.75;
     } else goal.set(...OVERVIEW);
     // Small screens see the whole town more often; close-ups go less deep.
     if (size.width < 640) mul = 1 + (mul - 1) * 0.6;
@@ -1045,7 +1049,7 @@ interface SceneProps extends CitySceneProps {
   overlay: RefObject<(HTMLDivElement | null)[]>;
 }
 
-function Scene({ phase, icon, attempt, rebootFailed, posts, model, overlay }: SceneProps) {
+function Scene({ phase, icon, attempt, rebootFailed, mood, posts, model, overlay }: SceneProps) {
   const reducedMotion = usePrefersReducedMotion();
   const geo = useSharedGeometry();
   const roof = useRoofGeometry();
@@ -1108,6 +1112,7 @@ function Scene({ phase, icon, attempt, rebootFailed, posts, model, overlay }: Sc
         <Lightformer form="rect" intensity={1} position={[-8, 4, 0]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
       </Environment>
 
+      <CitySky mood={mood} reducedMotion={reducedMotion} />
       <Ground />
       {BUILDINGS.map((b, i) => (
         <BuildingBlock key={i} b={b} env={env} />
