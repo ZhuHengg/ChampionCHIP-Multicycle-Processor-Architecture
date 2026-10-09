@@ -1,7 +1,7 @@
 // Station page. One focal point at a time:
 //   headline (what this scenario proves) + three live numbers
-//   -> state journey (the whole scenario in one row of pills)
-//   -> the charging bay, the chip's decisions, playback
+//   -> the charging bay with its playback timeline (one chapter per state),
+//      the chip's decisions as a terminal log
 //   -> meter readings and the scenario library
 //   -> evidence, closed until asked for.
 // All values come from the scenario step snapshots (data/scenarios.ts); this
@@ -13,9 +13,8 @@ import { Radio, Timer, X, Zap } from 'lucide-react';
 import ChargingScene from './ChargingScene';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
 import ScenarioPicker from './ScenarioPicker';
-import StepTimeline from './StepTimeline';
-import StateJourney from './StateJourney';
-import PlaybackCard from './PlaybackCard';
+import ChipLog from './ChipLog';
+import PlaybackBar from './PlaybackBar';
 import ReadingsCard from './ReadingsCard';
 import StateIndicator from './StateIndicator';
 import MeterChart from './MeterChart';
@@ -31,6 +30,7 @@ import { crc16 } from '../../data/crc';
 import { buildPlayback, flagNames, GROUP_ORDER, SCENARIO_META, STATE_LABEL, statusFor, TONE_COLOR } from './stationStory';
 
 const STEP_MS = 1900;
+const EDGE_FADE = 'linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%)';
 
 const PINS = [
   { bit: 4, name: 'P4', label: 'Contactor', color: '#3CCF5A' },
@@ -216,17 +216,11 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         </div>
       </header>
 
-      <section aria-label="Charger states over the scenario" className="-mx-1 overflow-x-auto px-1 pt-1 pb-2">
-        <div className="min-w-[520px]">
-          <StateJourney steps={steps} index={index} onJump={jump} />
-        </div>
-      </section>
-
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-12">
         {/* The bay */}
         <section
           aria-label="Charging bay"
-          className="relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-6"
+          className="relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-9"
           style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}
         >
           {/* Backdrops cross-fade between navy (calm) and charcoal (active/alert). */}
@@ -239,7 +233,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
             style={{ background: 'radial-gradient(120% 90% at 50% 30%, #34363B 0%, #232427 45%, #141517 100%)', opacity: status.backdrop === 'charcoal' ? 1 : 0 }}
           />
 
-          <div className="relative flex items-center justify-between gap-3 px-6 pt-5">
+          <div className="relative z-10 flex items-center justify-between gap-3 px-6 pt-5">
             <span className="flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} aria-hidden="true" />
               {STATE_LABEL[step.stateAfter]}
@@ -264,7 +258,14 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
             </span>
           </div>
 
-          <div className="relative h-[300px] sm:h-[360px]" aria-hidden="true">
+          {/* Runs up behind the pill row and fades out top and bottom, so the
+              road and the car on it dissolve into the backdrop instead of
+              being cut by the canvas edge. */}
+          <div
+            className="relative -mt-14 h-[356px] sm:h-[416px]"
+            style={{ maskImage: EDGE_FADE, WebkitMaskImage: EDGE_FADE }}
+            aria-hidden="true"
+          >
             <ChargingScene
               icon={status.icon}
               accent={accent}
@@ -283,41 +284,42 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
               {status.sub}
             </p>
           </div>
+
+          <div className="relative border-t border-white/10 px-6 pt-5 pb-5">
+            <PlaybackBar
+              steps={steps}
+              index={index}
+              playing={isPlaying}
+              speed={speed}
+              onToggle={togglePlay}
+              onJump={jump}
+              onSpeed={setSpeed}
+              nextScenario={{ id: next.id, name: SCENARIO_META[next.id]?.name ?? next.title, go: () => selectScenario(next.id) }}
+            />
+          </div>
         </section>
 
-        {/* Playback */}
-        <div className="xl:col-span-3">
-          <PlaybackCard
-            index={index}
-            total={steps.length}
-            playing={isPlaying}
-            speed={speed}
-            onToggle={togglePlay}
-            onStep={(d) => jump(Math.max(0, Math.min(last, index + d)))}
-            onRestart={() => jump(0)}
-            onSpeed={setSpeed}
-            nextScenario={{ id: next.id, name: SCENARIO_META[next.id]?.name ?? next.title, go: () => selectScenario(next.id) }}
-          />
-        </div>
 
-        {/* What the chip decided: the one dark card */}
+        {/* What the chip decided: the one dark card, as a terminal log */}
         <section
           aria-labelledby="decided-label"
           className="flex h-[560px] flex-col overflow-hidden rounded-[28px] bg-[var(--color-dark)] text-white xl:col-span-3 xl:row-span-2 xl:h-auto"
         >
-          <div className="flex items-end justify-between gap-3 px-6 pt-6 pb-4">
-            <h2 id="decided-label" className="font-display text-xl leading-snug font-medium">
-              What the chip
-              <br />
-              decided
+          <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+            <span className="flex gap-1.5" aria-hidden="true">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#FF6B6F]/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#F2C230]/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#3CCF5A]/80" />
+            </span>
+            <h2 id="decided-label" className="font-mono text-xs text-white/70">
+              what the chip decided
             </h2>
-            <span className="tabular font-display text-5xl leading-none font-light">
-              {index + 1}
-              <span className="text-2xl text-white/45">/{steps.length}</span>
+            <span className="tabular ml-auto font-mono text-xs text-white/45">
+              {String(index + 1).padStart(2, '0')}/{String(steps.length).padStart(2, '0')}
             </span>
           </div>
-          <div className="relative min-h-0 flex-1">
-            <StepTimeline steps={steps} index={index} onJump={jump} />
+          <div className="relative min-h-0 flex-1 pt-4">
+            <ChipLog steps={steps} scenarioId={scenario.id} index={index} playing={isPlaying} onJump={jump} />
           </div>
         </section>
 

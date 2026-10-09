@@ -40,10 +40,11 @@ const RUBBER = '#1C1E21';
 const GLASS = '#121417';
 
 const CAR_HOME = -0.55;
-const CAR_START = -7.8;
-const CAR_END = 7.2;
-const ARRIVE_S = 1.3;
-const LEAVE_S = 1.1;
+// The car drives in and out along a road that runs off both ends of the view.
+const CAR_START = -10;
+const CAR_END = 10;
+const ARRIVE_S = 1.7;
+const LEAVE_S = 1.4;
 const PLUG_S = 0.55;
 const FLOW_S = 0.35;
 
@@ -191,7 +192,7 @@ function FitCamera() {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as THREE.OrthographicCamera;
-    cam.zoom = Math.min(size.width / 7.4, size.height / 5.4);
+    cam.zoom = Math.min(size.width / 7.4, size.height / 6.2);
     cam.lookAt(0, 0.9, 0);
     cam.updateProjectionMatrix();
   }, [camera, size]);
@@ -211,6 +212,54 @@ function Plinth() {
           <meshBasicMaterial color="#7C8188" transparent opacity={0.55} />
         </mesh>
       ))}
+    </group>
+  );
+}
+
+// Road the car drives along (world x), level with the plinth top, joining
+// the plinth on both sides and running far past the edges of the view.
+const ROAD_Z = 0.6;
+const ROAD_W = 2.1;
+const ROAD_FAR = 24;
+const ROAD_NEAR = 2.95;
+const ASPHALT = '#3E4248';
+const DASH_LEN = 0.55;
+const DASH_GAP = 0.65;
+
+function Road() {
+  const len = ROAD_FAR - ROAD_NEAR;
+  const dashes = useMemo(() => {
+    const xs: number[] = [];
+    for (let x = ROAD_NEAR + 0.6; x < ROAD_FAR; x += DASH_LEN + DASH_GAP) xs.push(x + DASH_LEN / 2);
+    return xs;
+  }, []);
+  return (
+    <group>
+      {[-1, 1].map((side) => {
+        const cx = side * (ROAD_NEAR + len / 2);
+        return (
+          <group key={side}>
+            <mesh position={[cx, -0.15, ROAD_Z]} receiveShadow>
+              <boxGeometry args={[len, 0.3, ROAD_W]} />
+              <Clay color={ASPHALT} roughness={0.85} />
+            </mesh>
+            {/* Curbs */}
+            {[-1, 1].map((edge) => (
+              <mesh key={edge} position={[cx, 0.025, ROAD_Z + edge * (ROAD_W / 2 + 0.06)]} receiveShadow>
+                <boxGeometry args={[len, 0.1, 0.12]} />
+                <Clay color={CLAY_LIGHT} />
+              </mesh>
+            ))}
+            {/* Dashed centre line */}
+            {dashes.map((x) => (
+              <mesh key={x} position={[side * x, 0.003, ROAD_Z]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[DASH_LEN, 0.07]} />
+                <meshBasicMaterial color="#E8E3D6" transparent opacity={0.7} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -372,8 +421,9 @@ function Car({ motion }: { motion: MotionRef }) {
     }
     if (body.current) body.current.rotation.z = THREE.MathUtils.clamp(k.a * 0.0016, -0.05, 0.05);
 
-    // Fade in and out at the plinth edge so the car never pops.
-    const opacity = 1 - THREE.MathUtils.smoothstep(Math.abs(x), 2.6, 5.4);
+    // Fade only far down the road, near the edge of the view, so the car
+    // never pops in or out.
+    const opacity = 1 - THREE.MathUtils.smoothstep(Math.abs(x), 7.5, 9.6);
     g.visible = opacity > 0.01;
     parts.current.materials.forEach((m) => {
       const transparent = opacity < 0.999;
@@ -576,6 +626,7 @@ function Scene({ icon, accent, carPresent, charging, pins }: ChargingSceneProps)
       <FitCamera />
       <Lights />
       <Director motion={motion} carPresent={carPresent} charging={charging} reducedMotion={reducedMotion} />
+      <Road />
       <Plinth />
       <ContactShadows position={[0, 0.005, 0]} scale={7} blur={2.2} far={3} opacity={0.55} resolution={512} frames={reducedMotion ? 1 : Infinity} />
       <ContactShadows position={[0, -0.43, 0]} scale={9} blur={3} far={2} opacity={0.6} resolution={256} frames={1} />

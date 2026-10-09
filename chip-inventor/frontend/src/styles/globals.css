@@ -92,6 +92,16 @@ body {
   animation: fade-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.caret-blink {
+  animation: caret-blink 1s steps(1) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
