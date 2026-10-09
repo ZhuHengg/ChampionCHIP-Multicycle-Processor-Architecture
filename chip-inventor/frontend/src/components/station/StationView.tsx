@@ -275,8 +275,13 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
           </div>
 
           <div className="relative px-6 pb-6" aria-live="polite">
-            <p className="font-display text-2xl font-semibold text-white md:text-3xl">{status.caption}</p>
-            <p className="mt-1.5 min-h-5 text-sm text-white/65">{status.sub}</p>
+            {/* Keyed so each new caption fades in rather than swapping in place. */}
+            <p key={status.caption} className="fade-rise font-display text-2xl font-semibold text-white md:text-3xl">
+              {status.caption}
+            </p>
+            <p key={`sub:${status.sub}`} className="fade-rise mt-1.5 min-h-5 text-sm text-white/65">
+              {status.sub}
+            </p>
           </div>
         </section>
 

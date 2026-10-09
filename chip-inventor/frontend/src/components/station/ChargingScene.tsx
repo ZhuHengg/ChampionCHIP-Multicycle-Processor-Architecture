@@ -6,10 +6,17 @@
 // Lighting comes from an Environment built of local Lightformers rather than
 // a drei preset, because presets download an HDR file at runtime -- a blank
 // scene on an offline demo laptop.
+//
+// Nothing in the bay snaps between states. A Director eases a shared Motion
+// record each frame and every part reads from it, so a session plays as one
+// sequence: the car drives in and brakes, the cable reaches out to the port,
+// power pulses fade up; on unplug the order runs in reverse and the car
+// drives off. Colours, lamps and the status icon cross-fade the same way.
+// Reduced motion snaps every value straight to its target.
 
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
-import type { JSX } from 'react';
+import type { JSX, MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, Lightformer, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
@@ -31,6 +38,149 @@ const CLAY_MID = '#8A8F96';
 const CLAY_DARK = '#55595F';
 const RUBBER = '#1C1E21';
 const GLASS = '#121417';
+
+const CAR_HOME = -0.55;
+const CAR_START = -7.8;
+const CAR_END = 7.2;
+const ARRIVE_S = 1.3;
+const LEAVE_S = 1.1;
+const PLUG_S = 0.55;
+const FLOW_S = 0.35;
+
+type CarMode = 'away' | 'arriving' | 'parked' | 'leaving';
+
+/** Eased animation state shared by every part of the bay. */
+interface Motion {
+  mode: CarMode;
+  /** Progress through the current arriving/leaving drive, 0..1. */
+  p: number;
+  /** Car x position, world units. */
+  x: number;
+  /** Cable reach, 0 = coiled on the holster, 1 = plugged into the car. */
+  cable: number;
+  /** Power-pulse strength along the cable, 0..1. */
+  flow: number;
+}
+
+type MotionRef = MutableRefObject<Motion>;
+
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+const easeInCubic = (t: number) => t ** 3;
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+
+function approach(v: number, target: number, step: number) {
+  return v < target ? Math.min(v + step, target) : Math.max(v - step, target);
+}
+
+function restingMotion(carPresent: boolean, charging: boolean): Motion {
+  return {
+    mode: carPresent ? 'parked' : 'away',
+    p: 0,
+    x: carPresent ? CAR_HOME : CAR_START,
+    cable: carPresent ? 1 : 0,
+    flow: carPresent && charging ? 1 : 0,
+  };
+}
+
+/**
+ * Advances the bay choreography. Arrival: drive in, then plug, then flow.
+ * Departure: flow fades, cable retracts, then the car drives off. A target
+ * that flips mid-drive reverses the drive in place instead of jumping.
+ */
+function Director({ motion, carPresent, charging, reducedMotion }: { motion: MotionRef; carPresent: boolean; charging: boolean; reducedMotion: boolean }) {
+  useFrame((_, rawDelta) => {
+    if (reducedMotion) {
+      motion.current = restingMotion(carPresent, charging);
+      return;
+    }
+    // Clamp so a backgrounded tab does not skip the whole sequence.
+    const dt = Math.min(rawDelta, 0.05);
+    const m = motion.current;
+    switch (m.mode) {
+      case 'away':
+        if (carPresent) {
+          m.mode = 'arriving';
+          m.p = 0;
+        }
+        break;
+      case 'arriving':
+        m.p += ((carPresent ? 1 : -1) * dt) / ARRIVE_S;
+        if (m.p >= 1) {
+          m.p = 0;
+          m.mode = 'parked';
+        } else if (m.p <= 0) {
+          m.p = 0;
+          m.mode = 'away';
+        }
+        break;
+      case 'parked':
+        if (!carPresent && m.cable <= 0) {
+          m.mode = 'leaving';
+          m.p = 0;
+        }
+        break;
+      case 'leaving':
+        m.p += ((carPresent ? -1 : 1) * dt) / LEAVE_S;
+        if (m.p >= 1) {
+          m.p = 0;
+          m.mode = 'away';
+        } else if (m.p <= 0) {
+          m.p = 0;
+          m.mode = 'parked';
+        }
+        break;
+    }
+    if (m.mode === 'arriving') m.x = THREE.MathUtils.lerp(CAR_START, CAR_HOME, easeOutCubic(m.p));
+    else if (m.mode === 'leaving') m.x = THREE.MathUtils.lerp(CAR_HOME, CAR_END, easeInCubic(m.p));
+    else m.x = m.mode === 'parked' ? CAR_HOME : CAR_START;
+
+    // Plug only once parked; unplug only after the power flow has faded.
+    const plugged = carPresent && m.mode === 'parked';
+    const cableTarget = plugged ? 1 : m.flow > 0 ? m.cable : 0;
+    m.cable = approach(m.cable, cableTarget, dt / PLUG_S);
+    m.flow = approach(m.flow, charging && plugged && m.cable >= 1 ? 1 : 0, dt / FLOW_S);
+  });
+  return null;
+}
+
+/** Material whose colour eases toward `color` instead of jumping to it. */
+function FadingMaterial({
+  color,
+  emissiveIntensity,
+  base,
+  roughness = 0.4,
+  reducedMotion,
+}: {
+  color: string;
+  emissiveIntensity: number;
+  /** Fixed base colour; when omitted the base follows `color` too. */
+  base?: string;
+  roughness?: number;
+  reducedMotion: boolean;
+}) {
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+  const target = useRef(new THREE.Color());
+  // Initial values only: later changes go through the lerp, not the props.
+  const [initial] = useState(color);
+  useFrame((_, delta) => {
+    const m = mat.current;
+    if (!m) return;
+    const t = target.current.set(color);
+    const k = reducedMotion ? 1 : 1 - Math.exp(-5 * delta);
+    m.emissive.lerp(t, k);
+    if (!base) m.color.lerp(t, k);
+  });
+  return (
+    <meshStandardMaterial
+      ref={mat}
+      color={base ?? initial}
+      emissive={initial}
+      emissiveIntensity={emissiveIntensity}
+      roughness={roughness}
+      toneMapped={base !== undefined}
+    />
+  );
+}
 
 function Clay({ color, roughness = 0.62 }: { color: string; roughness?: number }) {
   return <meshStandardMaterial color={color} roughness={roughness} metalness={0} />;
@@ -72,7 +222,39 @@ const PIN_LAMPS = [
   { bit: 7, color: '#FF5A5F' },
 ];
 
-function Charger({ accent, pins, holsterCable }: { accent: string; pins: number; holsterCable: boolean }) {
+/** One DATAOUT pin lamp; brightness and colour ease between off and on. */
+function PinLamp({ on, color, position, reducedMotion }: { on: boolean; color: string; position: [number, number, number]; reducedMotion: boolean }) {
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+  const level = useRef(on ? 1 : 0);
+  const offColor = useMemo(() => new THREE.Color('#2A2D33'), []);
+  const onColor = useMemo(() => new THREE.Color(color), [color]);
+  // Initial values only, so a re-render never snaps what the frame loop eases.
+  const [initialOn] = useState(on);
+  useFrame((_, delta) => {
+    const m = mat.current;
+    if (!m) return;
+    level.current = reducedMotion ? (on ? 1 : 0) : THREE.MathUtils.damp(level.current, on ? 1 : 0, 9, delta);
+    m.color.lerpColors(offColor, onColor, level.current);
+    m.emissiveIntensity = 2.2 * level.current;
+  });
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.035, 16, 16]} />
+      <meshStandardMaterial ref={mat} color={initialOn ? color : '#2A2D33'} emissive={color} emissiveIntensity={initialOn ? 2.2 : 0} toneMapped={false} />
+    </mesh>
+  );
+}
+
+function Charger({ accent, pins, motion, reducedMotion }: { accent: string; pins: number; motion: MotionRef; reducedMotion: boolean }) {
+  const coil = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    // The coiled cable on the holster shrinks away as the cable reaches out.
+    const c = coil.current;
+    if (!c) return;
+    const k = 1 - easeInOut(Math.min(motion.current.cable * 1.6, 1));
+    c.scale.setScalar(Math.max(k, 0.001));
+    c.visible = k > 0.01;
+  });
   return (
     <group position={[1.55, 0, -1.25]}>
       <RoundedBox args={[1.25, 0.14, 0.95]} radius={0.05} smoothness={4} position={[0, 0.07, 0]} castShadow receiveShadow>
@@ -92,37 +274,30 @@ function Charger({ accent, pins, holsterCable }: { accent: string; pins: number;
       {/* Status light bar under the cap */}
       <mesh position={[0, 2.22, 0.315]}>
         <boxGeometry args={[0.46, 0.05, 0.02]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.6} toneMapped={false} />
+        <FadingMaterial color={accent} emissiveIntensity={1.6} reducedMotion={reducedMotion} />
       </mesh>
       {/* Screen */}
       <RoundedBox args={[0.5, 0.34, 0.03]} radius={0.02} smoothness={3} position={[0, 1.72, 0.35]}>
-        <meshStandardMaterial color="#0C1018" emissive={accent} emissiveIntensity={0.35} roughness={0.2} />
+        <FadingMaterial color={accent} base="#0C1018" emissiveIntensity={0.35} roughness={0.2} reducedMotion={reducedMotion} />
       </RoundedBox>
       {/* P4-P7 output lamps */}
-      {PIN_LAMPS.map((l, i) => {
-        const on = (pins & (1 << l.bit)) !== 0;
-        return (
-          <mesh key={l.bit} position={[-0.18 + i * 0.12, 1.4, 0.35]}>
-            <sphereGeometry args={[0.035, 16, 16]} />
-            <meshStandardMaterial
-              color={on ? l.color : '#2A2D33'}
-              emissive={l.color}
-              emissiveIntensity={on ? 2.2 : 0}
-              toneMapped={!on}
-            />
-          </mesh>
-        );
-      })}
+      {PIN_LAMPS.map((l, i) => (
+        <PinLamp
+          key={l.bit}
+          on={(pins & (1 << l.bit)) !== 0}
+          color={l.color}
+          position={[-0.18 + i * 0.12, 1.4, 0.35]}
+          reducedMotion={reducedMotion}
+        />
+      ))}
       {/* Holster */}
       <RoundedBox args={[0.22, 0.34, 0.14]} radius={0.05} smoothness={4} position={[0.22, 0.98, 0.36]} castShadow>
         <Clay color={CLAY_DARK} />
       </RoundedBox>
-      {holsterCable && (
-        <mesh position={[0.22, 0.62, 0.42]} castShadow>
-          <torusGeometry args={[0.2, 0.035, 12, 32, Math.PI * 1.6]} />
-          <Clay color={RUBBER} roughness={0.5} />
-        </mesh>
-      )}
+      <mesh ref={coil} position={[0.22, 0.62, 0.42]} castShadow>
+        <torusGeometry args={[0.2, 0.035, 12, 32, Math.PI * 1.6]} />
+        <Clay color={RUBBER} roughness={0.5} />
+      </mesh>
     </group>
   );
 }
@@ -131,6 +306,8 @@ function Wheel({ position }: { position: [number, number, number] }) {
   const outward = position[2] > 0 ? 1 : -1;
   return (
     <group position={position}>
+      {/* Spun by Car as it rolls; the name is how Car finds it. */}
+      <group name="wheel-spin">
       <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
         <cylinderGeometry args={[0.33, 0.33, 0.26, 40]} />
         <Clay color={RUBBER} roughness={0.85} />
@@ -145,28 +322,75 @@ function Wheel({ position }: { position: [number, number, number] }) {
           <Clay color="#5E636A" />
         </mesh>
       ))}
+      </group>
     </group>
   );
 }
 
-function Car({ present, reducedMotion }: { present: boolean; reducedMotion: boolean }) {
+const WHEEL_R = 0.33;
+
+function Car({ motion }: { motion: MotionRef }) {
   const group = useRef<THREE.Group>(null);
-  const home = -0.55;
-  const away = -6.5;
+  const body = useRef<THREE.Group>(null);
+  const parts = useRef<{ wheels: THREE.Object3D[]; materials: THREE.Material[] }>({ wheels: [], materials: [] });
+  const kin = useRef({ x: motion.current.x, v: 0, a: 0 });
+
+  useEffect(() => {
+    const g = group.current;
+    if (!g) return;
+    const wheels: THREE.Object3D[] = [];
+    const materials = new Set<THREE.Material>();
+    g.traverse((o) => {
+      if (o.name === 'wheel-spin') wheels.push(o);
+      const mat = (o as THREE.Mesh).material;
+      if (mat) (Array.isArray(mat) ? mat : [mat]).forEach((m) => materials.add(m));
+    });
+    parts.current = { wheels, materials: [...materials] };
+  }, []);
 
   useFrame((_, delta) => {
     const g = group.current;
     if (!g) return;
-    const target = present ? home : away;
-    g.position.x = reducedMotion ? target : THREE.MathUtils.damp(g.position.x, target, 3.2, delta);
-    g.visible = g.position.x > -4.6;
+    const x = motion.current.x;
+    const k = kin.current;
+    let dx = x - k.x;
+    k.x = x;
+    // A jump of metres in one frame is the off-screen reset, not driving.
+    if (Math.abs(dx) > 2) {
+      dx = 0;
+      k.v = 0;
+      k.a = 0;
+    }
+    g.position.x = x;
+    parts.current.wheels.forEach((w) => (w.rotation.z -= dx / WHEEL_R));
+
+    // Suspension: the nose dips under braking and lifts when pulling away.
+    if (delta > 0) {
+      const v = THREE.MathUtils.damp(k.v, dx / delta, 10, delta);
+      k.a = THREE.MathUtils.damp(k.a, (v - k.v) / delta, 6, delta);
+      k.v = v;
+    }
+    if (body.current) body.current.rotation.z = THREE.MathUtils.clamp(k.a * 0.0016, -0.05, 0.05);
+
+    // Fade in and out at the plinth edge so the car never pops.
+    const opacity = 1 - THREE.MathUtils.smoothstep(Math.abs(x), 2.6, 5.4);
+    g.visible = opacity > 0.01;
+    parts.current.materials.forEach((m) => {
+      const transparent = opacity < 0.999;
+      if (m.transparent !== transparent) {
+        m.transparent = transparent;
+        m.needsUpdate = true;
+      }
+      m.opacity = opacity;
+    });
   });
 
-  const { body, glass } = useCarGeometry();
+  const { body: bodyGeo, glass } = useCarGeometry();
 
   return (
-    <group ref={group} position={[present ? home : away, 0, 0.6]}>
-      <mesh geometry={body} castShadow receiveShadow>
+    <group ref={group} position={[motion.current.x, 0, 0.6]}>
+      <group ref={body}>
+      <mesh geometry={bodyGeo} castShadow receiveShadow>
         <Clay color={CLAY_WHITE} roughness={0.42} />
       </mesh>
       <mesh geometry={glass} castShadow>
@@ -194,6 +418,7 @@ function Car({ present, reducedMotion }: { present: boolean; reducedMotion: bool
         <boxGeometry args={[0.22, 0.16, 0.02]} />
         <Clay color={CLAY_LIGHT} />
       </mesh>
+      </group>
       <Wheel position={[0.98, 0.32, 0.6]} />
       <Wheel position={[0.98, 0.32, -0.6]} />
       <Wheel position={[-0.98, 0.32, 0.6]} />
@@ -247,38 +472,70 @@ const CABLE_POINTS = [
   new THREE.Vector3(-1.65, 0.84, -0.2),
 ];
 
-function Cable({ charging, accent, reducedMotion }: { charging: boolean; accent: string; reducedMotion: boolean }) {
+const TUBE_SEGMENTS = 96;
+const TUBE_RADIAL = 12;
+const PULSE_COUNT = 7;
+
+/** Reaches from the holster to the car port as motion.cable goes 0 -> 1. */
+function Cable({ motion, accent, reducedMotion }: { motion: MotionRef; accent: string; reducedMotion: boolean }) {
   const curve = useMemo(() => new THREE.CatmullRomCurve3(CABLE_POINTS), []);
-  const tube = useMemo(() => new THREE.TubeGeometry(curve, 96, 0.045, 12, false), [curve]);
+  const tube = useMemo(() => new THREE.TubeGeometry(curve, TUBE_SEGMENTS, 0.045, TUBE_RADIAL, false), [curve]);
+  const root = useRef<THREE.Group>(null);
+  const plug = useRef<THREE.Group>(null);
   const pulses = useRef<THREE.Group>(null);
-  const count = 7;
+  const tip = useMemo(() => new THREE.Vector3(), []);
+  const tangent = useMemo(() => new THREE.Vector3(), []);
+  const up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
 
   useFrame(({ clock }) => {
+    const { cable, flow } = motion.current;
+    const reach = easeInOut(cable);
+    if (root.current) root.current.visible = reach > 0.005;
+    // TubeGeometry indices run segment by segment, so a draw range grows the
+    // tube along its length. 6 indices per quad, TUBE_RADIAL quads per ring.
+    tube.setDrawRange(0, Math.round(reach * TUBE_SEGMENTS) * TUBE_RADIAL * 6);
+
+    const p = plug.current;
+    if (p) {
+      curve.getPointAt(reach, tip);
+      curve.getTangentAt(reach, tangent);
+      p.position.copy(tip);
+      p.quaternion.setFromUnitVectors(up, tangent);
+    }
+
     const g = pulses.current;
     if (!g) return;
+    g.visible = flow > 0.01;
     const t0 = reducedMotion ? 0 : clock.getElapsedTime() * 0.35;
+    const size = easeInOut(flow);
     g.children.forEach((child, i) => {
       // Power flows charger -> car, i.e. along the curve from t=0 to t=1.
-      const t = (i / count + t0) % 1;
+      const t = (i / PULSE_COUNT + t0) % 1;
       child.position.copy(curve.getPointAt(t));
+      child.scale.setScalar(Math.max(size, 0.001));
     });
   });
 
   return (
-    <group>
+    <group ref={root}>
       <mesh geometry={tube} castShadow>
         <Clay color={RUBBER} roughness={0.45} />
       </mesh>
-      {charging && (
-        <group ref={pulses}>
-          {Array.from({ length: count }, (_, i) => (
-            <mesh key={i}>
-              <sphereGeometry args={[0.065, 16, 16]} />
-              <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={2.4} toneMapped={false} />
-            </mesh>
-          ))}
-        </group>
-      )}
+      {/* Connector head riding the tip of the cable */}
+      <group ref={plug}>
+        <mesh castShadow>
+          <cylinderGeometry args={[0.075, 0.065, 0.2, 24]} />
+          <Clay color={CLAY_DARK} roughness={0.5} />
+        </mesh>
+      </group>
+      <group ref={pulses}>
+        {Array.from({ length: PULSE_COUNT }, (_, i) => (
+          <mesh key={i}>
+            <sphereGeometry args={[0.065, 16, 16]} />
+            <FadingMaterial color={accent} emissiveIntensity={2.4} reducedMotion={reducedMotion} />
+          </mesh>
+        ))}
+      </group>
     </group>
   );
 }
@@ -311,16 +568,20 @@ function Lights() {
 
 function Scene({ icon, accent, carPresent, charging, pins }: ChargingSceneProps) {
   const reducedMotion = usePrefersReducedMotion();
+  // First paint starts from an empty bay, so a session opening with a car
+  // attached still shows it driving in.
+  const motion = useRef<Motion>(restingMotion(false, false));
   return (
     <>
       <FitCamera />
       <Lights />
+      <Director motion={motion} carPresent={carPresent} charging={charging} reducedMotion={reducedMotion} />
       <Plinth />
       <ContactShadows position={[0, 0.005, 0]} scale={7} blur={2.2} far={3} opacity={0.55} resolution={512} frames={reducedMotion ? 1 : Infinity} />
       <ContactShadows position={[0, -0.43, 0]} scale={9} blur={3} far={2} opacity={0.6} resolution={256} frames={1} />
-      <Charger accent={accent} pins={pins} holsterCable={!carPresent} />
-      <Car present={carPresent} reducedMotion={reducedMotion} />
-      {carPresent && <Cable charging={charging} accent={accent} reducedMotion={reducedMotion} />}
+      <Charger accent={accent} pins={pins} motion={motion} reducedMotion={reducedMotion} />
+      <Car motion={motion} />
+      <Cable motion={motion} accent={accent} reducedMotion={reducedMotion} />
       <StatusIcon3D kind={icon} position={[-0.75, 2.75, 0.6]} reducedMotion={reducedMotion} />
     </>
   );

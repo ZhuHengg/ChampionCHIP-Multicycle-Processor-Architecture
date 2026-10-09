@@ -3,7 +3,7 @@
 // sync, pause, alert, power). Built from extruded shapes and rounded bars,
 // so no model files or network fetches are needed.
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
@@ -197,30 +197,54 @@ interface StatusIcon3DProps {
 }
 
 /**
- * Faces the camera (with a slight turn so the extrusion depth reads), pops
- * in when the icon kind changes, and bobs gently unless reduced motion is on.
+ * Faces the camera (with a slight turn so the extrusion depth reads) and
+ * bobs gently unless reduced motion is on. A new kind never swaps in place:
+ * the old glyph shrinks away with a quarter turn, then the new one springs
+ * up with a little overshoot.
  */
 export default function StatusIcon3D({ kind, position, reducedMotion, size = 1 }: StatusIcon3DProps) {
   const group = useRef<THREE.Group>(null);
-  const scale = useRef(0);
-  const lastKind = useRef(kind);
-  const spin = kind === 'sync' && !reducedMotion;
+  const [shown, setShown] = useState(kind);
+  // Scale spring; starts at 0 so the first icon grows in too.
+  const spring = useRef({ s: 0, v: 0 });
+  const swapping = useRef(false);
+  const spin = shown === 'sync' && !reducedMotion;
 
   useFrame(({ camera, clock }, delta) => {
     const g = group.current;
     if (!g) return;
-    if (lastKind.current !== kind) {
-      lastKind.current = kind;
-      scale.current = reducedMotion ? 1 : 0.2;
+    const sp = spring.current;
+    const target = shown === kind ? 1 : 0;
+    if (reducedMotion) {
+      sp.s = 1;
+      sp.v = 0;
+      if (shown !== kind) setShown(kind);
+    } else {
+      const dt = Math.min(delta, 0.05);
+      // Shrink fast and flat; grow with a soft bounce.
+      const [stiff, damping] = target === 0 ? [260, 30] : [140, 11];
+      sp.v += (target - sp.s) * stiff * dt;
+      sp.v *= Math.exp(-damping * dt);
+      sp.s += sp.v * dt;
+      if (target === 0 && sp.s <= 0.02) {
+        sp.s = 0;
+        sp.v = 0;
+        if (!swapping.current) {
+          swapping.current = true;
+          setShown(kind);
+        }
+      }
     }
-    scale.current = THREE.MathUtils.damp(scale.current, 1, reducedMotion ? 100 : 7, delta);
+    if (shown === kind) swapping.current = false;
+    const s = Math.max(sp.s, 0);
     const t = clock.getElapsedTime();
     g.position.set(position[0], position[1] + (reducedMotion ? 0 : Math.sin(t * 1.6) * 0.07), position[2]);
     g.lookAt(camera.position);
-    g.rotateY(-0.38 + (reducedMotion ? 0 : Math.sin(t * 0.7) * 0.08));
+    g.rotateY(-0.38 + (reducedMotion ? 0 : Math.sin(t * 0.7) * 0.08) + (1 - Math.min(s, 1)) * 1.4);
     if (spin) g.rotateZ(-t * 1.2);
-    g.scale.setScalar(scale.current * size);
+    g.visible = s > 0.005;
+    g.scale.setScalar(Math.max(s, 0.001) * size);
   });
 
-  return <group ref={group}>{ICONS[kind]()}</group>;
+  return <group ref={group}>{ICONS[shown]()}</group>;
 }
