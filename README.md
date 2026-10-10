@@ -1,274 +1,221 @@
-# RVBL-2 Multicycle RISC-V Core — Phase 2
-
-ChampionCHIP eXperience submission. A multicycle RISC-V core implementing
-RV32I + Zmmul (multiply) + Xicrc (CRC), targeting Sky130 via OpenLane.
-
-**New here? Read `docs/HANDOFF_control_unit_ALL_STAGES.md`** — self-contained
-handoff covering the control unit spec, all build slices, and the decision
-log. `.claude/CLAUDE.md` has the AI-agent working rules.
-
-⚠ **Repo has three build tracks** — see below. `legacy/` is the original
-hand-written first version (pre chip-inventor); it's what all the paths and
-history in this README describe, but it is no longer the active build.
-`chip-inventor/` is the current complete version under ChipInventor-assisted
-testing. `v2-chip-inventor-synth/` is the chip-inventor synthesis version.
-
----
-
-## Folder structure
-
-```
-rvbl2-core/
-├── legacy/                  First version (superseded) — everything below is inside this folder
-│   ├── rtl/                Hardware description (Verilog) — the chip itself
-│   │   ├── control_unit.v  FSM: decides what happens each cycle
-│   │   ├── top.v           Top-level wiring (not built yet)
-│   │   ├── pkg/            Shared constants — every module includes this
-│   │   ├── datapath/       Combinational compute blocks
-│   │   └── memory/         Stateful storage + memory interface
-│   ├── tb/                 Testbenches — one folder per owner
-│   │   ├── control_unit/
-│   │   ├── datapath/
-│   │   ├── memory/
-│   │   └── system/         Full-core test, firmware validation
-│   ├── firmware/           Validation firmware (official + team test programs)
-│   ├── scripts/            Build/automation helpers
-│   ├── sim/                Compiled .vvp / .vcd scratch (gitignored)
-│   ├── logs/               iverilog/vvp run logs (gitignored)
-│   └── config.json         OpenLane synthesis config (legacy version)
-├── chip-inventor/          Complete version, correct spec, ChipInventor-assisted testing
-├── v2-chip-inventor-synth/ Chip-inventor synthesis version, lighter test/size
-└── docs/                   Specs, build plans, report assets
-    ├── figures/            ChipInventor diagrams for the report
-    └── report/             Report drafts
-```
-
-### What each folder is for
-
-| Folder | Contents |
-|---|---|
-| `legacy/rtl/` | The actual hardware. Everything here becomes silicon. |
-| `legacy/rtl/pkg/` | `rvbl2_defines.vh` — every opcode, op-code value, and encoding, in one place. See the golden rule below. |
-| `legacy/rtl/datapath/` | **Combinational** blocks: values in, value out, no clock, no state. ALU, multiplier, CRC, branch comparator, immediate extender. Each takes a select line from the control unit and does one transform. |
-| `legacy/rtl/memory/` | **Stateful** blocks: register file, LSU, address decoder, IMEM, DMEM. These hold data and need a clock. |
-| `legacy/tb/` | Testbenches. Simulation only — never synthesized, never becomes hardware. |
-| `docs/` | Specs and build plans. `docs/report/` and `docs/figures/` hold submission assets. |
-| `legacy/firmware/` | Programs the core executes. The official validation firmware lands here when released. |
-| `chip-inventor/` | `config.json` plus synthesis runs for the current complete version. Produces the GDSII and gate-level netlist for submission. |
-| `legacy/sim/` | Build scratch. Gitignored — nothing here is worth keeping. |
-| `legacy/logs/` | iverilog/vvp stdout captures per test run. Gitignored — regenerate by re-running the suite. |
-
-**Control unit vs datapath**, since the split isn't obvious: the control unit
-emits *select lines and enables* (`alu_op_o = 4'h2`, `reg_write_o = 1`) — it
-decides what happens when, but never touches the data. The datapath carries
-the *32-bit values* and transforms them. Restaurant analogy: the control unit
-is the head chef calling out orders; the datapath is the kitchen equipment.
-Same menu (ISA), and you could satisfy it with a completely different kitchen.
+<p align="center">
+  <strong>CHAMPIONCHIP eXPERIENCE · MALAYSIA EDITION 2026</strong>
+</p>
+<h1 align="center">RVBL-2 — Gripper, a Multicycle RISC-V Core</h1>
+<p align="center"><strong>A 47-instruction RISC-V SoC that keeps a charging station safe on a shaky grid.</strong></p>
+<p align="center">
+  <i>RV32I + Zmmul + Xicrc multicycle processor with GPIO and UART, running a grid-aware EV-charger controller. Built in ChipInventor, targeting Sky130 via OpenLane.</i>
+</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/RISC--V-RV32I_+_Zmmul_+_Xicrc-283272?style=flat-square&logo=riscv&logoColor=white" alt="RISC-V" />
+  <img src="https://img.shields.io/badge/Verilog-Icarus_iverilog-8A2BE2?style=flat-square" alt="Verilog" />
+  <img src="https://img.shields.io/badge/Sky130-OpenLane-F58220?style=flat-square" alt="Sky130 OpenLane" />
+  <img src="https://img.shields.io/badge/Firmware-RISC--V_assembly-4B8BBE?style=flat-square" alt="Assembly" />
+  <img src="https://img.shields.io/badge/Viz-React_+_Vite-20232A?style=flat-square&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/Tests-pytest_+_Verilog_TB-0A9EDC?style=flat-square&logo=pytest&logoColor=white" alt="pytest" />
+</p>
 
 ---
 
-## Ownership map
+## Overview
 
-Two pairs own the hard-boundary modules; datapath, firmware, OpenLane, and
-integration are shared. **Don't edit outside your pair's folder without
-asking.** Shared folders still need coordination — "shared" means "everyone's
-responsible," not "whoever gets there first wins."
+> **What is Xicrc?** A custom ISA extension adding three CRC-16 instructions (`crcb`, `crch`, `crcw`) that consume 8 / 16 / 32 bits of `rs1` with `rs2` as the seed. CRC-16/CCITT-FALSE: polynomial `0x1021`, init `0xFFFF`, no reflection, no final XOR.
+>
+> **What is Zmmul?** The RISC-V multiply-only subset of "M": `mul`, `mulh`, `mulhsu`, `mulhu`. No divide.
 
-| Folder | Owner | Contents |
+**RVBL-2** is a multicycle RISC-V core designed in ChipInventor. Stage 2 delivered the processor and its Sky130 layout. Stage 3 adds a **GPIO** and a **UART**, then builds a real application on them: a **grid-aware EV charging-station controller**.
+
+**At a glance**
+
+- **47 instructions** — RV32I (40), Zmmul (4), Xicrc (3); all execute in 3–6 cycles on a 7-state FSM.
+- **Peripherals on plain `lw`/`sw`** — GPIO (8 pins, per-pin direction) and UART (115200 8-N-1) memory-mapped through the address decoder. No new FSM states, no new instructions.
+- **Official firmware passes** — organiser GPIO/UART test firmware echoes the UART byte and mirrors P3–0 to P7–4.
+- **Application** — IEC 61851 control-pilot FSM, protocol-v2 meter frames (escaped `0x7E` delimiters, sequence numbers, CRC-16), grid-hold on frequency/voltage excursions, fleet-staggered restart.
+- **Meter watchdog** — a hardware elapsed-time timer at `0xF2000000` lets firmware latch `METER_TIMEOUT` after 500 ms without a valid frame, and discard a half-received frame after 100 ms.
+- **Hardware `crcb` earns its keep** — about 21× faster than software shift-XOR (~60 vs ~1,276 cycles for 6 bytes), which the 1,740-cycle inter-byte budget at 115200 baud needs.
+- **Golden-model verification** — a bit-exact Python model produces every expected value; none are hand-written.
+- **Gripper (interactive visualiser)** — a React + Three.js app replays one station and a city-scale fleet as chapter timelines, with a without/with RVBL-2 comparison and an emulator-preview panel.
+
+---
+
+## The Problem
+
+A charging station is a safety device attached to a grid that can fail under it.
+
+### 1. Grid events
+- A frequency dip or voltage sag means the station should stop drawing power.
+- Hundreds of stations resuming at the same instant cause a second surge.
+
+**Answer:** autonomous GRID_HOLD, then a **per-charger restart delay** (2–9 frames) hashed from the charger ID with `crcb`. The hash spreads exactly 1,250 per bucket over 10,000 sequential IDs. A 1,000-charger simulation shows a **7.94× peak-load reduction** versus simultaneous restart.
+
+### 2. Untrusted meter data
+- Frames can be corrupted, dropped, replayed, or simply stop arriving.
+
+**Answer:** protocol v2 frames carry a sequence number and CRC-16, so gaps, duplicates and corruption are rejected, and `0x7E` delimiters let the receiver resync on byte alignment. A **500 ms watchdog** covers silence: charging needs a healthy first frame, and losing the meter opens the contactor.
+
+### 3. Safety interlocks
+- Overcurrent, emergency stop, invalid pilot codes, and a dead meter must never leave the contactor closed.
+
+**Answer:** latched FAULT and METER_TIMEOUT states, entered from any of those conditions, released only by the documented sequence (emergency input clear and pilot back to A).
+
+---
+
+## Processor Architecture
+
+| Extension | Instructions | Module |
 |---|---|---|
-| `legacy/rtl/control_unit.v`, `legacy/rtl/top.v` | **FSM pair** | FSM, top-level integration |
-| `legacy/tb/control_unit/` | **FSM pair** | Control unit testbench |
-| `legacy/rtl/memory/` | **Memory pair** | Register file, LSU, address decoder, IMEM, DMEM |
-| `legacy/tb/memory/` | **Memory pair** | Per-module memory-side testbenches |
-| `legacy/rtl/datapath/` | **Shared — all four** | ALU, multiplier, CRC, branch comparator, immediate extender |
-| `legacy/tb/datapath/` | **Shared — all four** | Per-module datapath testbenches |
-| `legacy/rtl/pkg/` | **Shared — read freely, edit only by team agreement** | `rvbl2_defines.vh` |
-| `legacy/tb/system/` | **Shared — all four** | Full-core testbench, firmware validation |
-| `legacy/firmware/` | **Shared — all four** | Validation firmware |
-| `chip-inventor/` | **Shared — all four** | `config.json`, synthesis runs |
-| `docs/` | **Shared — all four** | Specs, report assets, diagrams |
-| `legacy/sim/` | **Nobody — gitignored** | Scratch output |
+| RV32I | 40 | `alu_eq26`, `branch_comparator_eq26`, `control_unit_eq26`, `lsu_eq26` |
+| Zmmul | 4 | `mult_eq26` (combinational, single-cycle) |
+| Xicrc | 3 | `crc.eq26` |
 
-⚠ **`legacy/rtl/datapath/` being shared means nobody owns any given module by
-default** — which is how you end up with two `alu.v` implementations and no
-`crc.v`. Assign a name to each module before starting.
+FSM states: `FETCH → DECODE → EXECUTE → MEM_ACCESS_ADDR → MEM_ACCESS_DATA → WRITE_BACK → HALT`.
 
----
+**Memory map**
 
-## Golden rule for `legacy/rtl/pkg/rvbl2_defines.vh`
-
-About to write a raw opcode, `alu_op_o`, `mult_op_o`, `crc_op_o`, `result_src_o`, or
-`pc_src` literal into your module? Stop. `` `include "pkg/rvbl2_defines.vh" ``
-and use the named macro instead.
-
-Two modules hardcoding the same constant, with a typo in one, is the single
-most likely source of an integration bug that only surfaces at `top.v` time —
-and it surfaces as "the processor executes the wrong instruction," not as a
-compile error.
+| Address | Region |
+|---|---|
+| `0x00400000` | IMEM — instruction ROM, up to 1024 words |
+| `0x10010000` | DMEM — 32 bytes |
+| `0xF0000000` | GPIO — DATAOUT `+0`, DATAIN `+4`, DATADIR `+8` |
+| `0xF1000000` | UART — TXDATA `+0`, RXDATA `+4`, CONTROL `+8` |
+| `0xF2000000` | Elapsed timers — meter age `+0`, UART byte age `+4`; a full-word `sw` refreshes the selected timer |
 
 ---
 
-## Build / simulate
+## The Application
 
-Applies to `legacy/` (the original hand-written slice). Run these from inside
-`legacy/`, or prefix paths with `legacy/` from the repo root.
+**Inputs:** GPIO P0–P3 carry the control-pilot state and the safety trip. The UART carries protocol-v2 frames: two `0x7E` markers around an escaped 9-byte body (sequence, voltage 0.1 V, current 0.1 A, frequency 0.01 Hz, CRC-16), 11–20 wire bytes. The old unframed 8-byte format is no longer supported.
 
-Requires [Icarus Verilog](http://iverilog.icarus.com/) (`iverilog`, `vvp`) and
-optionally [GTKWave](http://gtkwave.sourceforge.net/) for waveforms.
+**Processing:** control-pilot FSM (IDLE, CONNECTED, CHARGING, GRID_HOLD, FAULT, METER_TIMEOUT), CRC and sequence validation, grid-health thresholds, the meter watchdog, staggered restart, and `mul`-based V×I accumulation.
+
+**Outputs:** GPIO P4–P7 drive contactor, cable lock, grid-hold LED, and fault LED. On session end the UART returns an 8-byte record (energy, status flags, frame count, CRC-16).
+
+Firmware is stackless and polling-based: all state lives in CPU registers. Source is `main.s` (370 words, about 36% of the 1,024-word IMEM), built with the organiser's RVBL-Firmware-Builder toolchain.
+
+---
+
+## Validation
+
+| Check | Result |
+|---|---|
+| Stage 2 organiser firmware | PASS — `x4 = 0x00000000`, self-loop at `0x004003ec` |
+| Stage 3 organiser GPIO/UART firmware | PASS — GPIO mirror and UART echo |
+| Per-module testbenches (9 modules) | PASS — ALU, branch, control unit, CRC, imm, LSU, memory map, multiplier, regfile |
+| ISA coverage | 47 / 47 |
+| Application scenarios | 12 + 3 harness scenarios, run against 2 tops = 30 runs |
+| Python tests | 78 pass: golden model, scenarios, watchdog, resync, rebound evidence |
+| Meter watchdog RTL | 14 cases pass; timer unit test pass |
+| UART recovery RTL | 44 cases pass |
+| Synthesis | OpenLane flow completes; no setup or hold violations at the Typical corner |
+
+Scenario counts and the exact figures differ between the folders below. Each folder's README is the source of truth for its own numbers.
+
+---
+
+## Repository Map
+
+This repo holds **several build tracks**. Only the first two are current.
+
+| Folder | What it is |
+|---|---|
+| [`chip-inventor/`](chip-inventor/) | **Active build.** Complete design, firmware, emulator interface, testbenches, and the Gripper visualiser (`frontend/`). Includes the meter-data watchdog and UART protocol v2 (see [`improvement made.md`](chip-inventor/improvement%20made.md)); not migrated to `legacy/` or `v2-chip-inventor-synth/`. |
+| [`ChampionCHIP-Stage3/`](ChampionCHIP-Stage3/) | Stage 3 submission snapshot: RTL, firmware, testbenches, evidence waveforms, `viz/`. |
+| [`ChampionCHIP - Stage2/`](ChampionCHIP%20-%20Stage2/) | Stage 2 submission: processor, OpenLane results, organiser-firmware validation. |
+| [`v2-chip-inventor-synth/`](v2-chip-inventor-synth/) | ChipInventor synthesis version, lighter test and size. |
+| [`legacy/`](legacy/) | First hand-written slice (pre-ChipInventor). Superseded. Per-module `rtl/` and `tb/` layout. |
+| [`reference/`](reference/) | Read-only reference material (another team's public submission, used for landscape only; no code reused). |
+| [`external/`](external/) | Vendored organiser material (Stage 2 firmware, Stage 3 test firmware). |
+| [`docs/`](docs/) | Specs, handoff docs, build plans, strategy, video script, figures. |
+
+```text
+chip-inventor/
+├── rtl/            one module per file
+├── hdl.v           flattened canvas netlist
+├── firmware/       main.s, Makefile, linker script, build outputs
+├── testbench/      official-firmware, gpio, uart, per-module, app (golden model + scenarios)
+├── emulator/       ./emu command lines and runner
+├── evidence/       waveform screenshots
+└── frontend/       React + Three.js Gripper visualiser (station view, city/fleet view)
+```
+
+---
+
+## Key Documents
+
+| Path | Contents |
+|---|---|
+| [`docs/STAGE3_STRATEGY.md`](docs/STAGE3_STRATEGY.md) | Stage 3 brief, constraints, application design, revision history |
+| [`docs/HANDOFF_control_unit_ALL_STAGES.md`](docs/HANDOFF_control_unit_ALL_STAGES.md) | Control-unit spec, all slices, decision log |
+| [`docs/DATAPATH_BUILD_PLAN.md`](docs/DATAPATH_BUILD_PLAN.md) | Per-module ports, operation tables, traps |
+| [`docs/OPENLANE_SYNTHESIS.md`](docs/OPENLANE_SYNTHESIS.md) | Synthesis flow notes |
+| [`docs/FIRMWARE_DEVELOPMENT.md`](docs/FIRMWARE_DEVELOPMENT.md) | Firmware workflow |
+| [`docs/video/`](docs/video/) | Stage 3 video storyboard and script |
+| [`chip-inventor/README.md`](chip-inventor/README.md) | Active build details, protocol v2, watchdog |
+| [`.claude/CLAUDE.md`](.claude/CLAUDE.md) | Working rules and 9-step module workflow |
+
+---
+
+## Quickstart
+
+Needs [Icarus Verilog](http://iverilog.icarus.com/), Python 3, and optionally GTKWave. Firmware builds also need a RISC-V GNU toolchain (`riscv32-unknown-elf` or `riscv64-unknown-elf`).
 
 ```bash
-# compile RTL + testbench into a simulation binary
-iverilog -o sim/<name>.vvp -I rtl rtl/<path>/<file>.v tb/<path>/tb_<name>.v
+# 1. Official firmware testbench on the active build
+cd chip-inventor
+iverilog -g2012 -o testbench/sim_testbench.vvp hdl.v testbench/testbench.v
+vvp testbench/sim_testbench.vvp
+python testbench/run_tests.py            # both top-level designs
 
-# run it — prints PASS/FAIL lines, ends with ALL TESTS PASSED
-vvp sim/<name>.vvp
+# 2. Peripheral tests
+python testbench/gpio/run_tests.py
+python testbench/uart/run_tests.py
 
-# optional: inspect waveforms when debugging a failure
-gtkwave sim/<name>.vcd
+# 3. Application: golden model + all scenarios x all tops
+python -m pytest testbench/app -q
+python testbench/app/run_tests.py
+
+# 4. Firmware build
+cd firmware && make
+
+# 5. Gripper visualiser (from chip-inventor/)
+cd frontend
+npm install && npm run dev
 ```
 
-**`-I rtl`, not `-I rtl/pkg`.** Modules include `"pkg/rvbl2_defines.vh"`, so
-the search root is `rtl/`. Using `-I rtl/pkg` fails with
-`Include file pkg/rvbl2_defines.vh not found`.
+**Always recompile before `vvp`.** A stale `.vvp` silently reruns the previous build.
 
-**Always recompile before running.** `vvp` on a stale `.vvp` silently runs
-your previous build and reports its results — the compile step is what picks
-up your edits.
-
-### Worked examples
-
-```bash
-# control unit — 48 tests, all 47 instructions
-iverilog -o sim/tb_control_unit.vvp -I rtl rtl/control_unit.v tb/control_unit/tb_control_unit.v
-vvp sim/tb_control_unit.vvp
-
-# ALU
-iverilog -o sim/tb_alu.vvp -I rtl rtl/datapath/alu.v tb/datapath/tb_alu.v
-vvp sim/tb_alu.vvp
-
-# every datapath module in one go
-for m in alu branch_comparator imm_extend mult; do
-  iverilog -o sim/tb_$m.vvp -I rtl rtl/datapath/$m.v tb/datapath/tb_$m.v && vvp sim/tb_$m.vvp
-done
-```
-
-### Testbench requirements
-
-Every testbench must call:
-
-```verilog
-$dumpfile("sim/<name>.vcd");
-$dumpvars(0, <testbench_module_name>);
-```
-
-Without these there's no waveform to inspect when something fails.
+Testbenches must call `$dumpfile` and `$dumpvars` so GTKWave has a waveform to open.
 
 ---
 
 ## Status
 
-**Control unit — done.** Slices 1-6 complete, 48/48 tests passing, all 47
-instructions decoding. Verified: SUB/SRA survive the funct7 dispatch added in
-slice 4, and the SRAI/SRLI bit-30 trap is covered.
-
-**Datapath — all 5 done.** `alu.v`, `branch_comparator.v`, `imm_extend.v`,
-`mult.v`, `crc.v` all pass their testbenches, including the signedness traps
-(SLT/SLTU and BLT/BLTU disagreeing on the same bits, MULHSU's mixed
-extension, SRA sign-extension, shift-amount masking).
-
-**Memory — all 5 done.** `regfile.v`, `imem.v`, `dmem.v`,
-`address_decoder.v`, `lsu.v` all pass. DMEM's registered-output timing is
-*proven*, not just value-checked: the testbench asserts read data is NOT
-valid in the address cycle and IS valid the next, so a combinational
-implementation would fail. x0 write protection verified in the regfile.
-
-**All 11 modules done and passing.** `top.v` is unblocked — it is the next
-build, and nothing else in the repo can start until it exists.
-
 | Item | Status |
 |---|---|
-| Control unit FSM design | ✅ `docs/HANDOFF_control_unit_ALL_STAGES.md` |
-| `control_unit.v` slices 1-6 | ✅ passing |
-| `halt_o` ECALL status flag | ✅ passing — funct12 decode separates ECALL from EBREAK |
-| `alu.v` | ✅ passing |
-| `branch_comparator.v` | ✅ passing |
-| `imm_extend.v` | ✅ passing |
-| `mult.v` | ✅ passing |
-| `crc.v` | ✅ passing |
-| `regfile.v` | ✅ passing |
-| `imem.v` | ✅ passing |
-| `dmem.v` | ✅ passing — registered-output timing proven |
-| `address_decoder.v` | ✅ passing |
-| `lsu.v` | ✅ passing |
-| `top.v` integration | ⬜ **Not started — unblocked, next up** |
-| System testbench + firmware | ⬜ Blocked on `top.v` |
-| OpenLane physical flow | ⬜ Blocked on `top.v` |
+| Processor, 47 / 47 instructions | ✅ Done |
+| GPIO and UART | ✅ Done, official firmware passes |
+| Application firmware and golden model | ✅ Done |
+| Meter watchdog and UART protocol v2 | ✅ In `chip-inventor/` |
+| Gripper visualiser: station view, fleet view, without/with RVBL-2 comparison, emulator preview | ✅ Done; frontend migrated to protocol v2 and `METER_TIMEOUT` |
+| Real hardware run (AWS FPGA) | ⬜ Out of Stage 3 scope |
 
-### `crc.v` parameters — confirmed by organisers
+**Known limits**
 
-The Block Guide never specified these; asked on Discord and answered in full.
-**CRC-16/CCITT-FALSE:**
-
-| Parameter | Value |
-|---|---|
-| Polynomial | `0x1021` |
-| Initial value | `0xFFFF` |
-| Input / output reflection | None |
-| Final XOR | `0x0000` |
-| `rs1` | **data** |
-| `rs2` | **seed** |
-
-`crcb`/`crch`/`crcw` select how many bits of `rs1` are consumed (8 / 16 / 32).
-The result is always 16 bits — same algorithm throughout, not three different
-CRCs.
-
-⚠ **Note the operand roles are the reverse of the usual convention.** Most
-incremental CRC instructions carry the running state in rs1 and new data in
-rs2; here it's the opposite. Worth asking about — a self-consistent guess
-would have computed the CRC of the wrong operand and still looked correct.
-
-### Open questions
-
-| Question | Blocks | Notes |
-|---|---|---|
-| Does the validation firmware expect the core to **stop** on ECALL, or just flag it? | System testbench design | **Half-answered 2026-08-25.** `halt_o` is now implemented: a sticky status flag set when an ECALL retires, cleared by reset. The system testbench can `wait (halt_o)` instead of guessing a cycle timeout. What is still unknown is whether the firmware needs the core to actually freeze (PC held) rather than keep running. If it does, that is one line: gate `pc_write_o` on `!halt_o`. Blocked on the firmware's release |
+- Results are simulation only; the emulator flow has not been run on hardware.
+- Senders must use protocol v2; see [`chip-inventor/emulator/README.md`](chip-inventor/emulator/README.md).
+- Numbers quoted in sub-READMEs track their own folder. If two folders disagree, the newer build (`chip-inventor/`) wins.
 
 ---
 
-## Build order from here
+## Submission Checklist (Stage 3)
 
-1. ~~**Memory modules**~~ — done. `dmem.v`'s registered-output timing is
-   proven by its testbench, not just assumed: the FSM's 2-cycle load design
-   depends on read data being invalid in the address cycle and valid the
-   next, and the testbench asserts both.
-2. ~~**`crc.v`**~~ — done, parameters confirmed by organisers (below).
-3. **`top.v`** (FSM pair) — control unit slice 7. **← next**
-4. **System testbench + firmware validation.**
-5. **OpenLane flow** → GDSII, gate-level netlist, area/density numbers for
-   report §5. Watch the multiplier's area here: a full combinational 64-bit
-   multiply is the largest block in the design, and if it dominates, the
-   fallback (iterative shift-add) changes the FSM, not just `mult.v`.
+- [x] Block diagram generated in ChipInventor
+- [x] Official GPIO/UART test firmware run, with logs and waveforms
+- [x] Application definition, including `./emu` values
+- [x] Firmware in binary and assembly
+- [x] Application testbench
+- [ ] Report PDF and video URL: confirm against `docs/Submission Guide_Stage__Block_Guide_Stage_3.pdf` before submitting
 
 ---
 
-## Key documents
-
-| Path | Contents |
-|---|---|
-| `docs/HANDOFF_control_unit_ALL_STAGES.md` | **Start here.** Control unit spec, all slices, decision log |
-| `docs/DATAPATH_BUILD_PLAN.md` | Per-module ports, operation tables, traps |
-| `docs/CONTROL_UNIT_BUILD_PLAN.md` | Slice-by-slice roadmap |
-| `docs/HANDOFF_control_unit.md` | Original spec doc |
-| `docs/fsm_control_signal_table.md` | Scaffold with issue-resolution history |
-| `docs/Championchip-stage-2-guide.pdf` | Competition block guide — source of truth for guide-fixed signals |
-| `legacy/rtl/pkg/rvbl2_defines.vh` | **All constants — what the RTL actually compiles against (legacy version)** |
-| `.claude/CLAUDE.md` | 9-step workflow, RTL coding standards |
-
-## Submission checklist (guide §9)
-
-- [ ] Report (PDF, ≤20 pages, ≤10 MB) covering guide topics 1-6
-- [ ] GDSII from OpenLane
-- [ ] Gate-level netlist (`results/final/verilog/gl/`)
-- [ ] `config.json` used for synthesis
-- [ ] All RTL and testbench files
-- [ ] YouTube demo video URL (3-4 min), included in the report
+<p align="center"><i>RVBL-2 — one small core, three extensions, one job done carefully: keep the contactor right when the grid is wrong.</i></p>
