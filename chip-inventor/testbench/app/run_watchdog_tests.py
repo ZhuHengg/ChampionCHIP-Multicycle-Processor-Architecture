@@ -1,13 +1,13 @@
 """RTL watchdog regressions on both flattened tops, using the real application ROM.
 
 The timer unit test checks the production 20 MHz millisecond divider. SoC cases
-accelerate only that divider by 100x, retaining the firmware's 500-tick deadline.
+accelerate only that divider by 100x, retaining the firmware's configured deadline.
 Frame/report expectations do not use the Charger model.
 """
 import argparse
 from pathlib import Path
 import subprocess
-from golden import Meter, corrupt, record_bytes, encode_frame
+from golden import Meter, corrupt, record_bytes, encode_frame, METER_TIMEOUT_MS
 from run_tests import imem_instance
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,16 +34,16 @@ def cases():
     first = m.frame(2300, 160, 5000)
     second = m.frame(2300, 160, 5000)
     charging = start + '\n' + send(first) + "\nemu_o(8'h30, 2);"
-    boundary = '''wait (dut.meter_timer_inst.age_ms == 499);
+    boundary = f'''wait (dut.meter_timer_inst.age_ms == {METER_TIMEOUT_MS - 1});
 if (pins_o !== 8'h30 || rx_count != 0) $fatal(1, "early timeout");
-wait (dut.meter_timer_inst.age_ms == 500);
+wait (dut.meter_timer_inst.age_ms == {METER_TIMEOUT_MS});
 repeat (2000) @(negedge clk);
 emu_o(8'h80, 5);
 '''
     out = {
-        'silence_500ms': (200000, charging + '\n' + boundary + record(368000, 5, 1)),
-        'no_initial_frame': (200000, start + '''
-repeat (101000) @(negedge clk);
+        'silence_deadline': (200000, charging + '\n' + boundary + record(368000, 5, 1)),
+        'no_initial_frame': (200000, start + f'''
+repeat ({(METER_TIMEOUT_MS + 5) * 200}) @(negedge clk);
 emu_o(8'h80, 5);
 ''' + record(0, 5, 0)),
         'partial_frame': (200000, charging + '\n' + send(encode_frame(second)[:7], raw=True) + '\n' + boundary + record(368000, 5, 1)),
@@ -53,19 +53,19 @@ emu_o(8'h80, 5);
     refresh += '\n' + check('dut.meter_timer_inst.age_ms < 20', 'valid frame did not refresh timer')
     refresh += "\nrepeat (60000) @(negedge clk); emu_o(8'h30, 2);\n"
     refresh += boundary + record(736000, 5, 2)
-    refresh += '\nrepeat (101000) @(negedge clk);\n' + send(m.frame(2300, 160, 5000))
+    refresh += f'\nrepeat ({(METER_TIMEOUT_MS + 5) * 200}) @(negedge clk);\n' + send(m.frame(2300, 160, 5000))
     refresh += "\nemu_o(8'h80, 5); emu_i(8'h08); emu_o(8'h80, 5); emu_i(0); emu_o(0, 0);"
     refresh += "\nemu_i(2); emu_o(8'h20, 1);"
     out['refresh_and_latch'] = (200000, refresh)
 
     m = Meter(); first = m.frame(2300, 160, 5000); low = m.frame(2300, 160, 4900)
-    out['hold_silence'] = (200000, start+'\n'+send(first)+'\n'+send(low)+'''
+    out['hold_silence'] = (200000, start+'\n'+send(first)+'\n'+send(low)+f'''
 emu_o(8'h60, 3);
-wait (dut.meter_timer_inst.age_ms == 500);
+wait (dut.meter_timer_inst.age_ms == {METER_TIMEOUT_MS});
 repeat (2000) @(negedge clk); emu_o(8'h80, 5);
 '''+record(368000, 0x85, 1))
-    out['idle_and_reset'] = (200000, '''emu_begin; emu_d(8'hf0);
-repeat (101000) @(negedge clk); emu_o(0, 0);
+    out['idle_and_reset'] = (200000, f'''emu_begin; emu_d(8'hf0);
+repeat ({(METER_TIMEOUT_MS + 5) * 200}) @(negedge clk); emu_o(0, 0);
 if (rx_count != 0) $fatal(1, "idle must not report");
 emu_i(2); emu_o(8'h20, 1);
 ''' + send(first) + '''

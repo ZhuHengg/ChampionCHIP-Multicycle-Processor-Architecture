@@ -8,8 +8,8 @@ export const HOLD_BASE = 2;           // minimum healthy frames before restart
 export const CHARGER_ID = 0x4D590001; // "MY" + 0001, hashed as bytes 01 00 59 4D
 
 // Meter watchdog (chip-inventor/improvement made.md, rtl/meter_timer.v).
-export const METER_TIMEOUT_MS = 500;  // no healthy frame in this window -> fault
-export const RX_TIMEOUT_MS = 100;     // partial/escaped frame abandoned after this
+export const METER_TIMEOUT_MS = 4000;  // no healthy frame in this window -> fault
+export const RX_TIMEOUT_MS = 400;     // partial/escaped frame abandoned after this
 
 // Plain `enum` emits runtime code, which tsconfig's erasableSyntaxOnly
 // forbids. This const-object + derived-union pattern is erasable (no

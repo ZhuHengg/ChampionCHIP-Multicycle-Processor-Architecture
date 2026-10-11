@@ -184,7 +184,7 @@ def _app():
     s.i(1).o().i(0).o().record()
 
     # ---- S1X: same, streamed ----------------------------------------------
-    # 16 bytes back to back with no gap: the first frame's end-of-frame
+    # Protocol-v2 frames back to back with no gap: the first frame's end-of-frame
     # processing must finish inside one byte time (1740 cycles).
     s, m = new('S1X', 'stress: S1 with back-to-back UART bytes', stream=True), Meter()
     s.i(0).o().i(1).o().i(2).o()

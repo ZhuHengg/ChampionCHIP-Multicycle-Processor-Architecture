@@ -10,12 +10,12 @@ Sky130 via OpenLane.
 CRC-checked, sequence-numbered metering, and fleet-staggered restart.
 
 **Meter-data watchdog update:** charging now requires a healthy initial meter
-frame. A 500 ms absence of valid frames latches METER_TIMEOUT and sends one report
+frame. A 4000 ms absence of valid frames latches METER_TIMEOUT and sends one report
 after opening the contactor. See [improvement made.md](improvement%20made.md) for
 configuration, report state code 5, updated hardware, and verification.
 
 **UART protocol v2:** meter frames now use escaped `0x7E` delimiters, sequence
-numbers, an independent CRC, and a 100 ms partial-frame timeout. Senders must
+numbers, an independent CRC, and a 400 ms partial-frame timeout. Senders must
 use the new format; see [emulator/README.md](emulator/README.md).
 
 ---
@@ -248,7 +248,7 @@ Full command lines in `emulator/emu_commands.txt`.
 
 ## 5. Firmware Development
 
-Assembly source: `firmware/src/main.s` (370 instruction words, 36% of IMEM).
+Assembly source: `firmware/src/main.s` (372 instruction words, 36% of IMEM).
 
 **Architecture:** register-only, stackless, polling-based. All state lives in
 CPU registers (32 bytes of DMEM is unused). Main loop: `apply_pins` (GPIO FSM)
@@ -278,7 +278,7 @@ budget at 115200 baud.
 firmware's FSM, framed UART parser, sequence checks, energy metering, and session record generation.
 Standard emulator scenario expectations come from the model. Focused UART
 fault-injection tests use independent expected states and accounting values.
-78 Python tests cover the model, scenario expectations, meter watchdog, and rebound evidence.
+102 Python tests cover the model, scenario expectations, meter watchdog, and rebound evidence.
 
 ### Scenario Coverage
 

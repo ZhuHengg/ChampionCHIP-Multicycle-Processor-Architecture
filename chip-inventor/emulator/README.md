@@ -39,7 +39,7 @@ continuously in the main loop. Consequences for the emulator:
   organiser's own test firmware *does*, which is why their README example only
   passes when `IN` already holds the value at boot — see §"What we rely on".)
 - A charge request stays CONNECTED (`0x20`) until a healthy meter frame arrives.
-  The 500 ms meter watchdog requires regular accepted frames during a session.
+  The 4000 ms meter watchdog requires regular accepted frames during a session.
 
 ## 3. How many bytes go to the processor over UART RX
 
@@ -65,8 +65,8 @@ Escape **every** body byte equal to `0x7E` or `0x7D` as `0x7D` followed by that
 byte XOR `0x20`. This includes sequence and CRC bytes. Other escape pairs are
 invalid. The receiver accepts exactly nine decoded bytes followed by a marker;
 short or oversized bodies cannot be billed. It never waits indefinitely for a
-missing byte: **100 ms without another byte discards an unfinished frame**.
-That byte timer is separate from the 500 ms accepted-meter-data watchdog.
+missing byte: **400 ms without another byte discards an unfinished frame**.
+That byte timer is separate from the 4000 ms accepted-meter-data watchdog.
 
 The first accepted frame establishes sequence after processor reset or a new
 vehicle session. Thereafter `delta = (sequence - previous) & 255` is used:
@@ -106,7 +106,7 @@ The second command prints:
 
 Append those options to the same `./emu` invocation as the GPIO/session commands;
 starting another invocation resets the processor. Keep every inter-byte/host gap
-below 100 ms, and accepted complete frames within the 500 ms watchdog deadline.
+below 400 ms, and accepted complete frames within the 4000 ms watchdog deadline.
 Use `frame_body` and `encode_frame` from `meter_protocol.py` in a real meter sender.
 
 ## 5. How many bytes the firmware returns
@@ -209,7 +209,8 @@ and hardware operation still require validation.
 
 
 Emulator word packing appends up to three harmless `0x7E` end markers so each
-write uses `-t4`. For the nominal frame this reduces four host writes to three,
-leaving more margin below the meter watchdog when one frame is corrupted. The
-plain hex encoder still emits the canonical 11-byte nominal frame. A Python
-regression checks nominal good/bad/good frames with 50 ms host access delays.
+option uses `-t4`. This reduces the number of command-line options, not AXI
+accesses: every byte still requires a write and a done poll. A padded nominal
+frame takes about 1.2 seconds at 50 ms per access. The plain hex encoder emits
+the canonical 11-byte nominal frame. Python regressions now model the delay
+per byte, including a bad frame between good ones and 20% extra host delay.

@@ -53,8 +53,8 @@
     .equ ST_FAULT,         4
     .equ ST_METER_TIMEOUT, 5             /* latched fault, report state code 5 */
     .equ METER_TIMER,      0xF2000000    /* read age in ms; word write resets */
-    .equ RX_TIMEOUT_MS,    100           /* maximum inter-byte gap */
-    .equ METER_TIMEOUT_MS, 500           /* configurable demonstration default */
+    .equ RX_TIMEOUT_MS,    400           /* maximum inter-byte gap */
+    .equ METER_TIMEOUT_MS, 4000          /* AWS host-paced demonstration default */
 
     /* DATAOUT per state (spec SS7.6) */
     .equ OUT_IDLE,         0x00

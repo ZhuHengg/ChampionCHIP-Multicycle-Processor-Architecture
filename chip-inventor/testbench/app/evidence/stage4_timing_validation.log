@@ -1,0 +1,102 @@
+Stage 4 host timing validation - 2026-10-11
+Working tree changes on baseline a295f74; no AWS hardware run.
+Firmware: RX_TIMEOUT_MS=400, METER_TIMEOUT_MS=4000; 372 words.
+Host initialization modeled as 0xF0; deployed emulator not modified.
+Python: 102 tests passed.
+Frontend: direct model 3999/4000 ms boundary and 13 scenario construction passed; no full UI build.
+AWS image generation: deterministic.
+Firmware binary SHA256: 59714c7c826306897ed3172b974937926b7458adc71986924958e4a643213866
+
+PASS timer/MMIO unit
+PASS watchdog hdl.v silence_deadline
+PASS watchdog hdl.v no_initial_frame
+PASS watchdog hdl.v partial_frame
+PASS watchdog hdl.v corrupt_frame
+PASS watchdog hdl.v refresh_and_latch
+PASS watchdog hdl.v hold_silence
+PASS watchdog hdl.v idle_and_reset
+PASS watchdog rtl/top.v silence_deadline
+PASS watchdog rtl/top.v no_initial_frame
+PASS watchdog rtl/top.v partial_frame
+PASS watchdog rtl/top.v corrupt_frame
+PASS watchdog rtl/top.v refresh_and_latch
+PASS watchdog rtl/top.v hold_silence
+PASS watchdog rtl/top.v idle_and_reset
+PASS resync hdl.v dropped_body_byte_1
+PASS resync hdl.v dropped_body_byte_2
+PASS resync hdl.v dropped_body_byte_3
+PASS resync hdl.v dropped_body_byte_4
+PASS resync hdl.v dropped_body_byte_5
+PASS resync hdl.v dropped_body_byte_6
+PASS resync hdl.v dropped_body_byte_7
+PASS resync hdl.v dropped_body_byte_8
+PASS resync hdl.v dropped_body_byte_9
+PASS resync hdl.v inserted_byte
+PASS resync hdl.v shared_marker
+PASS resync hdl.v noise
+PASS resync hdl.v invalid_escape
+PASS resync hdl.v dangling_escape
+PASS resync hdl.v partial_timeout
+PASS resync hdl.v late_tail
+PASS resync hdl.v escaped_data_and_sequence
+PASS resync hdl.v sequence_wrap
+PASS resync hdl.v duplicate_recovery
+PASS resync hdl.v fault_stays_latched
+PASS resync hdl.v escaped_crc
+PASS resync hdl.v new_session_reset
+PASS resync rtl/top.v dropped_body_byte_1
+PASS resync rtl/top.v dropped_body_byte_2
+PASS resync rtl/top.v dropped_body_byte_3
+PASS resync rtl/top.v dropped_body_byte_4
+PASS resync rtl/top.v dropped_body_byte_5
+PASS resync rtl/top.v dropped_body_byte_6
+PASS resync rtl/top.v dropped_body_byte_7
+PASS resync rtl/top.v dropped_body_byte_8
+PASS resync rtl/top.v dropped_body_byte_9
+PASS resync rtl/top.v inserted_byte
+PASS resync rtl/top.v shared_marker
+PASS resync rtl/top.v noise
+PASS resync rtl/top.v invalid_escape
+PASS resync rtl/top.v dangling_escape
+PASS resync rtl/top.v partial_timeout
+PASS resync rtl/top.v late_tail
+PASS resync rtl/top.v escaped_data_and_sequence
+PASS resync rtl/top.v sequence_wrap
+PASS resync rtl/top.v duplicate_recovery
+PASS resync rtl/top.v fault_stays_latched
+PASS resync rtl/top.v escaped_crc
+PASS resync rtl/top.v new_session_reset
+
+AWS command: python chip-inventor/aws/run_aws_tests.py --clk all --init-direction 0xF0 --tag timing_fixed -j 8
+Pacing: 50 ms per AXI access; time scale 100; UART bit timing unchanged.
+PASS 250 MHz H0: PASS
+PASS 250 MHz H1: expected-FAIL
+PASS 250 MHz H2: PASS
+PASS 250 MHz S1: PASS
+PASS 250 MHz S1X: PASS
+PASS 250 MHz S2: PASS
+PASS 250 MHz S3: PASS
+PASS 250 MHz S4: PASS
+PASS 250 MHz S5: PASS
+PASS 250 MHz S6: PASS
+PASS 250 MHz S7: PASS
+PASS 250 MHz S8: PASS
+PASS 250 MHz S9: PASS
+PASS 250 MHz S10: PASS
+PASS 250 MHz S11: PASS
+PASS 50 MHz H0: PASS
+PASS 50 MHz H1: expected-FAIL
+PASS 50 MHz H2: PASS
+PASS 50 MHz S1: PASS
+PASS 50 MHz S1X: PASS
+PASS 50 MHz S2: PASS
+PASS 50 MHz S3: PASS
+PASS 50 MHz S4: PASS
+PASS 50 MHz S5: PASS
+PASS 50 MHz S6: PASS
+PASS 50 MHz S7: PASS
+PASS 50 MHz S8: PASS
+PASS 50 MHz S9: PASS
+PASS 50 MHz S10: PASS
+PASS 50 MHz S11: PASS
+AWS completion: 30/30 as expected

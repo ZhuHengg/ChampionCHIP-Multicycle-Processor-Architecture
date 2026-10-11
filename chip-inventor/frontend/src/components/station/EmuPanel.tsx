@@ -249,7 +249,7 @@ export default function EmuPanel({ scenarioId, steps, index, onJump }: EmuPanelP
 
       {!emu ? (
         <p className="mt-6 rounded-2xl border border-dashed border-[var(--color-line-strong)] p-5 text-sm text-[var(--color-mute)]">
-          {scenarioId} has no <span className="font-mono">./emu</span> command line. It waits 500 ms with no meter data, and <span className="font-mono">./emu</span> has
+          {scenarioId} has no <span className="font-mono">./emu</span> command line. It waits 4 seconds with no meter data, and <span className="font-mono">./emu</span> has
           no option that waits. The watchdog is checked on the RTL by <span className="font-mono">testbench/app/run_watchdog_tests.py</span> instead.
         </p>
       ) : !aligned ? (

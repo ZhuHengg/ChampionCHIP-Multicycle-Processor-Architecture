@@ -15,7 +15,7 @@ def test_no_data_at_startup_times_out_with_contactor_open():
     c = Charger()
     c.set_inputs(2)
     assert c.state == CONNECTED and c.out == 0x20
-    c.advance_ms(499)
+    c.advance_ms(METER_TIMEOUT_MS - 1)
     assert c.state == CONNECTED
     c.advance_ms(1)
     assert c.state == METER_TIMEOUT and c.out == 0x80
@@ -49,7 +49,7 @@ def test_silence_after_charging_latches_once():
 def test_valid_frames_refresh_deadline():
     c, m = charging()
     for _ in range(5):
-        c.advance_ms(499)
+        c.advance_ms(METER_TIMEOUT_MS - 1)
         c.rx_frame(m.frame(2300, 160, 5000))
         assert c.state == CHARGING and c.age_ms == 0
     assert not c.tx
@@ -58,14 +58,14 @@ def test_valid_frames_refresh_deadline():
 @pytest.mark.parametrize('kind', ['corrupt', 'partial'])
 def test_invalid_or_partial_frame_does_not_refresh(kind):
     c, m = charging()
-    c.advance_ms(490)
+    c.advance_ms(METER_TIMEOUT_MS - 10)
     frame = m.frame(2300, 160, 5000)
     if kind == 'corrupt':
         c.rx_frame(corrupt(frame))
     else:
         for byte in encode_frame(frame)[:7]:
             c.rx_byte(byte)
-    assert c.age_ms == 490
+    assert c.age_ms == METER_TIMEOUT_MS - 10
     c.advance_ms(10)
     assert c.state == METER_TIMEOUT
 
@@ -82,7 +82,7 @@ def test_grid_hold_silence_faults():
     c, m = charging()
     c.rx_frame(m.frame(2300, 160, 4900))
     assert c.state == GRID_HOLD
-    c.advance_ms(500)
+    c.advance_ms(METER_TIMEOUT_MS)
     assert c.state == METER_TIMEOUT and c.tx[4] == 0x85
 
 

@@ -58,7 +58,7 @@ export const SCENARIO_META: Record<string, ScenarioMeta> = {
   S3: { name: 'Corrupt & missing frames', group: 'Data integrity', proves: 'A bad frame is rejected; the next valid frame recovers billing.' },
   S10: { name: 'Replay attack', group: 'Data integrity', proves: 'Replayed meter frames are rejected by sequence number, then fault.' },
   S4: { name: 'Meter link lost', group: 'Data integrity', proves: 'Two bad frames in a row latch a fault and stop the session.' },
-  S12: { name: 'Meter goes silent', group: 'Safety', proves: 'A 500 ms watchdog opens the contactor when meter data stops.' },
+  S12: { name: 'Meter goes silent', group: 'Safety', proves: 'A 4-second watchdog opens the contactor when meter data stops.' },
   S5: { name: 'Emergency stop', group: 'Safety', proves: 'E-stop latches a fault until it is released and the car unplugs.' },
   S7: { name: 'Limits & over-current', group: 'Safety', proves: 'Readings exactly on a limit are billed; one step over trips.' },
   S8: { name: 'Unsupported pilot states', group: 'Safety', proves: 'Ventilation (CP D) is refused and pilot error (CP E) faults.' },

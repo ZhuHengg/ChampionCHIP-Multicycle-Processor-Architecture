@@ -9,7 +9,7 @@
 // before/after, mirroring what `o()` would have asserted against the
 // emulator.
 
-import { ChargerState } from './constants';
+import { ChargerState, METER_TIMEOUT_MS } from './constants';
 import { Charger, restartDelay, recordBytes } from './charger';
 import { Meter, corrupt } from './meter';
 
@@ -288,16 +288,16 @@ function buildScenarios(): Scenario[] {
   // ---- S12: meter watchdog timeout ---------------------------------------
   // Not in scenarios.py (the pytest suite covers this in test_watchdog.py
   // instead); added here so the viewer can show the headline new feature
-  // from "improvement made.md" -- 500 ms without a healthy frame opens the
+  // from "improvement made.md" -- 4 seconds without a healthy frame opens the
   // contactor and latches METER_TIMEOUT, mirroring
   // test_no_data_at_startup_times_out_with_contactor_open.
   {
     const s = new ScenarioBuilder();
     s.i(1).o().i(2).o(); // CONNECTED, contactor still open: no healthy frame yet
-    s.tick(499).o();     // just under the deadline: still CONNECTED
+    s.tick(METER_TIMEOUT_MS - 1).o();     // just under the deadline: still CONNECTED
     s.tick(1).o();       // deadline reached: METER_TIMEOUT, fault LED (0x80)
     s.record();
-    scenarios.push({ id: 'S12', title: 'meter watchdog: 500 ms silence opens the contactor', category: 'timeout', presetIn: s.presetIn, steps: s.steps });
+    scenarios.push({ id: 'S12', title: 'meter watchdog: 4 seconds silence opens the contactor', category: 'timeout', presetIn: s.presetIn, steps: s.steps });
   }
 
   return scenarios;

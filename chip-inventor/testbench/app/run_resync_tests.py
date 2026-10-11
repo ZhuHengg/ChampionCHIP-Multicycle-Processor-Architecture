@@ -6,7 +6,7 @@ Only inter-byte timeout cases accelerate the timer divider by 100x.
 import argparse
 from pathlib import Path
 import subprocess
-from golden import Meter, encode_frame, corrupt, record_bytes
+from golden import Meter, encode_frame, corrupt, record_bytes, RX_TIMEOUT_MS
 from run_tests import imem_instance
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,18 +47,18 @@ def cases():
     for name, suffix in [('invalid_escape', b'\x7d\x00'), ('dangling_escape', b'\x7d\x7e')]:
         out[name] = (False, base + send_wire(encoded[1][:4]+suffix) +
                      send_wire(encoded[2]) + finish(736000, 0x40, 2))
-    # Partial timeout: 99/100 timer milliseconds, tail cannot finish old frame.
-    partial = base + send_wire(encoded[1][:5]) + '''
-wait (dut.meter_timer_inst.rx_age_ms == 99);
+    # Partial timeout: deadline minus one / deadline; late tails cannot complete a frame.
+    partial = base + send_wire(encoded[1][:5]) + f'''
+wait (dut.meter_timer_inst.rx_age_ms == {RX_TIMEOUT_MS - 1});
 if (pins_o !== 8'h30) $fatal(1, "partial timeout changed output early");
-wait (dut.meter_timer_inst.rx_age_ms == 100);
+wait (dut.meter_timer_inst.rx_age_ms == {RX_TIMEOUT_MS});
 repeat (1500) @(negedge clk);
 '''
     partial += send_wire(encoded[1][5:-1]) + send_wire(encoded[2]) + finish(736000, 0x40, 2)
     out['partial_timeout'] = (True, partial)
-    # Completing after >100 ticks without a new marker must NOT bill the old frame.
-    out['late_tail'] = (True, base + send_wire(encoded[1][:-1]) + '''
-wait (dut.meter_timer_inst.rx_age_ms == 100);
+    # Completing after the timeout deadline without a new marker must NOT bill the old frame.
+    out['late_tail'] = (True, base + send_wire(encoded[1][:-1]) + f'''
+wait (dut.meter_timer_inst.rx_age_ms == {RX_TIMEOUT_MS});
 repeat (1500) @(negedge clk);
 ''' + send_wire(encoded[1][-1:]) + send_wire(encoded[2]) + finish(736000, 0x40, 2))
     m = Meter(0x7D)

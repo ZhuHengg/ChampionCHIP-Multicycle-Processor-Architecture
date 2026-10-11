@@ -1,5 +1,86 @@
 # Handoff: Stage 4 AWS FPGA integration
 
+## Follow-up: stock-host timeout configuration (2026-10-11)
+
+Implemented the original handoff's Option A for the demonstration firmware:
+`RX_TIMEOUT_MS = 400` and `METER_TIMEOUT_MS = 4000`. No state-machine or latch
+semantics changed. Loss of meter data now takes four seconds to trip instead
+of half a second; these are host-paced demonstration limits, not production
+charger requirements.
+
+The emulator takes two delayed AXI accesses per transmitted byte. A nominal
+padded frame takes about 1.2 s; the existing recovery scenarios reach about
+2.5 s between accepted frames. The previous Python pacing test incorrectly
+charged one delay per word and has been corrected. New model regressions replay
+all application scenarios at 50 ms and 60 ms per access.
+
+Firmware, Python model and boundary tests, frontend timeout behavior/text,
+documentation, both Stage 3 ROMs, and all AWS images are synchronized. Firmware
+now occupies 372 instruction words. See `new change.md` for the detailed record.
+
+**Validation complete for this local timing change:**
+
+- 102 Python tests pass, including per-byte host timing at 50 ms and 60 ms.
+- Timer/MMIO unit test, 14/14 watchdog RTL cases, and 44/44 UART recovery RTL
+  cases pass on the two Stage 3 designs.
+- **30/30 AWS runs behave as expected** at stock 50 ms per AXI access, time scale
+  100, both core clocks, and the corrected host initialization (`0xF0`). The two
+  H1 negative harness cases correctly fail their intentional output check.
+- Direct frontend-model execution passes the 3999/4000 ms boundary and constructs
+  all 13 scenarios. A full frontend build has not been run.
+- AWS image generation is deterministic.
+
+Evidence summary: `testbench/app/evidence/stage4_timing_validation.log`.
+Per-scenario logs: `sim/aws/timing_fixed_{250,50}mhz_<scenario>/run.log`.
+The last 250 MHz S2 run completed successfully; its long runtime was computation,
+not a stall. The local timeout mismatch is resolved for this tested configuration;
+physical FPGA behavior and unbounded host delays remain unverified.
+
+Run the real-pacing gate from the repository root:
+
+```sh
+python chip-inventor/aws/run_aws_tests.py --clk all --init-direction 0xF0 --tag timing_fixed -j 8
+```
+
+On this Windows machine the full run takes substantially longer than the
+historical 15-minute estimate below. S2 sends 156 bytes over 13 frames and is
+the longest case. The runner captures each simulator's output until it exits,
+so a quiet terminal does not by itself indicate a hang.
+
+The `0xF0` initialization models a necessary host fix; it does not modify the
+emulator deployed on AWS. That source is absent from this checkout. After
+simulation validation, the next steps are to apply/rebuild that host change,
+synthesize on AWS, inspect WNS, and run the hardware scenarios with saved logs.
+
+---
+
+## Follow-up: startup report investigation (2026-10-11)
+
+The historical Blocker 2 diagnosis below has been narrowed down with S6 tracing.
+The extra report is an **empty report before the requested session**, not a
+second report after it. Stock host initialization sets direction to `0x01`,
+leaving pilot bit 0 undriven. The simulation enters CONNECTED; the subsequent
+`-d 0xF0` supplies zero pilot inputs, causing an unplug report.
+
+Configure the application host's initial direction as `0xF0` before releasing
+processor reset. The host emulator source is absent from this checkout; apply
+this change to its `fpga_init` direction setup and rebuild it on the host.
+The local runner now exposes `--init-direction 0xF0` to model that change and
+`--trace-rx` to log the evidence. Its default stays `0x01` so stock-host failures
+remain reproducible. See `aws/README.md` for the comparison commands.
+
+Verified S6 at both 250 MHz and 50 MHz with 5 ms AXI pacing and time scale 10:
+stock initialization fails with 16 report bytes at both clocks; `0xF0`
+initialization passes with exactly eight bytes at both clocks. Logs are under
+`sim/aws/startup_stock_{250,50}mhz_S6/` and
+`sim/aws/startup_fixed_{250,50}mhz_S6/` (ignored build output).
+
+This does not resolve Blocker 1 (real host pacing versus firmware timeouts).
+The original handoff below is historical; its claim that AWS files are
+uncommitted is also outdated, since they were pulled in commit `a295f74`.
+
+---
+
 **Date:** 2026-10-11 | **State:** integration built and verified in simulation;
 application **not yet ready** for FPGA (see Blocker 1). Nothing is committed yet.
 

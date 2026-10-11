@@ -1,3 +1,14 @@
+## Stage 4 timing update ? 11 October 2026
+
+The active demonstration defaults are now **4000 ms for meter freshness** and
+**400 ms for an unfinished UART frame**, replacing the 500/100 ms defaults in
+the historical entries below. Stock host access delays require about 1.2 s per
+nominal meter frame and about 2.5 s between accepted frames in the recovery
+scenarios. The state machine and fault latch rules are unchanged. Firmware,
+Python model/boundary tests, frontend model, ROMs, and AWS images were updated
+together. See `new change.md` and the current handoff follow-up for validation
+and remaining host/hardware work.
+
 ## Integration onto latest main ? 7 October 2026
 
 Applied both improvements to `chip-inventor/` on top of upstream main

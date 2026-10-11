@@ -17,8 +17,8 @@
 //
 // Time compression: real pacing (50 ms per AXI access) would mean 12.5 M cycles
 // per access at 250 MHz. TIME_SCALE divides both the emu delay AND the
-// millisecond base of meter_timer (defparam), so every firmware timeout (100 ms
-// inter-byte, 500 ms watchdog) keeps its true ratio to the host pacing. UART
+// millisecond base of meter_timer (defparam), so every firmware timeout (400 ms
+// inter-byte, 4000 ms watchdog) keeps its true ratio to the host pacing. UART
 // bit timing is NOT scaled: 2170 clocks/bit, as on the FPGA.
 //
 // Scenario bodies (scenario.vh) are shared with testbench/app/tb_app.v and
@@ -36,6 +36,9 @@ module tb_aws;
 `endif
 `ifndef PRESET_IN
 `define PRESET_IN 0               // IN register left over from a previous run
+`endif
+`ifndef INIT_DIRECTION
+`define INIT_DIRECTION 1          // stock emu.c; application host should use 0xF0
 `endif
 
     localparam integer SYS_HZ      = 250_000_000;
@@ -86,6 +89,15 @@ module tb_aws;
     reg     core_out_of_reset = 0;
     integer rx_bytes = 0;                 // bytes top.sv's Receiver stored
     reg [7:0] uart_ptr = 0;               // emu.c fpga_read_uart static current_ptr
+
+`ifdef TRACE_RX
+    // Event-based startup trace: expose floating inputs and false sessions.
+    always @(dut.riscvtop.e_PROCESSOR.x4_dbg_o or dut.input_en or dut.io_Pins)
+        if (core_out_of_reset)
+            $display("[startup] t=%0d ms: state=%0d direction=%02X pads=%02X",
+                     $time / 4 / CYC_PER_MS,
+                     dut.riscvtop.e_PROCESSOR.x4_dbg_o, dut.input_en, dut.io_Pins);
+`endif
 
     always @(posedge clk_main_a0) begin
         if (!dut.riscv_nreset) rx_bytes <= 0;
@@ -180,7 +192,7 @@ module tb_aws;
             axi_write_raw(IN_ADDR, `PRESET_IN);      // IN persists from earlier runs
             // fpga_init: fpga_write_direction(0x01), then fpga_reset (1, 0, 1)
             fpga_read_addr(IN_ADDR, in_reg);
-            fpga_write_addr(IN_ADDR, (in_reg & 32'h00FF) | 32'h0100);
+            fpga_write_addr(IN_ADDR, (in_reg & 32'h00FF) | (`INIT_DIRECTION << 8));
             fpga_write_addr(RESET_ADDR, 32'h1);
             fpga_write_addr(RESET_ADDR, 32'h0);
             fpga_write_addr(RESET_ADDR, 32'h1);

@@ -130,9 +130,9 @@ python testbench/app/run_watchdog_tests.py
 
 This runs a timer/MMIO unit test and seven scenarios on each top-level design.
 The unit test verifies the production 20 MHz millisecond divider; the SoC tests
-accelerate the timer alone by 100x and retain the firmware's 500-tick deadline.
+accelerate the timer alone by 100x and retain the firmware's 4000-tick deadline.
 Expectations for state and report contents are independent of the Charger model.
-New model tests in `test_watchdog.py` cover the exact 499/500 ms boundary,
+New model tests in `test_watchdog.py` cover the exact 3999/4000 ms boundary,
 refresh, corrupt/partial frames, initial gating, fault latching, and reconnect.
 
 `run_tests.py --no-vcd` skips waveform generation. Application scenarios now
@@ -158,6 +158,8 @@ top accelerate only the timer divider by 100x. `--case NAME` and `--top PATH`
 select a subset. Full application scenarios now transmit protocol-v2 wire frames.
 
 Emulator transmit options pad complete frames with empty markers into full-word
-writes to reduce host delays. `--run-tag NAME` isolates application runner output
+options. Each byte still incurs a write and a poll; padding does not reduce
+AXI access delays. `test_host_pacing.py` replays all application scenarios with
+50 ms and 60 ms per access. `--run-tag NAME` isolates application runner output
 when checking variants concurrently; a tagged padded-command check covers S1X
 and S3 on both top-level designs in addition to the full unpadded v2 regression.

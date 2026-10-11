@@ -31,7 +31,7 @@
 - **Peripherals on plain `lw`/`sw`** — GPIO (8 pins, per-pin direction) and UART (115200 8-N-1) memory-mapped through the address decoder. No new FSM states, no new instructions.
 - **Official firmware passes** — organiser GPIO/UART test firmware echoes the UART byte and mirrors P3–0 to P7–4.
 - **Application** — IEC 61851 control-pilot FSM, protocol-v2 meter frames (escaped `0x7E` delimiters, sequence numbers, CRC-16), grid-hold on frequency/voltage excursions, fleet-staggered restart.
-- **Meter watchdog** — a hardware elapsed-time timer at `0xF2000000` lets firmware latch `METER_TIMEOUT` after 500 ms without a valid frame, and discard a half-received frame after 100 ms.
+- **Meter watchdog** — a hardware elapsed-time timer at `0xF2000000` lets firmware latch `METER_TIMEOUT` after 4000 ms without a valid frame, and discard a half-received frame after 400 ms.
 - **Hardware `crcb` earns its keep** — about 21× faster than software shift-XOR (~60 vs ~1,276 cycles for 6 bytes), which the 1,740-cycle inter-byte budget at 115200 baud needs.
 - **Golden-model verification** — a bit-exact Python model produces every expected value; none are hand-written.
 - **Gripper (interactive visualiser)** — a React + Three.js app replays one station and a city-scale fleet as chapter timelines, with a without/with RVBL-2 comparison and an emulator-preview panel.
@@ -51,7 +51,7 @@ A charging station is a safety device attached to a grid that can fail under it.
 ### 2. Untrusted meter data
 - Frames can be corrupted, dropped, replayed, or simply stop arriving.
 
-**Answer:** protocol v2 frames carry a sequence number and CRC-16, so gaps, duplicates and corruption are rejected, and `0x7E` delimiters let the receiver resync on byte alignment. A **500 ms watchdog** covers silence: charging needs a healthy first frame, and losing the meter opens the contactor.
+**Answer:** protocol v2 frames carry a sequence number and CRC-16, so gaps, duplicates and corruption are rejected, and `0x7E` delimiters let the receiver resync on byte alignment. A **4000 ms watchdog** covers silence: charging needs a healthy first frame, and losing the meter opens the contactor.
 
 ### 3. Safety interlocks
 - Overcurrent, emergency stop, invalid pilot codes, and a dead meter must never leave the contactor closed.

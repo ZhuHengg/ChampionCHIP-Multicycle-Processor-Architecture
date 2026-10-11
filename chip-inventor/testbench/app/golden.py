@@ -22,8 +22,9 @@ CHARGER_ID = 0x4D590001  # "MY" + 0001, hashed as bytes 01 00 59 4D
 # Application states; the firmware mirrors these in tp (x4).
 IDLE, CONNECTED, CHARGING, GRID_HOLD, FAULT = range(5)
 METER_TIMEOUT = 5       # latched fault; distinct low-three-bit report state
-METER_TIMEOUT_MS = 500
-RX_TIMEOUT_MS = 100
+# AWS demonstration defaults; keep firmware and frontend constants synchronized.
+METER_TIMEOUT_MS = 4000
+RX_TIMEOUT_MS = 400
 
 # DATAOUT per state (spec SS7.3/7.6).
 OUT = {IDLE: 0x00, CONNECTED: 0x20, CHARGING: 0x30, GRID_HOLD: 0x60, FAULT: 0x80}

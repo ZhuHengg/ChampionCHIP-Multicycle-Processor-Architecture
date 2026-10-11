@@ -1,7 +1,7 @@
 """Fault injection for protocol v2, independent of the scenario DSL."""
 import pytest
 from golden import (Charger, Meter, encode_frame, crc16, corrupt, CHARGING,
-                    FAULT, METER_TIMEOUT, F_CRC_LOST, transmit_options)
+                    FAULT, METER_TIMEOUT, F_CRC_LOST, transmit_options, RX_TIMEOUT_MS, METER_TIMEOUT_MS)
 
 
 def wire(c, data):
@@ -78,11 +78,11 @@ def test_partial_timeout_boundary_and_tail_ignored():
     c, m = setup()
     data = encode_frame(m.frame(2300, 160, 5000))
     wire(c, data[:5])
-    c.advance_ms(99)
+    c.advance_ms(RX_TIMEOUT_MS - 1)
     assert c._active and c.bad == 0
     c.advance_ms(1)
-    assert not c._active and c.bad == 1 and c.age_ms == 100
-    c.advance_ms(100)
+    assert not c._active and c.bad == 1 and c.age_ms == RX_TIMEOUT_MS
+    c.advance_ms(RX_TIMEOUT_MS)
     assert c.bad == 1             # counted once, not once per polling loop
     wire(c, data[5:-1])           # late body bytes cannot complete stale frame
     c.rx_frame(m.frame(2300, 160, 5000))
@@ -103,8 +103,8 @@ def test_received_bytes_refresh_only_partial_timer():
 def test_duplicate_does_not_refresh_watchdog():
     c = Charger(); c.set_inputs(2)
     f = Meter().frame(2300, 160, 5000)
-    c.rx_frame(f); c.advance_ms(490); c.rx_frame(f)
-    assert c.age_ms == 490 and c.frames == 1
+    c.rx_frame(f); c.advance_ms(METER_TIMEOUT_MS - 10); c.rx_frame(f)
+    assert c.age_ms == METER_TIMEOUT_MS - 10 and c.frames == 1
     c.advance_ms(10)
     assert c.state == METER_TIMEOUT
 
@@ -176,7 +176,7 @@ def test_partial_error_deadline_precedes_watchdog_during_long_silence():
     c, m = setup()
     c.rx_frame(corrupt(m.frame(2300, 160, 5000)))
     wire(c, encode_frame(m.frame(2300, 160, 5000))[:5])
-    c.advance_ms(500)
+    c.advance_ms(METER_TIMEOUT_MS)
     assert c.state == FAULT and c.tx[4] == 0x44
 
 
@@ -186,8 +186,10 @@ def test_emulator_word_padding_and_50ms_host_pacing():
     bodies[1] = corrupt(bodies[1])
     for body in bodies:
         for size, value in transmit_options(encode_frame(body)):
-            c.advance_ms(50)  # documented emulator host access delay
-            wire(c, value.to_bytes(size, 'little'))
+            for byte in value.to_bytes(size, 'little'):
+                c.advance_ms(50)  # TX register write
+                c.rx_byte(byte)
+                c.advance_ms(50)  # TX-done poll, per byte (not per word)
         c.advance_ms(50)      # output-check access between frames
     assert c.state == CHARGING and c.frames == 2 and c.bad == 0
     assert c.flags & F_CRC_LOST

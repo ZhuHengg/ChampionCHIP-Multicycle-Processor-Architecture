@@ -83,8 +83,13 @@ does not change.
 
 ## Pre-upload verification
 
+The application now uses a 400 ms partial-frame timeout and a 4000 ms meter
+watchdog to accommodate the stock 50 ms-per-access host pacing. These are
+demonstration defaults; they do not guarantee tolerance of arbitrary OS delays.
+The host must also apply the GPIO initialization correction described below.
+
 ```
-python chip-inventor/aws/run_aws_tests.py --clk all     # every scenario, both clocks
+python chip-inventor/aws/run_aws_tests.py --clk all --init-direction 0xF0
 ```
 
 [`tb/tb_aws.sv`](tb/tb_aws.sv) simulates **the organiser's top.sv unchanged**
@@ -105,6 +110,32 @@ AWS HDK files are replaced by simulation stubs in [`sim/stubs/`](sim/stubs).
 **Never upload the stubs.**
 
 ## Assumptions and open items
+
+### Empty report at startup: host direction initialization
+
+The stock emulator initializes direction to `0x01` before releasing processor
+reset. Bit 0 is then undriven: the wrapper releases it, and the application
+also treats it as an input. In simulation this starts a false CONNECTED session.
+The later `-d 0xF0` drives the pilot inputs to zero, ending that false session
+and sending an empty eight-byte report before the intended session.
+
+The application host must initialize direction to `0xF0` before releasing
+processor reset (replace the `0x01` direction used by `fpga_init`). Rebuild the
+host emulator after that change. Merely adding `-d 0xF0` to its command line is
+too late: options run after initialization. The host source is not present in
+this checkout, so this change still needs applying to the emulator used on AWS.
+Do not mask this by dropping bytes or forcing unknown GPIO values to zero.
+
+Compare the stock and corrected initialization from the repository root:
+
+```sh
+python chip-inventor/aws/run_aws_tests.py --scenario S6 --clk all --axi-delay-ms 5 --time-scale 10 --trace-rx --tag startup_stock
+python chip-inventor/aws/run_aws_tests.py --scenario S6 --clk all --axi-delay-ms 5 --time-scale 10 --trace-rx --init-direction 0xF0 --tag startup_fixed
+```
+
+The default remains the stock emulator behavior. The second command models the
+host fix; it does not patch a deployed emulator. Use default 50 ms pacing for
+the integration gate; fast-host runs alone do not validate stock host timing.
 
 - **Vivado was not run locally.** The first AWS synthesis is the first real Vivado
   elaboration. Risks:

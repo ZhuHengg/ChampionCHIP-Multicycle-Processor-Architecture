@@ -3,12 +3,16 @@
     python chip-inventor/aws/run_aws_tests.py [--clk 250|50|all]
         [--axi-delay-ms 50] [--time-scale 100] [--scenario NAME]... [-j N] [--vcd]
 
-Every scenario runs on aws/tb/tb_aws.sv, which drives the real top.sv over
-AXI-Lite exactly like RVBL-Emulator's emu.c, including the 50 ms sleep
+By default, every scenario runs on aws/tb/tb_aws.sv, which drives the real top.sv over
+AXI-Lite like RVBL-Emulator's emu.c, including the 50 ms sleep
 before each AXI access (scaled with the firmware's millisecond timer, see
 tb_aws.sv). H* scenarios use FIRMWARE 4 (the organiser's test firmware), S*
 use FIRMWARE 5 (our application). The images are the committed outputs of
 gen_riscv_sv.py; regenerate them first if rtl/ changed.
+
+--init-direction 0xF0 models an application-specific host initialization fix;
+it does not modify the real emulator. --trace-rx records startup state/pins and
+each received UART byte in run.log.
 
 Build output goes to chip-inventor/sim/aws/[<tag>_]<clk>_<scenario>/ (ignored).
 Exits non-zero if any scenario does not behave as expected.
@@ -45,7 +49,10 @@ def run_one(args, mhz, name):
     work.mkdir(parents=True, exist_ok=True)
     (work / 'scenario.vh').write_text(s.to_vh(), encoding='utf-8')
     defines = [f'-DCORE_DIV={250 // mhz}', f'-DPRESET_IN={s.preset_in}',
-               f'-DAXI_DELAY_MS={args.axi_delay_ms}', f'-DTIME_SCALE={args.time_scale}']
+               f'-DAXI_DELAY_MS={args.axi_delay_ms}', f'-DTIME_SCALE={args.time_scale}',
+               f'-DINIT_DIRECTION={args.init_direction}']
+    if args.trace_rx:
+        defines.append('-DTRACE_RX')
     if args.vcd:
         defines.append('-DVCD')
     vvp = work / 'aws.vvp'
@@ -76,8 +83,13 @@ def main():
     ap.add_argument('--scenario', action='append', dest='names')
     ap.add_argument('-j', '--jobs', type=int, default=4)
     ap.add_argument('--vcd', action='store_true')
+    ap.add_argument('--trace-rx', action='store_true', help='trace UART bytes and startup GPIO/state changes')
+    ap.add_argument('--init-direction', type=lambda value: int(value, 0), default=1,
+                    help='host direction before reset release (default 0x01: stock emu; 0xF0: application fix)')
     ap.add_argument('--tag', default='', help='prefix for the sim/aws work directories')
     args = ap.parse_args()
+    if not 0 <= args.init_direction <= 255:
+        ap.error('--init-direction must be a byte (0..255)')
 
     names = args.names or list(SCENARIOS)
     for n in names:
