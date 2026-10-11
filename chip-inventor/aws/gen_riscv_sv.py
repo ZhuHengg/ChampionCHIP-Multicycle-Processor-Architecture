@@ -1,0 +1,235 @@
+"""Generate riscv.sv for the Stage 4 AWS FPGA flow from the tested Stage 3 RTL.
+
+    python chip-inventor/aws/gen_riscv_sv.py            # every committed image
+    python chip-inventor/aws/gen_riscv_sv.py --firmware 5 --clk-div 1 --out x.sv
+
+The organiser's top.sv (CCX_Malaysia_Edition_Stage_4) instantiates
+`RISCV riscvtop` and also `Transmitter` / `Receiver`, all of which must live
+in one uploaded file, riscv.sv. This script builds that file. It never
+changes processor logic. It copies chip-inventor/rtl/top.v, the file every
+Stage 3 testbench ran against, and then:
+
+  1. renames our SoC module `top` -> `rvbl2_soc`. The AWS wrapper is also
+     called `top`, so two modules would have the same name.
+  2. prefixes every other module with `rvbl2_`, so generic names such as uart,
+     gpio and imem cannot clash with AWS HDK sources in the same Vivado project.
+  3. sets the imem FIRMWARE default. The SoC instantiates imem without a
+     parameter, so the ROM default is what gets synthesised. Default 0 is the
+     Stage 2 ROM, not our application.
+  4. adds `w_PC_Output` inside the SoC. top.sv's PC readback (0x1C) reads
+     riscvtop.e_PROCESSOR.w_PC_Output, so top.sv can be uploaded unchanged.
+  5. appends the RISCV adapter (clock, active-low reset, inout io_Pins) and
+     Transmitter/Receiver wrappers around our uart_tx/uart_rx.
+  6. `undef`s every macro the core defines, so they do not leak into other
+     files compiled after riscv.sv.
+
+Edit rtl/, then rerun this script. Do not hand-edit the generated .sv files.
+"""
+import argparse
+import re
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+CHIP = HERE.parent
+SOURCE = CHIP / 'rtl/top.v'
+
+SYS_HZ = 250_000_000          # clk_main_a0 (AWS Guide; top.sv p_CLKS_PER_BIT 2170)
+PREFIX = 'rvbl2_'
+SOC = 'rvbl2_soc'
+
+# (firmware, clk_div, output) for every image kept in the repo.
+IMAGES = [
+    (5, 1, 'riscv.sv'),                        # primary: EV charger app, 250 MHz
+    (5, 5, 'variants/riscv_fw5_50mhz.sv'),     # timing fallback: core at 50 MHz
+    (4, 1, 'variants/riscv_fw4_250mhz.sv'),    # bring-up: organiser test firmware
+    (4, 5, 'variants/riscv_fw4_50mhz.sv'),
+]
+FIRMWARE_NAMES = {4: 'organiser official GPIO/UART test firmware',
+                  5: 'grid-aware EV charger application (Stage 3)'}
+
+
+def transform(text, firmware):
+    modules = re.findall(r'^\s*module\s+(\w+)', text, re.M)
+    assert 'top' in modules and 'imem' in modules, modules
+    rename = {m: (SOC if m == 'top' else PREFIX + m) for m in modules}
+
+    def sub_module_names(t):
+        for old, new in rename.items():
+            # Declarations: `module old`.
+            t, n_decl = re.subn(rf'^(\s*module\s+){old}\b', rf'\g<1>{new}', t, flags=re.M)
+            assert n_decl == 1, f'{old}: {n_decl} declarations'
+            # Instantiations: `old #(` or `old inst (` at the start of a line.
+            t = re.sub(rf'^(\s*){old}(\s*#\s*\(|\s+\w+\s*\()', rf'\g<1>{new}\g<2>', t, flags=re.M)
+        return t
+
+    text = sub_module_names(text)
+
+    # Every instantiation must now name a renamed module: catches a missed pattern.
+    for line in text.splitlines():
+        m = re.match(r'^\s*(\w+)\s*(?:#\s*\(.*)?\s+\w+\s*\($', line)
+        if m and m.group(1) in rename:
+            raise AssertionError(f'unrenamed instance: {line.strip()}')
+
+    text, n = re.subn(r'(module\s+rvbl2_imem\s*#\(\s*parameter\s+integer\s+FIRMWARE\s*=\s*)0\b',
+                      rf'\g<1>{firmware}', text)
+    assert n == 1, 'imem FIRMWARE default not found'
+
+    # w_PC_Output: insert before the SoC's endmodule (the SoC is last in the file).
+    soc_start = text.index(f'module {SOC}')
+    end = text.index('endmodule', soc_start)
+    pc_alias = ('\n// Stage 4: top.sv reads the PC as riscvtop.e_PROCESSOR.w_PC_Output.\n'
+                'wire [31:0] w_PC_Output = pc_dbg_o;\n\n')
+    text = text[:end] + pc_alias + text[end:]
+
+    macros = sorted(set(re.findall(r'^\s*`define\s+(\w+)', text, re.M)))
+    return text, rename, macros
+
+
+def wrappers(firmware, clk_div):
+    core_hz = SYS_HZ // clk_div
+    if clk_div == 1:
+        clock = ('    // Core runs directly on clk_main_a0 (250 MHz).\n'
+                 '    assign core_clk = i_Clk;\n')
+    else:
+        clock = f'''\
+    // Core clock = clk_main_a0 / {clk_div}. BUFGCE_DIV is the UltraScale+ global
+    // clock divider; Vivado derives the {core_hz // 1_000_000} MHz generated clock on its output
+    // automatically, so paths inside the core are timed at the slower clock and
+    // paths to/from top.sv's 250 MHz registers are timed as related clocks.
+    // Simulation uses the behavioural model in aws/sim/stubs/BUFGCE_DIV.v.
+    BUFGCE_DIV #(.BUFGCE_DIVIDE({clk_div})) u_core_clk_div (
+        .I(i_Clk), .CE(1'b1), .CLR(1'b0), .O(core_clk)
+    );
+'''
+    return f'''
+
+//=============================================================================
+// Stage 4 AWS FPGA adapters, generated by aws/gen_riscv_sv.py.
+//=============================================================================
+
+// RISCV: the module top.sv instantiates as `riscvtop`. Ports match the
+// organiser's reference processor, so the top.sv instance needs no edits.
+//   FIRMWARE {firmware}: {FIRMWARE_NAMES.get(firmware, '')}
+//   core clock: {core_hz // 1_000_000} MHz (clk_main_a0 / {clk_div})
+module RISCV (
+    input  wire       i_Clk,       // clk_main_a0, 250 MHz
+    input  wire       i_nRst,      // active low, from OCL register 0x00
+    input  wire       i_Rx_Serial, // from top.sv's Transmitter
+    output wire       o_Tx_Serial, // to top.sv's Receiver
+    inout  wire [7:0] io_Pins      // shared with top.sv's IN register drivers
+);
+    wire core_clk;
+{clock}
+    // GPIO pads. top.sv drives io_Pins[i] when its direction bit is 0 and
+    // reads it when the bit is 1. We drive when DATADIR[i] = 1 (Block Guide
+    // section 1). Both sides use z when released; Vivado converts these internal
+    // tristates to logic, as in the organiser's reference design.
+    wire [7:0] pins_o;
+    wire [7:0] pins_oe;
+    genvar i;
+    generate
+        for (i = 0; i < 8; i = i + 1) begin : g_pad
+            assign io_Pins[i] = pins_oe[i] ? pins_o[i] : 1'bz;
+        end
+    endgenerate
+
+    {SOC} #(.CLK_HZ({core_hz})) e_PROCESSOR (
+        .clk_i     (core_clk),
+        .rst_i     (~i_nRst),   // our core uses an active-high synchronous reset
+        .rx_i      (i_Rx_Serial),
+        .tx_o      (o_Tx_Serial),
+        .pins_i    (io_Pins),
+        .pins_o    (pins_o),
+        .pins_oe_o (pins_oe),
+        .halt_o    (),
+        .pc_dbg_o  (),
+        .x4_dbg_o  ()
+    );
+endmodule
+
+// Host-side UART used by top.sv (e_UART_TX): 8-N-1, one-cycle i_Tx_Transmit
+// pulse, o_Tx_Done high while idle (emu.c polls register 0x0C bit 8).
+module Transmitter #(
+    parameter integer p_CLKS_PER_BIT = 2170
+) (
+    input  wire       i_Clk,
+    input  wire       i_Rst,
+    input  wire       i_Tx_Transmit,
+    input  wire [7:0] i_Tx_Byte,
+    output wire       o_Tx_Serial,
+    output wire       o_Tx_Done
+);
+    wire busy;
+    {PREFIX}uart_tx #(.CLKS_PER_BIT(p_CLKS_PER_BIT)) u_tx (
+        .clk_i(i_Clk), .rst_i(i_Rst), .start_i(i_Tx_Transmit), .data_i(i_Tx_Byte),
+        .tx_o(o_Tx_Serial), .busy_o(busy), .done_o(o_Tx_Done)
+    );
+endmodule
+
+// Host-side UART used by top.sv (e_UART_RX). o_Rx_Done is a one-cycle pulse,
+// which top.sv's 64-bit receive FIFO requires: it stores a byte per pulse.
+module Receiver #(
+    parameter integer p_CLKS_PER_BIT = 2170
+) (
+    input  wire       i_Clk,
+    input  wire       i_Rst,
+    input  wire       i_Rx_Serial,
+    output wire       o_Rx_Done,
+    output wire [7:0] o_Rx_Byte
+);
+    {PREFIX}uart_rx #(.CLKS_PER_BIT(p_CLKS_PER_BIT)) u_rx (
+        .clk_i(i_Clk), .rst_i(i_Rst), .rx_i(i_Rx_Serial),
+        .data_o(o_Rx_Byte), .valid_o(o_Rx_Done)
+    );
+endmodule
+'''
+
+
+def build(firmware, clk_div):
+    if SYS_HZ % clk_div:
+        raise SystemExit(f'clk_div {clk_div} does not divide {SYS_HZ}')
+    core_hz = SYS_HZ // clk_div
+    # Our UART rounds CLK_HZ/BAUD; the host side counts 2170 at 250 MHz. The
+    # bit times must agree or bytes drift (0.15% error is about 1.4% after 10 bits).
+    ours = (core_hz + 115200 // 2) // 115200 * clk_div
+    if ours != 2170:
+        raise SystemExit(f'clk_div {clk_div}: core UART bit = {ours} sys clocks, host = 2170')
+    if not 1 <= clk_div <= 8:
+        raise SystemExit('BUFGCE_DIV supports divide 1..8')
+
+    body, rename, macros = transform(SOURCE.read_text(encoding='utf-8'), firmware)
+    header = f'''// riscv.sv -- ChampionCHIP RVBL-2 multicycle RV32I + Zmmul + Xicrc SoC
+// for the Stage 4 AWS FPGA flow (upload with the organiser's top.sv).
+//
+// GENERATED by chip-inventor/aws/gen_riscv_sv.py from chip-inventor/rtl/top.v.
+// Do not edit by hand: change rtl/ and regenerate.
+//   firmware : FIRMWARE {firmware} ({FIRMWARE_NAMES.get(firmware, '?')})
+//   core clk : {core_hz // 1_000_000} MHz (clk_main_a0 / {clk_div})
+//   modules  : {', '.join(sorted(rename.values()))}, RISCV, Transmitter, Receiver
+'''
+    undef = '\n// Keep the core\'s macros local to this file.\n' + \
+        ''.join(f'`undef {m}\n' for m in macros)
+    return header + '\n' + body.rstrip() + '\n' + wrappers(firmware, clk_div) + undef
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--firmware', type=int)
+    ap.add_argument('--clk-div', type=int, default=1)
+    ap.add_argument('--out')
+    args = ap.parse_args()
+    if args.firmware is None:
+        jobs = IMAGES
+    else:
+        jobs = [(args.firmware, args.clk_div, args.out or 'riscv_custom.sv')]
+    for fw, div, out in jobs:
+        path = Path(out) if Path(out).is_absolute() else HERE / out
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build(fw, div), encoding='utf-8', newline='\n')
+        print(f'wrote {path.relative_to(CHIP.parent) if path.is_relative_to(CHIP.parent) else path}'
+              f'  (FIRMWARE {fw}, {SYS_HZ // div // 1_000_000} MHz core)')
+
+
+if __name__ == '__main__':
+    main()
