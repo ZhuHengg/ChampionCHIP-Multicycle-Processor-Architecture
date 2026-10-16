@@ -195,9 +195,9 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
   const next = ORDERED[(ORDERED.findIndex((s) => s.id === scenario.id) + 1) % ORDERED.length];
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="station-view flex flex-col gap-8">
       {/* Headline + live numbers */}
-      <header className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+      <header className="station-heading flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-2xl">
           <p className="text-sm text-[var(--color-mute)]">
             Scenario <span className="font-mono text-[var(--color-ink-2)]">{scenario.id}</span> · {meta.group}
@@ -218,11 +218,11 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-12">
+      <div className="station-dashboard grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-12">
         {/* The bay */}
         <section
           aria-label="Charging bay"
-          className="relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-8"
+          className="station-bay relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-8"
           style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}
         >
           {/* Backdrops cross-fade between navy (calm) and charcoal (active/alert). */}
@@ -264,7 +264,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
               road and the car on it dissolve into the backdrop instead of
               being cut by the canvas edge. */}
           <div
-            className="relative -mt-14 h-[356px] sm:h-[416px]"
+            className="station-scene relative -mt-14 h-[356px] sm:h-[416px]"
             style={{ maskImage: EDGE_FADE, WebkitMaskImage: EDGE_FADE }}
             aria-hidden="true"
           >
@@ -277,7 +277,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
             />
           </div>
 
-          <div className="relative px-6 pb-6" aria-live="polite">
+          <div className="station-caption relative px-6 pb-6" aria-live="polite">
             {/* Keyed so each new caption fades in rather than swapping in place. */}
             <p key={status.caption} className="fade-rise font-display text-2xl font-semibold text-white md:text-3xl">
               {status.caption}
@@ -287,7 +287,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
             </p>
           </div>
 
-          <div className="relative border-t border-white/10 px-6 pt-5 pb-5">
+          <div className="station-playback relative border-t border-white/10 px-6 pt-5 pb-5">
             <PlaybackBar
               steps={steps}
               index={index}
@@ -305,7 +305,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         {/* What the chip decided: the one dark card, as a terminal log */}
         <section
           aria-labelledby="decided-label"
-          className="flex h-[560px] flex-col overflow-hidden rounded-[28px] bg-[var(--color-dark)] text-white md:col-span-2 xl:col-span-4 xl:h-auto"
+          className="station-log flex h-[560px] flex-col overflow-hidden rounded-[28px] bg-[var(--color-dark)] text-white md:col-span-2 xl:col-span-4 xl:h-auto"
         >
           <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
             <span className="flex gap-1.5" aria-hidden="true">
@@ -326,7 +326,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         </section>
 
         {/* State machine, under the bay, with the emulator link beside it */}
-        <section aria-labelledby="fsm-label" className="card flex flex-col p-6 md:col-span-2 xl:col-span-6">
+        <section aria-labelledby="fsm-label" className="station-fsm card flex flex-col p-6 md:col-span-2 xl:col-span-6">
           <h2 id="fsm-label" className="font-display text-2xl font-medium text-[var(--color-ink)]">
             State machine
           </h2>
@@ -336,7 +336,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         </section>
 
         {/* The organisers' emulator driving the chip, synced to playback */}
-        <EmuPanel className="md:col-span-2 xl:col-span-6" scenarioId={scenario.id} steps={steps} index={index} onJump={jump} />
+        <EmuPanel className="station-emu md:col-span-2 xl:col-span-6" scenarioId={scenario.id} steps={steps} index={index} onJump={jump} />
       </div>
 
       {/* Scenario library and meter readings */}

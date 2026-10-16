@@ -242,11 +242,16 @@ export default function EmuPanel({ scenarioId, steps, index, onJump, className =
       <h2 id="emu-label" className="mt-2 font-display text-2xl font-medium text-[var(--color-ink)] md:text-3xl">
         How <span className="font-mono">./emu</span> drives the chip
       </h2>
+
+
+      <details className="mt-2 text-sm text-[var(--color-ink-2)]">
+        <summary className="cursor-pointer">How the emulator connection works</summary>
       <p className="mt-3 max-w-3xl leading-relaxed text-[var(--color-ink-2)]">
         The organisers' emulator talks to the FPGA top over PCIe and AXI-Lite. Each option writes or reads one register, and each register is one group
         of the chip's pins. One command line is one charging session. The log below shows <strong className="text-[var(--color-ink)]">the chip's own answers</strong>
         : every line printed when this exact command was played on the RTL in simulation.
       </p>
+      </details>
 
       {!emu ? (
         <p className="mt-6 rounded-2xl border border-dashed border-[var(--color-line-strong)] p-5 text-sm text-[var(--color-mute)]">
@@ -272,29 +277,6 @@ export default function EmuPanel({ scenarioId, steps, index, onJump, className =
             </p>
           )}
 
-          {/* The command line, one button per option */}
-          <div className="mt-5 rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel-2)] px-4 py-3 font-mono text-[13px] leading-7">
-            <span className="mr-2 text-[var(--color-ink)]">./emu</span>
-            {emu.ops.map((op, k) => {
-              const isCurrent = op.step === index;
-              const future = op.step > index;
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  disabled={op.step < 0}
-                  onClick={() => onJump(op.step)}
-                  aria-current={isCurrent ? 'step' : undefined}
-                  className={`mr-1.5 rounded-md px-1.5 whitespace-nowrap transition-[background-color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ink)] enabled:cursor-pointer ${
-                    isCurrent ? 'bg-[var(--color-accent-soft)] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-accent)]' : future ? 'opacity-35 enabled:hover:opacity-70' : 'enabled:hover:bg-white'
-                  }`}
-                  style={{ color: LANE_COLOR[LANE_OF[op.kind]] }}
-                >
-                  {op.text}
-                </button>
-              );
-            })}
-          </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6">
             <div>
@@ -335,6 +317,31 @@ export default function EmuPanel({ scenarioId, steps, index, onJump, className =
               })}
             </div>
           </div>
+
+          {/* The command line, one button per option */}
+          <div className="mt-5 rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel-2)] px-4 py-3 font-mono text-[13px] leading-7">
+            <span className="mr-2 text-[var(--color-ink)]">./emu</span>
+            {emu.ops.map((op, k) => {
+              const isCurrent = op.step === index;
+              const future = op.step > index;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={op.step < 0}
+                  onClick={() => onJump(op.step)}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className={`mr-1.5 rounded-md px-1.5 whitespace-nowrap transition-[background-color,opacity] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ink)] enabled:cursor-pointer ${
+                    isCurrent ? 'bg-[var(--color-accent-soft)] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-accent)]' : future ? 'opacity-35 enabled:hover:opacity-70' : 'enabled:hover:bg-white'
+                  }`}
+                  style={{ color: LANE_COLOR[LANE_OF[op.kind]] }}
+                >
+                  {op.text}
+                </button>
+              );
+            })}
+          </div>
+
 
           <p className="mt-5 text-xs text-[var(--color-mute)]">
             {DATA.source}, exported {DATA.generated}. All {Object.keys(DATA.scenarios).length} command lines pass. This is

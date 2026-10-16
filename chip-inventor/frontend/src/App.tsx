@@ -39,7 +39,7 @@ function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <Navbar activeTab={route.tab} onTabChange={(tab) => go({ tab, scenario: route.scenario })} />
-      <main className="w-full flex-1 px-4 py-8 md:px-8 md:py-12 xl:px-12 2xl:px-16">
+      <main className={`w-full flex-1 px-4 py-8 md:px-8 md:py-12 xl:px-12 2xl:px-16 ${route.tab === 'station' ? 'station-main' : ''}`}>
         {route.tab === 'station' ? (
           <StationView
             key={`${route.scenario}/${route.step ?? ''}`}
