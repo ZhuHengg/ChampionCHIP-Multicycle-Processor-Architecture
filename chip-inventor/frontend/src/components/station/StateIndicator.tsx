@@ -77,7 +77,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
 
       {/* Latched zone */}
       <rect x={322} y={160} width={370} height={84} rx={14} fill="none" stroke="#CFC9BC" strokeDasharray="5 5" />
-      <text x={682} y={238} textAnchor="end" fontSize={11} fill="#6E6C66">
+      <text x={682} y={238} textAnchor="end" fontSize={12} fill="#6E6C66">
         latched · from any active state
       </text>
 
@@ -95,7 +95,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
               style={{ transition: 'stroke 300ms, stroke-width 300ms' }}
             />
             {e.label && (
-              <text x={e.lx} y={e.ly} textAnchor="middle" fontSize={11} fill={on ? activeColor : '#6E6C66'}>
+              <text x={e.lx} y={e.ly} textAnchor="middle" fontSize={12} fill={on ? activeColor : '#6E6C66'}>
                 {e.label}
               </text>
             )}
@@ -127,7 +127,7 @@ export default function StateIndicator({ currentState, previousState }: StateInd
               y={n.y + NH / 2}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={13}
+              fontSize={15}
               fontWeight={current ? 700 : 500}
               fill={current ? '#FFFFFF' : color}
               fontFamily="Manrope, system-ui, sans-serif"

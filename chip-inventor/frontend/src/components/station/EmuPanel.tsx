@@ -209,9 +209,10 @@ interface EmuPanelProps {
   steps: PlayStep[];
   index: number;
   onJump: (index: number) => void;
+  className?: string;
 }
 
-export default function EmuPanel({ scenarioId, steps, index, onJump }: EmuPanelProps) {
+export default function EmuPanel({ scenarioId, steps, index, onJump, className = '' }: EmuPanelProps) {
   const emu = DATA.scenarios[scenarioId];
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -236,14 +237,14 @@ export default function EmuPanel({ scenarioId, steps, index, onJump }: EmuPanelP
   if (aligned) for (const op of emu.ops) if (op.kind === 'r') readIndex.set(op, reads++);
 
   return (
-    <section aria-labelledby="emu-label" className="card p-6 md:p-8">
+    <section aria-labelledby="emu-label" className={`card min-w-0 p-6 ${className}`}>
       <p className="text-xs font-medium tracking-[0.14em] text-[var(--color-mute)] uppercase">Application logic · the emulator link</p>
       <h2 id="emu-label" className="mt-2 font-display text-2xl font-medium text-[var(--color-ink)] md:text-3xl">
         How <span className="font-mono">./emu</span> drives the chip
       </h2>
       <p className="mt-3 max-w-3xl leading-relaxed text-[var(--color-ink-2)]">
         The organisers' emulator talks to the FPGA top over PCIe and AXI-Lite. Each option writes or reads one register, and each register is one group
-        of the chip's pins. One command line is one charging session. The right-hand side shows <strong className="text-[var(--color-ink)]">the chip's own answers</strong>
+        of the chip's pins. One command line is one charging session. The log below shows <strong className="text-[var(--color-ink)]">the chip's own answers</strong>
         : every line printed when this exact command was played on the RTL in simulation.
       </p>
 
@@ -295,8 +296,8 @@ export default function EmuPanel({ scenarioId, steps, index, onJump }: EmuPanelP
             })}
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="lg:col-span-7">
+          <div className="mt-6 grid grid-cols-1 gap-6">
+            <div>
               <div className="overflow-x-auto">
                 <Diagram active={active} pinsOut={lastOut?.value ?? 0} />
               </div>
@@ -315,7 +316,7 @@ export default function EmuPanel({ scenarioId, steps, index, onJump }: EmuPanelP
 
             <div
               ref={logRef}
-              className="h-[320px] overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel-2)] p-4 font-mono text-[12px] leading-relaxed lg:col-span-5"
+              className="h-[320px] overflow-y-auto rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel-2)] p-4 font-mono text-[12px] leading-relaxed"
               aria-label="RTL simulation output"
             >
               <p className="text-[var(--color-ink-2)]">

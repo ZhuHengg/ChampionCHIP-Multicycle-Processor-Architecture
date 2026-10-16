@@ -46,7 +46,7 @@ export default function ChipLog({ steps, scenarioId, index, playing, onJump }: C
   }, [index]);
 
   return (
-    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto px-5 pb-5 font-mono text-[12.5px] leading-relaxed [scrollbar-color:#55555a_transparent]">
+    <div ref={scrollRef} className="absolute inset-0 overflow-y-auto px-5 pb-5 font-mono text-[15px] leading-relaxed [scrollbar-color:#55555a_transparent]">
       <p className="text-white/35">$ replay {scenarioId} · {steps.length} steps</p>
 
       <ol className="relative mt-3" aria-label="Chip decisions so far" aria-live="polite">

@@ -2,9 +2,9 @@
 //   headline (what this scenario proves) + three live numbers
 //   -> the charging bay with its playback timeline (one chapter per state),
 //      the chip's decisions as a terminal log
-//   -> the state machine beside the log
+//      (the log sits on the bay's row)
+//   -> the state machine with the ./emu panel (RTL simulation output) beside it
 //   -> the scenario library and meter readings
-//   -> how ./emu drives the chip (RTL simulation output)
 //   -> evidence, closed until asked for.
 // All values come from the scenario step snapshots (data/scenarios.ts); this
 // file only arranges and narrates them.
@@ -222,7 +222,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         {/* The bay */}
         <section
           aria-label="Charging bay"
-          className="relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-9"
+          className="relative overflow-hidden rounded-[28px] md:col-span-2 xl:col-span-8"
           style={{ boxShadow: '0 30px 60px -34px rgba(20,24,40,0.55)' }}
         >
           {/* Backdrops cross-fade between navy (calm) and charcoal (active/alert). */}
@@ -305,7 +305,7 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
         {/* What the chip decided: the one dark card, as a terminal log */}
         <section
           aria-labelledby="decided-label"
-          className="flex h-[560px] flex-col overflow-hidden rounded-[28px] bg-[var(--color-dark)] text-white xl:col-span-3 xl:row-span-2 xl:h-auto"
+          className="flex h-[560px] flex-col overflow-hidden rounded-[28px] bg-[var(--color-dark)] text-white md:col-span-2 xl:col-span-4 xl:h-auto"
         >
           <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
             <span className="flex gap-1.5" aria-hidden="true">
@@ -313,10 +313,10 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
               <span className="h-2.5 w-2.5 rounded-full bg-[#F2C230]/80" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#3CCF5A]/80" />
             </span>
-            <h2 id="decided-label" className="font-mono text-xs text-white/70">
+            <h2 id="decided-label" className="font-mono text-base text-white/70">
               what the chip decided
             </h2>
-            <span className="tabular ml-auto font-mono text-xs text-white/45">
+            <span className="tabular ml-auto font-mono text-sm text-white/45">
               {String(index + 1).padStart(2, '0')}/{String(steps.length).padStart(2, '0')}
             </span>
           </div>
@@ -325,15 +325,18 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
           </div>
         </section>
 
-        {/* State machine, always visible under the bay */}
-        <section aria-labelledby="fsm-label" className="card p-6 md:col-span-2 xl:col-span-9 xl:col-start-1 xl:row-start-2">
-          <h2 id="fsm-label" className="font-display text-xl font-medium text-[var(--color-ink)]">
+        {/* State machine, under the bay, with the emulator link beside it */}
+        <section aria-labelledby="fsm-label" className="card flex flex-col p-6 md:col-span-2 xl:col-span-6">
+          <h2 id="fsm-label" className="font-display text-2xl font-medium text-[var(--color-ink)]">
             State machine
           </h2>
-          <div className="mx-auto mt-4 max-w-4xl">
+          <div className="w-full pt-4">
             <StateIndicator currentState={step.stateAfter} previousState={previousState} />
           </div>
         </section>
+
+        {/* The organisers' emulator driving the chip, synced to playback */}
+        <EmuPanel className="md:col-span-2 xl:col-span-6" scenarioId={scenario.id} steps={steps} index={index} onJump={jump} />
       </div>
 
       {/* Scenario library and meter readings */}
@@ -345,9 +348,6 @@ export default function StationView({ initialScenarioId = 'S1', initialStep, onS
           <ReadingsCard steps={steps} index={index} />
         </div>
       </div>
-
-      {/* The organisers' emulator driving the chip, synced to playback */}
-      <EmuPanel scenarioId={scenario.id} steps={steps} index={index} onJump={jump} />
 
       {/* Evidence, closed by default */}
       <section aria-labelledby="evidence-label" className="card p-6 md:p-8">
